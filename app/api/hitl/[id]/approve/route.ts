@@ -16,9 +16,16 @@ export async function POST(
 
   const { id } = await params;
   const supabase: SupabaseAny = createServiceClientDirect();
-  const body = await request.json();
 
-  const { editedContent, saveOnly } = body as { editedContent?: string; saveOnly?: boolean };
+  let body: { editedContent?: string; saveOnly?: boolean };
+  try {
+    body = await request.json();
+  } catch (err) {
+    console.error("[hitl/approve] Failed to parse request body:", err);
+    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+  }
+
+  const { editedContent, saveOnly } = body;
 
   const { data: chaser, error: fetchError } = await supabase
     .from("chasers")
@@ -27,8 +34,11 @@ export async function POST(
     .single();
 
   if (fetchError || !chaser) {
+    console.error("[hitl/approve] Chaser fetch failed:", fetchError?.message ?? "not found", "id:", id);
     return NextResponse.json({ error: "Chaser not found" }, { status: 404 });
   }
+
+  console.log("[hitl/approve] Chaser", id, "status:", chaser.status, "client:", chaser.clients?.email ?? "no email");
 
   if (chaser.status !== "pending_hitl" && chaser.status !== "draft_saved") {
     return NextResponse.json(
@@ -49,7 +59,11 @@ export async function POST(
       savePayload.team_lead_edits = editedContent;
     }
 
-    await supabase.from("chasers").update(savePayload).eq("id", id);
+    const { error: saveError } = await supabase.from("chasers").update(savePayload).eq("id", id);
+    if (saveError) {
+      console.error("[hitl/approve] Save draft failed:", saveError.message);
+      return NextResponse.json({ error: saveError.message }, { status: 500 });
+    }
 
     await supabase.from("audit_log").insert({
       entity_type: "chaser",
@@ -65,22 +79,37 @@ export async function POST(
   const newStatus = wasEdited ? "edited" : "approved";
   const clientEmail = chaser.clients?.email;
   const clientName = chaser.clients?.name ?? "there";
-  const fallbackSubject = `Following up: ${chaser.scripts?.title}`;
+
+  // Use AI-generated subject from hitl_state, fall back to generic
+  const hitlSubject = chaser.hitl_state?.email_subject as string | undefined;
+  const emailSubject = hitlSubject || `Following up: ${chaser.scripts?.title ?? "your script"}`;
+
+  // Attempt email delivery — failure should not block approval
+  let emailFailed = false;
+  let emailError = "";
 
   if (clientEmail) {
-    const emailResult = await sendChaserEmail(clientEmail, finalContent, fallbackSubject, clientName);
-    if (!emailResult.success) {
-      console.error("[hitl/approve] Email send failed:", emailResult.error);
-      return NextResponse.json(
-        { error: `Email delivery failed: ${emailResult.error}` },
-        { status: 500 }
-      );
+    console.log("[hitl/approve] Sending email to:", clientEmail, "subject:", emailSubject);
+    try {
+      const emailResult = await sendChaserEmail(clientEmail, finalContent, emailSubject, clientName);
+      if (!emailResult.success) {
+        emailFailed = true;
+        emailError = emailResult.error ?? "Unknown email error";
+        console.error("[hitl/approve] Email send failed:", emailError);
+      }
+    } catch (err) {
+      emailFailed = true;
+      emailError = err instanceof Error ? err.message : "Email send threw unexpectedly";
+      console.error("[hitl/approve] Email send threw:", emailError);
     }
+  } else {
+    console.warn("[hitl/approve] No client email found for chaser", id, "— skipping delivery");
   }
 
+  // Always mark the chaser as approved regardless of email outcome
   const updatePayload: Record<string, unknown> = {
     status: newStatus,
-    sent_at: new Date().toISOString(),
+    sent_at: emailFailed ? null : new Date().toISOString(),
   };
   if (wasEdited) {
     updatePayload.team_lead_edits = editedContent;
@@ -92,6 +121,7 @@ export async function POST(
     .eq("id", id);
 
   if (updateError) {
+    console.error("[hitl/approve] Chaser update failed:", updateError.message);
     return NextResponse.json({ error: updateError.message }, { status: 500 });
   }
 
@@ -100,7 +130,12 @@ export async function POST(
     entity_id: id,
     action: `chaser_${newStatus}`,
     actor: "team_lead",
-    metadata: { script_id: chaser.script_id, was_edited: wasEdited },
+    metadata: {
+      script_id: chaser.script_id,
+      was_edited: wasEdited,
+      email_sent: !emailFailed,
+      email_error: emailFailed ? emailError : undefined,
+    },
   });
 
   const sentAt = chaser.scripts?.sent_at;
@@ -127,6 +162,15 @@ export async function POST(
     "chaser_sent",
     { chaser_id: id, script_id: chaser.script_id }
   ).catch((err: unknown) => console.error("[hitl/approve] Memory storage failed:", err));
+
+  // Return success with a warning if email failed
+  if (emailFailed) {
+    return NextResponse.json({
+      success: true,
+      status: newStatus,
+      warning: `Approved but email delivery failed: ${emailError}`,
+    });
+  }
 
   return NextResponse.json({ success: true, status: newStatus });
 }
