@@ -35,9 +35,10 @@ interface KanbanBoardProps {
   initialScripts: ScriptWithClient[];
   onConnectionChange?: (connected: boolean) => void;
   refreshKey?: number;
+  showArchived?: boolean;
 }
 
-export default function KanbanBoard({ initialScripts, onConnectionChange, refreshKey }: KanbanBoardProps) {
+export default function KanbanBoard({ initialScripts, onConnectionChange, refreshKey, showArchived }: KanbanBoardProps) {
   const [scripts, setScripts] = useState<ScriptWithClient[]>(initialScripts);
   const [selectedScript, setSelectedScript] = useState<ScriptWithClient | null>(null);
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -143,6 +144,12 @@ export default function KanbanBoard({ initialScripts, onConnectionChange, refres
     return () => clearInterval(interval);
   }, []);
 
+  const handleArchive = useCallback((id: string) => {
+    setScripts((prev) => prev.map((s) => s.id === id ? { ...s, archived: true } : s));
+  }, []);
+
+  const visibleScripts = showArchived ? scripts : scripts.filter((s) => !s.archived);
+
   const grouped = columns.reduce<Record<ColumnKey, ScriptWithClient[]>>(
     (acc, col) => {
       acc[col.key] = [];
@@ -151,7 +158,7 @@ export default function KanbanBoard({ initialScripts, onConnectionChange, refres
     {} as Record<ColumnKey, ScriptWithClient[]>
   );
 
-  for (const script of scripts) {
+  for (const script of visibleScripts) {
     const col = categorizeScript(script);
     if (col) grouped[col].push(script);
   }
@@ -194,7 +201,12 @@ export default function KanbanBoard({ initialScripts, onConnectionChange, refres
                 </div>
               ) : (
                 grouped[col.key].map((script) => (
-                  <ScriptCard key={script.id} script={script} onClick={() => setSelectedScript(script)} />
+                  <ScriptCard
+                    key={script.id}
+                    script={script}
+                    onClick={() => setSelectedScript(script)}
+                    onArchive={handleArchive}
+                  />
                 ))
               )}
             </AnimatePresence>

@@ -27,9 +27,9 @@ export async function POST(
     return NextResponse.json({ error: "Script not found" }, { status: 404 });
   }
 
-  if (script.status !== "pending_review") {
+  if (script.status !== "pending_review" && script.status !== "overdue") {
     return NextResponse.json(
-      { error: `Script status is '${script.status}', expected 'pending_review'` },
+      { error: `Script status is '${script.status}', expected 'pending_review' or 'overdue'` },
       { status: 400 }
     );
   }

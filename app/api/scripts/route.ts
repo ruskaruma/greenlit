@@ -41,9 +41,36 @@ export async function POST(request: Request) {
     review_channel?: string;
   };
 
-  if (!title || !content || !client_id) {
+  if (!title || !client_id) {
     return NextResponse.json(
-      { error: "title, content, and client_id are required" },
+      { error: "title and client_id are required" },
+      { status: 400 }
+    );
+  }
+
+  // Guard: empty script content
+  if (!content || !content.trim()) {
+    return NextResponse.json(
+      { error: "Script content is required. The approval loop cannot function without the script text." },
+      { status: 400 }
+    );
+  }
+
+  // Fetch client to validate contact info before inserting
+  const { data: client, error: clientError } = await supabase
+    .from("clients")
+    .select("name, email, total_scripts, whatsapp_number, preferred_channel")
+    .eq("id", client_id)
+    .single();
+
+  if (clientError) {
+    return NextResponse.json({ error: clientError.message }, { status: 500 });
+  }
+
+  // Guard: no contact info
+  if (!client.email && !client.whatsapp_number) {
+    return NextResponse.json(
+      { error: "This client has no email or WhatsApp number. Add contact information before uploading scripts." },
       { status: 400 }
     );
   }
@@ -69,16 +96,6 @@ export async function POST(request: Request) {
   }
 
   const typedScript = script as Script;
-
-  const { data: client, error: clientError } = await supabase
-    .from("clients")
-    .select("name, email, total_scripts, whatsapp_number, preferred_channel")
-    .eq("id", client_id)
-    .single();
-
-  if (clientError) {
-    return NextResponse.json({ error: clientError.message }, { status: 500 });
-  }
 
   // Increment total_scripts
   await supabase
@@ -114,6 +131,8 @@ export async function POST(request: Request) {
       clientName: client.name,
       scriptTitle: typedScript.title,
       reviewUrl,
+      clientEmail: client.email,
+      scriptId: typedScript.id,
     });
     if (waResult.success) {
       anySendSucceeded = true;
@@ -122,7 +141,6 @@ export async function POST(request: Request) {
     }
   }
 
-  // Mark script as sent ONLY if at least one delivery method succeeded
   if (anySendSucceeded) {
     await supabase
       .from("scripts")

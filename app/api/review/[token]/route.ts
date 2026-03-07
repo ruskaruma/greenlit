@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServiceClientDirect } from "@/lib/supabase/server";
 import { Resend } from "resend";
-import { storeClientMemory, buildMemoryContent, actionToMemoryType } from "@/lib/agent/nodes/memoryUpdate";
+import { storeClientMemory, buildClientResponseMemory } from "@/lib/agent/nodes/memoryUpdate";
 import type { ScriptStatus } from "@/lib/supabase/types";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -174,12 +174,22 @@ export async function PATCH(
       await notifyTeam(client.name, action, scriptForMemory.title, feedback ?? null);
     }
 
-    // Store interaction as client memory for RAG (fire-and-forget)
-    const memoryContent = buildMemoryContent(action, scriptForMemory.title, feedback ?? null);
+    const sentAt = script.sent_at ? new Date(script.sent_at) : null;
+    const respHours = sentAt
+      ? (respondedAt.getTime() - sentAt.getTime()) / (1000 * 60 * 60)
+      : null;
+
     storeClientMemory(
       script.client_id,
-      memoryContent,
-      actionToMemoryType(action),
+      buildClientResponseMemory({
+        clientName: client.name,
+        scriptTitle: scriptForMemory.title,
+        intent: action,
+        feedback: feedback ?? null,
+        responseHours: respHours,
+        channel: "email",
+      }),
+      "client_response",
       { script_id: script.id, review_token: token }
     ).catch((err: unknown) => console.error("[review] Memory storage failed:", err));
   }

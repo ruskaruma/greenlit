@@ -1,4 +1,5 @@
 import { StateGraph, Annotation, END, START } from "@langchain/langgraph";
+import { createServiceClientDirect } from "@/lib/supabase/server";
 import { monitorOverdueScripts } from "./nodes/monitor";
 import { retrieveClientMemories } from "./nodes/ragRetrieval";
 import { analyzeSentiment } from "./nodes/sentimentAnalysis";
@@ -7,6 +8,9 @@ import { selfCritique } from "./nodes/selfCritique";
 import { reviseEmail } from "./nodes/revision";
 import { addStreamEvent } from "./stream";
 import type { AgentState, CritiqueScores, NodeLogEntry } from "./types";
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type SupabaseAny = any;
 
 const MAX_REVISIONS = 2;
 const MIN_AVG_SCORE = 7;
@@ -87,7 +91,7 @@ async function revisionNode(state: typeof GraphState.State): Promise<Partial<typ
   };
 }
 
-function routeAfterCritique(state: typeof GraphState.State): "revision" | typeof END {
+function routeAfterCritique(state: typeof GraphState.State): "revision" | "finalize" {
   if (
     state.critiqueScores &&
     state.critiqueScores.average < MIN_AVG_SCORE &&
@@ -95,7 +99,41 @@ function routeAfterCritique(state: typeof GraphState.State): "revision" | typeof
   ) {
     return "revision";
   }
-  return END;
+  return "finalize";
+}
+
+async function finalizeNode(state: typeof GraphState.State): Promise<Partial<typeof GraphState.State>> {
+  if (!state.chaserId) return {};
+
+  const supabase: SupabaseAny = createServiceClientDirect();
+
+  const updatePayload: Record<string, unknown> = {};
+
+  if (state.critiqueScores) {
+    updatePayload.hitl_state = {
+      email_subject: state.emailSubject,
+      client_email: state.clientEmail,
+      hours_overdue: state.hoursOverdue,
+      memories_used: state.clientMemories.length,
+      critique_scores: {
+        professionalism: state.critiqueScores.professionalism,
+        personalization: state.critiqueScores.personalization,
+        clarity: state.critiqueScores.clarity,
+        persuasiveness: state.critiqueScores.persuasiveness,
+        average: state.critiqueScores.average,
+      },
+    };
+  }
+
+  if (state.revisionCount > 0 && state.generatedEmail) {
+    updatePayload.draft_content = state.generatedEmail;
+  }
+
+  if (Object.keys(updatePayload).length > 0) {
+    await supabase.from("chasers").update(updatePayload).eq("id", state.chaserId);
+  }
+
+  return {};
 }
 
 const workflow = new StateGraph(GraphState)
@@ -104,12 +142,14 @@ const workflow = new StateGraph(GraphState)
   .addNode("generation", generationNode)
   .addNode("selfCritique", critiqueNode)
   .addNode("revision", revisionNode)
+  .addNode("finalize", finalizeNode)
   .addEdge(START, "ragRetrieval")
   .addEdge("ragRetrieval", "sentimentAnalysis")
   .addEdge("sentimentAnalysis", "generation")
   .addEdge("generation", "selfCritique")
   .addConditionalEdges("selfCritique", routeAfterCritique)
   .addEdge("revision", "selfCritique")
+  .addEdge("finalize", END)
   .compile();
 
 function defaultState(): Partial<AgentState> {

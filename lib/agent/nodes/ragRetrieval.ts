@@ -50,7 +50,12 @@ export async function retrieveClientMemories(state: AgentState): Promise<AgentSt
   }
 }
 
-// Shared embedding function for memory storage
 export async function generateEmbedding(text: string): Promise<number[]> {
-  return embeddings.embedQuery(text);
+  try {
+    return await embeddings.embedQuery(text);
+  } catch (firstErr) {
+    console.warn("[embedding] First attempt failed, retrying in 2s:", firstErr);
+    await new Promise((r) => setTimeout(r, 2000));
+    return embeddings.embedQuery(text);
+  }
 }

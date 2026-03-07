@@ -25,7 +25,7 @@ export async function POST(
     return NextResponse.json({ error: "Chaser not found" }, { status: 404 });
   }
 
-  if (chaser.status !== "pending_hitl") {
+  if (chaser.status !== "pending_hitl" && chaser.status !== "draft_saved") {
     return NextResponse.json(
       { error: `Chaser already ${chaser.status}` },
       { status: 409 }

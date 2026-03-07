@@ -8,6 +8,7 @@ export type ScriptStatus =
 
 export type ChaserStatus =
   | "pending_hitl"
+  | "draft_saved"
   | "approved"
   | "edited"
   | "rejected"
@@ -17,7 +18,9 @@ export type MemoryType =
   | "feedback"
   | "approval"
   | "rejection"
-  | "behavioral_pattern";
+  | "behavioral_pattern"
+  | "chaser_sent"
+  | "client_response";
 
 export interface Client {
   id: string;
@@ -53,6 +56,7 @@ export interface Script {
   platform: string | null;
   assigned_writer: string | null;
   review_channel: string;
+  archived: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -155,6 +159,7 @@ export interface Database {
           platform?: string | null;
           assigned_writer?: string | null;
           review_channel?: string;
+          archived?: boolean;
           created_at?: string;
           updated_at?: string;
         };
@@ -173,6 +178,7 @@ export interface Database {
           platform?: string | null;
           assigned_writer?: string | null;
           review_channel?: string;
+          archived?: boolean;
           updated_at?: string;
         };
         Relationships: [

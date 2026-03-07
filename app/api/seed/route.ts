@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createServiceClientDirect } from "@/lib/supabase/server";
+import { storeClientMemory } from "@/lib/agent/nodes/memoryUpdate";
 import type { Client, Script } from "@/lib/supabase/types";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -14,7 +15,6 @@ export async function GET(request: Request) {
 
   const supabase: SupabaseAny = createServiceClientDirect();
 
-  // Clear existing data (order matters for FK constraints)
   await supabase.from("audit_log").delete().neq("id", "00000000-0000-0000-0000-000000000000");
   await supabase.from("chasers").delete().neq("id", "00000000-0000-0000-0000-000000000000");
   await supabase.from("client_memories").delete().neq("id", "00000000-0000-0000-0000-000000000000");
@@ -176,8 +176,71 @@ export async function GET(request: Request) {
     );
   }
 
+  // Seed starter memories with embeddings for each client
+  const starterMemories: { clientId: string; name: string; company: string; channel: string; avgHours: number }[] = [
+    { clientId: nike.id, name: "Sarah Chen", company: "Nike", channel: "both (email + WhatsApp)", avgHours: 12.5 },
+    { clientId: adidas.id, name: "Marcus Weber", company: "Adidas", channel: "email", avgHours: 72 },
+    { clientId: puma.id, name: "Priya Patel", company: "Puma", channel: "email", avgHours: 36 },
+  ];
+
+  const memoryResults = { stored: 0, failed: 0 };
+
+  for (const m of starterMemories) {
+    const content = `Client ${m.name} for brand ${m.company}. Preferred contact: ${m.channel}. ` +
+      `Typical response time: ${m.avgHours} hours. ` +
+      `Brand style: short-form video content for social media.`;
+
+    try {
+      await storeClientMemory(m.clientId, content, "behavioral_pattern", { source: "seed" });
+      memoryResults.stored++;
+    } catch (err) {
+      console.error(`[seed] Failed to store starter memory for ${m.name}:`, err);
+      memoryResults.failed++;
+    }
+  }
+
+  // Seed historical interaction memories
+  const historicalMemories: { clientId: string; content: string; type: "approval" | "rejection" | "feedback" }[] = [
+    {
+      clientId: nike.id,
+      content: `Client Sarah Chen approved script "Nike Air Force 1 - Street Culture" in 8 hours. Quick turnaround, minimal feedback.`,
+      type: "approval",
+    },
+    {
+      clientId: nike.id,
+      content: `Client Sarah Chen requested changes on "Nike Dunk Low - Skate Origins". Feedback: "Too retro, needs modern edge." Response time: 14 hours.`,
+      type: "feedback",
+    },
+    {
+      clientId: adidas.id,
+      content: `Client Marcus Weber rejected script "Adidas Forum - Basketball Heritage". Reason: "Doesn't align with Q3 campaign direction." Response time: 96 hours. Slow responder.`,
+      type: "rejection",
+    },
+    {
+      clientId: adidas.id,
+      content: `Client Marcus Weber approved script "Adidas Samba - Dance Floor" after 3 days. Required two follow-ups before responding.`,
+      type: "approval",
+    },
+    {
+      clientId: puma.id,
+      content: `Client Priya Patel approved script "Puma RS-X - Tech Runner" in 24 hours. Comment: "Love it, ship it." Generally responsive.`,
+      type: "approval",
+    },
+  ];
+
+  for (const mem of historicalMemories) {
+    try {
+      await storeClientMemory(mem.clientId, mem.content, mem.type, { source: "seed" });
+      memoryResults.stored++;
+    } catch (err) {
+      console.error("[seed] Failed to store historical memory:", err);
+      memoryResults.failed++;
+    }
+  }
+
   return NextResponse.json({
     success: true,
     created: { clients: typedClients.length, scripts: 6 },
+    memories: memoryResults,
   });
 }

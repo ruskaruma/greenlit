@@ -1,6 +1,7 @@
 import { createServiceClientDirect } from "@/lib/supabase/server";
 import { Resend } from "resend";
 import Anthropic from "@anthropic-ai/sdk";
+import { storeClientMemory, buildClientResponseMemory } from "@/lib/agent/nodes/memoryUpdate";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type SupabaseAny = any;
@@ -16,13 +17,14 @@ type Intent = "approve" | "reject" | "feedback";
 async function classifyIntent(
   message: string
 ): Promise<{ intent: Intent; feedback: string | null }> {
-  const response = await anthropic.messages.create({
-    model: "claude-haiku-4-5-20251001",
-    max_tokens: 100,
-    messages: [
-      {
-        role: "user",
-        content: `Classify this client reply to a script review. Return ONLY valid JSON.
+  try {
+    const response = await anthropic.messages.create({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 100,
+      messages: [
+        {
+          role: "user",
+          content: `Classify this client reply to a script review. Return ONLY valid JSON.
 
 Message: "${message}"
 
@@ -32,21 +34,29 @@ Rules:
 - Otherwise, treat it as feedback and return {"intent":"feedback","feedback":"<the original message>"}
 
 JSON:`,
-      },
-    ],
-  });
+        },
+      ],
+    });
 
-  const text =
-    response.content[0].type === "text" ? response.content[0].text : "";
+    const text =
+      response.content[0].type === "text" ? response.content[0].text : "";
 
-  try {
-    const parsed = JSON.parse(text.trim());
+    try {
+      const parsed = JSON.parse(text.trim());
+      return {
+        intent: parsed.intent as Intent,
+        feedback: parsed.feedback ?? null,
+      };
+    } catch {
+      console.warn("[whatsapp-webhook] Claude returned unparseable JSON, raw:", text);
+      return { intent: "feedback", feedback: message };
+    }
+  } catch (err) {
+    console.error("[whatsapp-webhook] Claude intent classification failed:", err);
     return {
-      intent: parsed.intent as Intent,
-      feedback: parsed.feedback ?? null,
+      intent: "feedback",
+      feedback: "Client replied but intent unclear — please review manually",
     };
-  } catch {
-    return { intent: "feedback", feedback: message };
   }
 }
 
@@ -79,7 +89,6 @@ async function notifyTeam(
 }
 
 export async function POST(request: Request) {
-  // Parse Twilio form-encoded body
   const formData = await request.formData();
   const from = formData.get("From")?.toString() ?? "";
   const body = formData.get("Body")?.toString()?.trim() ?? "";
@@ -88,12 +97,10 @@ export async function POST(request: Request) {
     return twiml("Invalid request.");
   }
 
-  // Strip "whatsapp:" prefix for DB lookup
   const phoneNumber = from.replace("whatsapp:", "");
 
   const supabase: SupabaseAny = createServiceClientDirect();
 
-  // Look up client by whatsapp_number
   const { data: client, error: clientError } = await supabase
     .from("clients")
     .select("id, name, avg_response_hours")
@@ -104,7 +111,6 @@ export async function POST(request: Request) {
     return twiml("Sorry, we couldn't find your account. Please contact your team lead.");
   }
 
-  // Find the most recent pending_review script for this client
   const { data: script, error: scriptError } = await supabase
     .from("scripts")
     .select("id, title, status, sent_at")
@@ -118,10 +124,8 @@ export async function POST(request: Request) {
     return twiml("No pending scripts found for review. If you think this is an error, please contact your team lead.");
   }
 
-  // Classify intent with Claude
   const { intent, feedback } = await classifyIntent(body);
 
-  // Map intent to script status
   const statusMap: Record<Intent, string> = {
     approve: "approved",
     reject: "rejected",
@@ -131,7 +135,6 @@ export async function POST(request: Request) {
   const newStatus = statusMap[intent];
   const respondedAt = new Date();
 
-  // Update script
   const updatePayload: Record<string, unknown> = {
     status: newStatus,
     reviewed_at: respondedAt.toISOString(),
@@ -143,7 +146,6 @@ export async function POST(request: Request) {
 
   await supabase.from("scripts").update(updatePayload).eq("id", script.id);
 
-  // Calculate avg_response_hours using exponential moving average
   const sentAt = script.sent_at ? new Date(script.sent_at) : null;
   const responseHours = sentAt
     ? (respondedAt.getTime() - sentAt.getTime()) / (1000 * 60 * 60)
@@ -155,7 +157,6 @@ export async function POST(request: Request) {
     ? alpha * responseHours + (1 - alpha) * oldAvg
     : oldAvg;
 
-  // Update client counter + avg_response_hours
   const statField =
     intent === "approve" ? "approved_count" :
     intent === "reject" ? "rejected_count" :
@@ -177,7 +178,6 @@ export async function POST(request: Request) {
     })
     .eq("id", client.id);
 
-  // Insert whatsapp_messages row
   await supabase.from("whatsapp_messages").insert({
     client_id: client.id,
     script_id: script.id,
@@ -187,7 +187,6 @@ export async function POST(request: Request) {
     classified_intent: intent,
   });
 
-  // Audit log
   await supabase.from("audit_log").insert({
     entity_type: "script",
     entity_id: script.id,
@@ -196,10 +195,22 @@ export async function POST(request: Request) {
     metadata: { phone: phoneNumber, message: body, intent },
   });
 
-  // Notify team via email (fire-and-forget, must not fail webhook)
   await notifyTeam(client.name, intent, script.title, feedback);
 
-  // Reply based on intent
+  storeClientMemory(
+    client.id,
+    buildClientResponseMemory({
+      clientName: client.name,
+      scriptTitle: script.title,
+      intent,
+      feedback,
+      responseHours,
+      channel: "whatsapp",
+    }),
+    "client_response",
+    { script_id: script.id }
+  ).catch((err: unknown) => console.error("[whatsapp-webhook] Memory storage failed:", err));
+
   const replyMap: Record<Intent, string> = {
     approve: `"${script.title}" has been approved. Thank you, ${client.name}!`,
     reject: `"${script.title}" has been rejected. Your team lead has been notified.`,

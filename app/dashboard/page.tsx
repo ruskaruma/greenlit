@@ -52,12 +52,16 @@ export default async function DashboardPage() {
     isOverdue(s.sent_at, s.status)
   ).length;
 
+  const twilioFrom = process.env.TWILIO_WHATSAPP_FROM || "";
+  const isSandbox = twilioFrom === "whatsapp:+14155238886";
+
   return (
     <DashboardShell
       scripts={scripts}
       clients={clients}
       inReview={inReview}
       overdueCount={overdueCount}
+      isSandbox={isSandbox}
     />
   );
 }

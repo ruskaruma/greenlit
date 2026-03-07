@@ -6,26 +6,14 @@ import Link from "next/link";
 import { Bot } from "lucide-react";
 import ChaserCard from "./ChaserCard";
 import ToastProvider from "@/components/ui/ToastProvider";
-
-interface ChaserData {
-  id: string;
-  script_id: string;
-  draft_content: string;
-  created_at: string;
-  hitl_state: {
-    email_subject?: string;
-    hours_overdue?: number;
-    client_email?: string;
-  } | null;
-  client: { name: string; company: string | null };
-  script: { title: string };
-}
+import type { ChaserData } from "@/app/hitl/page";
 
 interface HitlListProps {
   initialChasers: ChaserData[];
+  memories: Record<string, { content: string; memory_type: string; created_at: string }[]>;
 }
 
-export default function HitlList({ initialChasers }: HitlListProps) {
+export default function HitlList({ initialChasers, memories }: HitlListProps) {
   const [chasers, setChasers] = useState(initialChasers);
   const router = useRouter();
 
@@ -56,23 +44,16 @@ export default function HitlList({ initialChasers }: HitlListProps) {
 
   return (
     <ToastProvider>
-    <div className="space-y-4">
-      {chasers.map((chaser) => (
-        <ChaserCard
-          key={chaser.id}
-          id={chaser.id}
-          scriptId={chaser.script_id}
-          clientName={chaser.client.name}
-          clientCompany={chaser.client.company}
-          scriptTitle={chaser.script.title}
-          hoursOverdue={chaser.hitl_state?.hours_overdue ?? 0}
-          emailSubject={chaser.hitl_state?.email_subject ?? "Follow-up"}
-          draftContent={chaser.draft_content}
-          createdAt={chaser.created_at}
-          onActionComplete={() => handleActionComplete(chaser.id)}
-        />
-      ))}
-    </div>
+      <div className="space-y-6">
+        {chasers.map((chaser) => (
+          <ChaserCard
+            key={chaser.id}
+            chaser={chaser}
+            memories={memories[chaser.client_id] ?? []}
+            onActionComplete={() => handleActionComplete(chaser.id)}
+          />
+        ))}
+      </div>
     </ToastProvider>
   );
 }
