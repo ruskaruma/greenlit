@@ -3,9 +3,14 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 const protectedPaths = ["/dashboard", "/hitl", "/analytics", "/reports", "/intelligence"];
+const publicApiPaths = ["/api/seed"];
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  if (publicApiPaths.some((p) => pathname === p || pathname.startsWith(p + "/"))) {
+    return NextResponse.next();
+  }
 
   const isProtected = protectedPaths.some(
     (path) => pathname === path || pathname.startsWith(path + "/")

@@ -248,6 +248,7 @@ export default function KanbanBoard({ initialScripts, onConnectionChange, refres
                   onClick={() => setSelectedScript(script)}
                   onArchive={handleArchive}
                   onStatusChange={handleStatusChange}
+                  onRunAgent={onRunAgent}
                 />
               ))}
             </AnimatePresence>

@@ -34,8 +34,8 @@ export async function GET(
     });
   }
 
-  const sentDate = new Date(script.sent_at);
-  const hoursOverdue = Math.round((Date.now() - sentDate.getTime()) / (1000 * 60 * 60));
+  const sentDate = script.sent_at ? new Date(script.sent_at) : new Date();
+  const hoursOverdue = Math.max(0, Math.round((Date.now() - sentDate.getTime()) / (1000 * 60 * 60)));
 
   const stream = new ReadableStream({
     start(controller) {
@@ -55,7 +55,7 @@ export async function GET(
         clientName: client.name,
         scriptTitle: script.title,
         scriptContent: script.content,
-        sentAt: script.sent_at,
+        sentAt: script.sent_at ?? new Date().toISOString(),
         dueDate: script.due_date ?? null,
         hoursOverdue,
         clientMemories: [],

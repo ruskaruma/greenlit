@@ -29,8 +29,6 @@ export async function GET() {
         changes_requested_count: 1,
         whatsapp_number: "+918340121267",
         preferred_channel: "both",
-        instagram_handle: "nikecreative",
-        youtube_channel_id: "UC_nike_placeholder",
       },
       {
         name: "Marcus Weber",
@@ -43,8 +41,6 @@ export async function GET() {
         changes_requested_count: 2,
         whatsapp_number: null,
         preferred_channel: "email",
-        instagram_handle: "adidasoriginals",
-        youtube_channel_id: "UC_adidas_placeholder",
       },
       {
         name: "Priya Patel",
@@ -57,8 +53,6 @@ export async function GET() {
         changes_requested_count: 1,
         whatsapp_number: null,
         preferred_channel: "email",
-        instagram_handle: "pumaindia",
-        youtube_channel_id: "UC_puma_placeholder",
       },
     ])
     .select();
