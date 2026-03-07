@@ -33,11 +33,12 @@ export async function POST(request: Request) {
   const supabase: SupabaseAny = createServiceClientDirect();
   const body = await request.json();
 
-  const { title, content, client_id, due_date } = body as {
+  const { title, content, client_id, due_date, review_channel } = body as {
     title: string;
     content: string;
     client_id: string;
     due_date?: string;
+    review_channel?: string;
   };
 
   if (!title || !content || !client_id) {
@@ -88,7 +89,7 @@ export async function POST(request: Request) {
   // Send review notifications
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
   const reviewUrl = `${appUrl}/review/${typedScript.review_token}`;
-  const channel: string = client.preferred_channel ?? "email";
+  const channel: string = review_channel || client.preferred_channel || "email";
 
   let anySendSucceeded = false;
 

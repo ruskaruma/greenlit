@@ -14,7 +14,6 @@ async function getScripts(): Promise<ScriptWithClient[]> {
   const { data, error } = await supabase
     .from("scripts")
     .select("*, clients(*)")
-    .neq("status", "draft")
     .order("created_at", { ascending: false });
 
   if (error) {
@@ -30,12 +29,12 @@ async function getScripts(): Promise<ScriptWithClient[]> {
   return scripts;
 }
 
-async function getClients(): Promise<{ id: string; name: string }[]> {
+async function getClients(): Promise<{ id: string; name: string; email: string; whatsapp_number: string | null; preferred_channel: string }[]> {
   const supabase: SupabaseAny = createServiceClientDirect();
 
   const { data, error } = await supabase
     .from("clients")
-    .select("id, name")
+    .select("id, name, email, whatsapp_number, preferred_channel")
     .order("name", { ascending: true });
 
   if (error) return [];

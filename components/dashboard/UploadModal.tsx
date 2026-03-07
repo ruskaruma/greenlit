@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { X, Upload, Loader2, Check } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
-import type { Client } from "@/lib/supabase/types";
+import type { ClientItem } from "./DashboardShell";
 
 type ToastState = { type: "success" | "error"; message: string } | null;
 
@@ -31,9 +31,13 @@ function Toast({ toast, onDismiss }: { toast: NonNullable<ToastState>; onDismiss
   );
 }
 
-export default function UploadModal() {
+interface UploadModalProps {
+  clients: ClientItem[];
+  onScriptUploaded?: () => void;
+}
+
+export default function UploadModal({ clients, onScriptUploaded }: UploadModalProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [clients, setClients] = useState<Client[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [toast, setToast] = useState<ToastState>(null);
 
@@ -41,28 +45,24 @@ export default function UploadModal() {
   const [clientId, setClientId] = useState("");
   const [content, setContent] = useState("");
   const [dueDate, setDueDate] = useState("");
+  const [reviewChannel, setReviewChannel] = useState("email");
 
-  const fetchClients = useCallback(async () => {
-    try {
-      const res = await fetch("/api/clients");
-      if (res.ok) {
-        const data = await res.json();
-        setClients(data);
-      }
-    } catch (err) {
-      console.error("Failed to fetch clients:", err);
+  const selectedClient = clients.find((c) => c.id === clientId);
+
+  const handleClientChange = useCallback((id: string) => {
+    setClientId(id);
+    const c = clients.find((cl) => cl.id === id);
+    if (c) {
+      setReviewChannel(c.preferred_channel || "email");
     }
-  }, []);
-
-  useEffect(() => {
-    if (isOpen) fetchClients();
-  }, [isOpen, fetchClients]);
+  }, [clients]);
 
   function resetForm() {
     setTitle("");
     setClientId("");
     setContent("");
     setDueDate("");
+    setReviewChannel("email");
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -81,6 +81,7 @@ export default function UploadModal() {
           content,
           client_id: clientId,
           due_date: dueDate || undefined,
+          review_channel: reviewChannel,
         }),
       });
 
@@ -92,6 +93,7 @@ export default function UploadModal() {
       setIsOpen(false);
       resetForm();
       setToast({ type: "success", message: "Script sent for review" });
+      onScriptUploaded?.();
     } catch (err) {
       const message = err instanceof Error ? err.message : "Something went wrong";
       setToast({ type: "error", message });
@@ -163,7 +165,7 @@ export default function UploadModal() {
                   <select
                     id="client"
                     value={clientId}
-                    onChange={(e) => setClientId(e.target.value)}
+                    onChange={(e) => handleClientChange(e.target.value)}
                     required
                     className="w-full px-3 py-2 bg-[var(--input-bg)] border border-[var(--border)] rounded-lg text-sm text-[var(--text)] focus:outline-none focus:border-[#333333] transition-colors"
                   >
@@ -172,7 +174,7 @@ export default function UploadModal() {
                     </option>
                     {clients.map((c) => (
                       <option key={c.id} value={c.id}>
-                        {c.name}{c.company ? ` (${c.company})` : ""}
+                        {c.name}{c.whatsapp_number ? "" : ""}{c.email ? "" : " (no email)"}
                       </option>
                     ))}
                   </select>
@@ -193,18 +195,39 @@ export default function UploadModal() {
                   />
                 </div>
 
-                <div>
-                  <label htmlFor="due_date" className="block text-xs font-medium text-[var(--muted)] mb-1.5">
-                    Due Date
-                  </label>
-                  <input
-                    id="due_date"
-                    type="date"
-                    value={dueDate}
-                    onChange={(e) => setDueDate(e.target.value)}
-                    className="w-full px-3 py-2 bg-[var(--input-bg)] border border-[var(--border)] rounded-lg text-sm text-[var(--text)] focus:outline-none focus:border-[#333333] transition-colors"
-                  />
+                <div className="flex gap-3">
+                  <div className="flex-1">
+                    <label htmlFor="due_date" className="block text-xs font-medium text-[var(--muted)] mb-1.5">
+                      Due Date
+                    </label>
+                    <input
+                      id="due_date"
+                      type="date"
+                      value={dueDate}
+                      onChange={(e) => setDueDate(e.target.value)}
+                      className="w-full px-3 py-2 bg-[var(--input-bg)] border border-[var(--border)] rounded-lg text-sm text-[var(--text)] focus:outline-none focus:border-[#333333] transition-colors"
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <label htmlFor="review_channel" className="block text-xs font-medium text-[var(--muted)] mb-1.5">
+                      Send via
+                    </label>
+                    <select
+                      id="review_channel"
+                      value={reviewChannel}
+                      onChange={(e) => setReviewChannel(e.target.value)}
+                      className="w-full px-3 py-2 bg-[var(--input-bg)] border border-[var(--border)] rounded-lg text-sm text-[var(--text)] focus:outline-none focus:border-[#333333] transition-colors"
+                    >
+                      <option value="email">Email</option>
+                      <option value="whatsapp">WhatsApp</option>
+                      <option value="both">Both</option>
+                    </select>
+                  </div>
                 </div>
+
+                {selectedClient && !selectedClient.email && !selectedClient.whatsapp_number && (
+                  <p className="text-xs text-amber-400">This client has no contact info configured. Delivery will fail.</p>
+                )}
 
                 <button
                   type="submit"

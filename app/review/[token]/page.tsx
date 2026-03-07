@@ -1,8 +1,8 @@
 import { createServiceClientDirect } from "@/lib/supabase/server";
 import StatusBadge from "@/components/ui/StatusBadge";
 import ReviewActions from "@/components/review/ReviewActions";
-import { formatStatus } from "@/lib/utils";
-import { format } from "date-fns";
+import { cn, formatStatus } from "@/lib/utils";
+import { format, differenceInHours } from "date-fns";
 import { Check, RotateCcw, X, Clock } from "lucide-react";
 import type { ScriptStatus } from "@/lib/supabase/types";
 
@@ -57,7 +57,7 @@ function AlreadyReviewed({ status, clientName }: { status: ScriptStatus; clientN
         Already reviewed
       </h2>
       <p className="text-sm text-[var(--muted)] max-w-sm">
-        {clientName}, you marked this script as{" "}
+        You&apos;ve already submitted your response for this script. Your decision was recorded as{" "}
         <span className="text-[var(--text)] opacity-80">{formatStatus(status).toLowerCase()}</span>.
         No further action needed.
       </p>
@@ -74,7 +74,7 @@ function ExpiredLink() {
         </div>
         <h1 className="text-lg font-semibold text-[var(--text)] mb-2">Review link expired</h1>
         <p className="text-sm text-[var(--muted)]">
-          This review link has expired. Please contact the team to request a new one.
+          This review link has expired. Please contact your Scrollhouse team for a new link.
         </p>
       </div>
     </div>
@@ -144,7 +144,7 @@ export default async function ReviewPage({
                 {script.title}
               </h1>
               <p className="text-sm text-[var(--muted)]">
-                Hi {clientName}, please review this script and let us know your thoughts.
+                Hi {clientName}, here&apos;s your script for review. Please read it carefully and let us know your thoughts.
               </p>
             </div>
 
@@ -159,11 +159,21 @@ export default async function ReviewPage({
               </div>
             </div>
 
-            {script.due_date && (
-              <p className="text-xs text-[var(--muted)] opacity-60 mb-6 sm:mb-8">
-                Due by {format(new Date(script.due_date), "MMMM d, yyyy")}
-              </p>
-            )}
+            {script.due_date && (() => {
+              const dueDate = new Date(script.due_date);
+              const hoursLeft = differenceInHours(dueDate, new Date());
+              const isUrgent = hoursLeft > 0 && hoursLeft <= 48;
+              const isPast = hoursLeft <= 0;
+              return (
+                <p className={cn(
+                  "text-xs mb-6 sm:mb-8 font-medium",
+                  isPast ? "text-red-400" : isUrgent ? "text-amber-400" : "text-[var(--muted)] opacity-60"
+                )}>
+                  {isPast ? "Response overdue - was due " : "Please respond by "}
+                  {format(dueDate, "MMMM d, yyyy")}
+                </p>
+              );
+            })()}
 
             <div className="h-px bg-[var(--border)] mb-6 sm:mb-8" />
 

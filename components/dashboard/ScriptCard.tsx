@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Clock, Calendar } from "lucide-react";
+import { Clock, Calendar, AlertTriangle } from "lucide-react";
 import StatusBadge from "@/components/ui/StatusBadge";
 import { cn, formatTimeAgo, isOverdue } from "@/lib/utils";
 import type { ScriptWithClient } from "@/lib/supabase/types";
@@ -14,8 +14,8 @@ interface ScriptCardProps {
 export default function ScriptCard({ script, onClick }: ScriptCardProps) {
   const overdue = isOverdue(script.sent_at, script.status);
   const displayStatus = overdue ? "overdue" as const : script.status;
-
   const clientInitial = script.client.name.charAt(0).toUpperCase();
+  const noContact = !script.client.email && !script.client.whatsapp_number;
 
   return (
     <motion.div
@@ -36,13 +36,13 @@ export default function ScriptCard({ script, onClick }: ScriptCardProps) {
           <h3 className="text-[14px] font-medium text-[var(--text)] truncate leading-tight">
             {script.title}
           </h3>
-          {script.version > 1 && (
-            <span className="shrink-0 text-[9px] font-medium px-1 py-0.5 rounded bg-[var(--surface-elevated)] border border-[var(--border)] text-[var(--muted)]">
-              v{script.version}
-            </span>
-          )}
         </div>
-        <StatusBadge status={displayStatus} />
+        <div className="flex items-center gap-1.5 shrink-0">
+          <span className="text-[9px] font-medium px-1 py-0.5 rounded bg-[var(--surface-elevated)] border border-[var(--border)] text-[var(--muted)]">
+            v{script.version}
+          </span>
+          <StatusBadge status={displayStatus} />
+        </div>
       </div>
 
       <div className="flex items-center gap-2 text-xs text-[var(--muted)] mb-2">
@@ -55,6 +55,11 @@ export default function ScriptCard({ script, onClick }: ScriptCardProps) {
             <span className="opacity-60"> / {script.client.company}</span>
           )}
         </span>
+        {noContact && (
+          <span title="No contact info - delivery will fail">
+            <AlertTriangle size={12} className="text-amber-400 shrink-0" />
+          </span>
+        )}
       </div>
 
       {script.sent_at && (

@@ -8,9 +8,17 @@ import RunAgentButton from "./RunAgentButton";
 import ToastProvider from "@/components/ui/ToastProvider";
 import type { ScriptWithClient } from "@/lib/supabase/types";
 
+export interface ClientItem {
+  id: string;
+  name: string;
+  email: string;
+  whatsapp_number: string | null;
+  preferred_channel: string;
+}
+
 interface DashboardShellProps {
   scripts: ScriptWithClient[];
-  clients: { id: string; name: string }[];
+  clients: ClientItem[];
   inReview: number;
   overdueCount: number;
 }
@@ -42,18 +50,24 @@ function DashboardShellInner({
   const [activeClientId, setActiveClientId] = useState<string | null>(null);
   const [clients, setClients] = useState(initialClients);
   const [connected, setConnected] = useState(true);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const fetchClients = useCallback(async () => {
     try {
       const res = await fetch("/api/clients");
       if (res.ok) {
         const data = await res.json();
-        const newClients = data.map((c: { id: string; name: string }) => ({ id: c.id, name: c.name }));
+        const newClients: ClientItem[] = data.map((c: ClientItem) => ({
+          id: c.id,
+          name: c.name,
+          email: c.email,
+          whatsapp_number: c.whatsapp_number,
+          preferred_channel: c.preferred_channel,
+        }));
         setClients(newClients);
 
-        // Fix 5: If active client was deleted, reset filter
         setActiveClientId((prev) => {
-          if (prev && !newClients.some((c: { id: string }) => c.id === prev)) {
+          if (prev && !newClients.some((c) => c.id === prev)) {
             return null;
           }
           return prev;
@@ -71,6 +85,10 @@ function DashboardShellInner({
   const filteredScripts = activeClientId
     ? scripts.filter((s) => s.client_id === activeClientId)
     : scripts;
+
+  const handleScriptUploaded = useCallback(() => {
+    setRefreshKey((k) => k + 1);
+  }, []);
 
   return (
     <div className="noise-bg min-h-screen bg-[var(--bg)] flex">
@@ -103,12 +121,12 @@ function DashboardShellInner({
 
           <div className="flex items-center gap-3">
             <RunAgentButton scripts={filteredScripts.map((s) => ({ id: s.id, title: s.title, status: s.status, sent_at: s.sent_at }))} />
-            <UploadModal />
+            <UploadModal clients={clients} onScriptUploaded={handleScriptUploaded} />
           </div>
         </header>
 
         <div className="p-6 overflow-x-auto">
-          <KanbanBoard initialScripts={filteredScripts} onConnectionChange={setConnected} />
+          <KanbanBoard initialScripts={filteredScripts} onConnectionChange={setConnected} refreshKey={refreshKey} />
         </div>
       </main>
     </div>

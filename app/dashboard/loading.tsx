@@ -1,6 +1,6 @@
 import SkeletonCard from "@/components/dashboard/SkeletonCard";
 
-const columns = ["Pending Review", "Changes Requested", "Approved", "Overdue", "Rejected"];
+const columns = ["Draft", "Pending Review", "Changes Requested", "Approved", "Overdue", "Rejected"];
 
 export default function DashboardLoading() {
   return (

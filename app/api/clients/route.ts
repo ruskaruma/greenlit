@@ -51,7 +51,7 @@ export async function POST(request: Request) {
     email,
     company: company ?? null,
   };
-  if (whatsapp) insertData.whatsapp = whatsapp;
+  if (whatsapp) insertData.whatsapp_number = whatsapp;
   if (preferred_channel) insertData.preferred_channel = preferred_channel;
 
   const { data, error } = await (supabase as SupabaseAny)

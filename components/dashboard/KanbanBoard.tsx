@@ -1,17 +1,18 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { AnimatePresence } from "framer-motion";
-import { Plus, Upload } from "lucide-react";
+import { Plus, Upload, FileEdit } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import ScriptCard from "./ScriptCard";
 import ScriptDetailSheet from "./ScriptDetailSheet";
 import { isOverdue } from "@/lib/utils";
 import type { ScriptWithClient, Script, ScriptStatus } from "@/lib/supabase/types";
 
-type ColumnKey = "pending_review" | "changes_requested" | "approved" | "overdue" | "rejected";
+type ColumnKey = "draft" | "pending_review" | "changes_requested" | "approved" | "overdue" | "rejected";
 
 const columns: { key: ColumnKey; label: string }[] = [
+  { key: "draft", label: "Draft" },
   { key: "pending_review", label: "Pending Review" },
   { key: "changes_requested", label: "Changes Requested" },
   { key: "approved", label: "Approved" },
@@ -20,6 +21,8 @@ const columns: { key: ColumnKey; label: string }[] = [
 ];
 
 function categorizeScript(script: ScriptWithClient): ColumnKey | null {
+  if (script.status === "draft") return "draft";
+  if (script.status === "overdue") return "overdue";
   if (isOverdue(script.sent_at, script.status)) return "overdue";
   if (script.status === "pending_review") return "pending_review";
   if (script.status === "changes_requested") return "changes_requested";
@@ -31,11 +34,14 @@ function categorizeScript(script: ScriptWithClient): ColumnKey | null {
 interface KanbanBoardProps {
   initialScripts: ScriptWithClient[];
   onConnectionChange?: (connected: boolean) => void;
+  refreshKey?: number;
 }
 
-export default function KanbanBoard({ initialScripts, onConnectionChange }: KanbanBoardProps) {
+export default function KanbanBoard({ initialScripts, onConnectionChange, refreshKey }: KanbanBoardProps) {
   const [scripts, setScripts] = useState<ScriptWithClient[]>(initialScripts);
   const [selectedScript, setSelectedScript] = useState<ScriptWithClient | null>(null);
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const subscribedRef = useRef(false);
 
   const handleStatusChange = useCallback((scriptId: string, newStatus: ScriptStatus) => {
     setScripts((prev) =>
@@ -49,6 +55,24 @@ export default function KanbanBoard({ initialScripts, onConnectionChange }: Kanb
   useEffect(() => {
     setScripts(initialScripts);
   }, [initialScripts]);
+
+  const fetchScripts = useCallback(async () => {
+    try {
+      const res = await fetch("/api/scripts");
+      if (res.ok) {
+        const data = await res.json();
+        setScripts(data as ScriptWithClient[]);
+      }
+    } catch {
+      // silent
+    }
+  }, []);
+
+  useEffect(() => {
+    if (refreshKey !== undefined && refreshKey > 0) {
+      fetchScripts();
+    }
+  }, [refreshKey, fetchScripts]);
 
   const handleScriptChange = useCallback(
     (payload: { eventType: string; new: Record<string, unknown>; old: Record<string, unknown> }) => {
@@ -68,10 +92,14 @@ export default function KanbanBoard({ initialScripts, onConnectionChange }: Kanb
           return next;
         }
 
+        if (payload.eventType === "INSERT") {
+          fetchScripts();
+        }
+
         return prev;
       });
     },
-    []
+    [fetchScripts]
   );
 
   useEffect(() => {
@@ -85,13 +113,28 @@ export default function KanbanBoard({ initialScripts, onConnectionChange }: Kanb
         handleScriptChange
       )
       .subscribe((status: string) => {
-        onConnectionChange?.(status === "SUBSCRIBED");
+        console.log("[realtime] status:", status);
+        const isSubscribed = status === "SUBSCRIBED";
+        subscribedRef.current = isSubscribed;
+        onConnectionChange?.(isSubscribed);
+
+        if (!isSubscribed && !pollingRef.current) {
+          pollingRef.current = setInterval(fetchScripts, 10_000);
+        }
+        if (isSubscribed && pollingRef.current) {
+          clearInterval(pollingRef.current);
+          pollingRef.current = null;
+        }
       });
 
     return () => {
       supabase.removeChannel(channel);
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
+      }
     };
-  }, [handleScriptChange, onConnectionChange]);
+  }, [handleScriptChange, onConnectionChange, fetchScripts]);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -132,7 +175,12 @@ export default function KanbanBoard({ initialScripts, onConnectionChange }: Kanb
             <AnimatePresence mode="popLayout">
               {grouped[col.key].length === 0 ? (
                 <div className="flex-1 flex flex-col items-center justify-center border border-dashed border-[var(--border)] rounded min-h-[200px] gap-2">
-                  {col.key === "pending_review" ? (
+                  {col.key === "draft" ? (
+                    <>
+                      <FileEdit size={14} className="text-[var(--muted)] opacity-40" />
+                      <p className="text-[11px] text-[var(--muted)] opacity-40">No drafts</p>
+                    </>
+                  ) : col.key === "pending_review" ? (
                     <>
                       <Upload size={14} className="text-[var(--muted)] opacity-40" />
                       <p className="text-[11px] text-[var(--muted)] opacity-40">No pending scripts</p>

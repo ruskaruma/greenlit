@@ -6,16 +6,13 @@ import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, Shield, BarChart3, FileText, Brain,
   ChevronLeft, ChevronRight, Plus, MoreHorizontal, Trash2, X, Loader2,
+  Mail, Phone,
 } from "lucide-react";
 import LogoutButton from "./LogoutButton";
 import ThemeToggle from "./ThemeToggle";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/components/ui/ToastProvider";
-
-interface ClientItem {
-  id: string;
-  name: string;
-}
+import type { ClientItem } from "./DashboardShell";
 
 interface SidebarProps {
   clients: ClientItem[];
@@ -46,7 +43,6 @@ export default function Sidebar({ clients, onClientFilter, activeClientId, onCli
         collapsed ? "w-[52px]" : "w-[220px]"
       )}
     >
-      {/* Logo */}
       <div className="px-4 pt-5 pb-6">
         {collapsed ? (
           <span className="text-sm font-bold text-[var(--text)] block text-center">G</span>
@@ -58,7 +54,6 @@ export default function Sidebar({ clients, onClientFilter, activeClientId, onCli
         )}
       </div>
 
-      {/* Nav links */}
       <nav className="px-2 space-y-0.5">
         {navItems.map((item) => {
           const isActive = pathname === item.href;
@@ -82,7 +77,6 @@ export default function Sidebar({ clients, onClientFilter, activeClientId, onCli
         })}
       </nav>
 
-      {/* Client filter */}
       {!collapsed && (
         <div className="flex-1 px-3 pt-6 pb-3 overflow-hidden flex flex-col">
           <p className="text-[10px] uppercase tracking-widest text-[var(--muted)] opacity-50 mb-2 px-1">
@@ -134,7 +128,6 @@ export default function Sidebar({ clients, onClientFilter, activeClientId, onCli
         </div>
       )}
 
-      {/* Bottom controls */}
       <div className={cn(
         "px-3 py-3 border-t border-[var(--border)] flex items-center",
         collapsed ? "justify-center" : "justify-between"
@@ -154,7 +147,6 @@ export default function Sidebar({ clients, onClientFilter, activeClientId, onCli
         </button>
       </div>
 
-      {/* Add Client Modal */}
       {addOpen && (
         <AddClientModal
           onClose={() => setAddOpen(false)}
@@ -202,13 +194,17 @@ function ClientRow({
       <button
         onClick={onSelect}
         className={cn(
-          "w-full text-left px-2 py-1.5 rounded text-[11px] truncate pr-6",
+          "w-full text-left px-2 py-1.5 rounded text-[11px] truncate pr-6 flex items-center gap-1.5",
           isActive
             ? "bg-[var(--surface-elevated)] text-[var(--text)] font-medium"
             : "text-[var(--muted)] hover:text-[var(--text)] hover:bg-[var(--surface-elevated)]"
         )}
       >
-        {client.name}
+        <span className="truncate">{client.name}</span>
+        <span className="flex items-center gap-0.5 shrink-0 ml-auto mr-4">
+          {client.email && <Mail size={9} className="text-[var(--muted)] opacity-40" />}
+          {client.whatsapp_number && <Phone size={9} className="text-[var(--muted)] opacity-40" />}
+        </span>
       </button>
       <button
         onClick={(e) => { e.stopPropagation(); onMenuToggle(); }}
@@ -288,7 +284,7 @@ function AddClientModal({ onClose, onCreated }: { onClose: () => void; onCreated
           />
           <input
             type="email" value={email} onChange={(e) => setEmail(e.target.value)} required
-            placeholder="Email *"
+            placeholder="client@brand.com *"
             className="w-full px-3 py-2 bg-[var(--input-bg)] border border-[var(--border)] rounded-lg text-sm text-[var(--text)] placeholder:text-[var(--muted)]/50 focus:outline-none focus:border-[var(--muted)]"
           />
           <input
@@ -298,17 +294,20 @@ function AddClientModal({ onClose, onCreated }: { onClose: () => void; onCreated
           />
           <input
             type="text" value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)}
-            placeholder="WhatsApp number"
+            placeholder="+91XXXXXXXXXX or +1XXXXXXXXXX"
             className="w-full px-3 py-2 bg-[var(--input-bg)] border border-[var(--border)] rounded-lg text-sm text-[var(--text)] placeholder:text-[var(--muted)]/50 focus:outline-none focus:border-[var(--muted)]"
           />
-          <select
-            value={channel} onChange={(e) => setChannel(e.target.value)}
-            className="w-full px-3 py-2 bg-[var(--input-bg)] border border-[var(--border)] rounded-lg text-sm text-[var(--text)] focus:outline-none focus:border-[var(--muted)]"
-          >
-            <option value="email">Email</option>
-            <option value="whatsapp">WhatsApp</option>
-            <option value="both">Both</option>
-          </select>
+          <div>
+            <label className="block text-xs font-medium text-[var(--muted)] mb-1.5">Preferred Channel</label>
+            <select
+              value={channel} onChange={(e) => setChannel(e.target.value)}
+              className="w-full px-3 py-2 bg-[var(--input-bg)] border border-[var(--border)] rounded-lg text-sm text-[var(--text)] focus:outline-none focus:border-[var(--muted)]"
+            >
+              <option value="email">Email</option>
+              <option value="whatsapp">WhatsApp</option>
+              <option value="both">Both</option>
+            </select>
+          </div>
           {error && <p className="text-xs text-red-400">{error}</p>}
           <button
             type="submit" disabled={loading || !name || !email}

@@ -1,0 +1,474 @@
+{
+  "project": {
+    "name": "Greenlit",
+    "tagline": "Content approval, automated.",
+    "branding": "Greenlit for Scrollhouse · by ruskaruma",
+    "deployed_url": "greenlit.ruskaruma.me",
+    "github_repo": "to be pushed",
+    "assignment": "Binge Labs AI Intern Take-Home (72hr deadline)",
+    "problem_chosen": "Problem 3 — Content Approval Loop",
+    "submission_angle": "Built Content Approval Loop as primary problem. Extended infrastructure to also solve Performance Reporting (Problem 4) — two problems solved in one system."
+  },
+
+  "problem_statements": {
+    "problem_3_content_approval": {
+      "title": "Content Approval Loop",
+      "raw_description": "After a script is written, it goes to the client for approval over WhatsApp or email. There is no tracking. Nobody knows which scripts are waiting for feedback, which have been approved, and which have been rejected. The team lead manually chases clients every 2 to 3 days. We have missed deadlines because a script was just sitting unseen in someone's inbox.",
+      "impact_metrics": {
+        "manual_chase_actions_per_month": 125,
+        "team_lead_hours_saved_per_month": 6,
+        "missed_deadlines_caused_by": "scripts sitting unseen in inbox",
+        "channels_used_by_clients": ["WhatsApp", "Email"]
+      }
+    },
+    "problem_4_performance_reporting": {
+      "title": "Performance Reporting",
+      "raw_description": "At the end of each month, we pull content performance data from Instagram Insights and YouTube Studio manually, paste it into a Google Sheet, write a short summary, and email it to each client. This takes 2 to 3 hours per client. We have 22 active clients. We are always late with reports, and clients keep asking for them before we send them.",
+      "impact_metrics": {
+        "time_per_client_hours": "2-3",
+        "active_clients": 22,
+        "total_hours_per_month": "44-66",
+        "problem": "Always late, clients chasing reports before team sends them"
+      }
+    }
+  },
+
+  "tech_stack": {
+    "frontend": "Next.js 14 App Router, TypeScript, Tailwind CSS, Framer Motion",
+    "database": "Supabase (PostgreSQL + pgvector extension + Realtime + Auth)",
+    "agent_framework": "LangGraph TypeScript (@langchain/langgraph)",
+    "llm": "Claude claude-sonnet-4-5 via @langchain/anthropic",
+    "hitl": "OpenAI Agents SDK JS (RunState serialization for pause/resume)",
+    "auth": "NextAuth.js with GitHub OAuth",
+    "email": "Resend (dark branded HTML templates)",
+    "whatsapp": "Twilio WhatsApp Business API (sandbox for demo)",
+    "instagram_scraping": "Apify Instagram Post Scraper API ($0.0027/result, ~2000 free results)",
+    "youtube_data": "YouTube Data API v3 (official Google API, free, 10,000 units/day quota)",
+    "observability": "LangSmith (free tier, 5000 traces/month, zero-config via env vars)",
+    "hosting": "Vercel (with hourly cron for agent)",
+    "cron": "Vercel Cron Jobs"
+  },
+
+  "database_schema": {
+    "tables": {
+      "clients": {
+        "columns": ["id (uuid)", "name", "email", "company", "whatsapp_number", "instagram_handle", "youtube_channel_id", "avg_response_hours", "total_scripts", "approved_count", "rejected_count", "changes_requested_count", "created_at", "updated_at"],
+        "notes": "whatsapp_number added for Twilio integration. instagram_handle and youtube_channel_id added for performance reporting scraping."
+      },
+      "scripts": {
+        "columns": ["id (uuid)", "title", "content", "client_id", "status (draft|pending_review|changes_requested|approved|rejected|overdue)", "review_token (uuid)", "client_feedback", "sent_at", "reviewed_at", "due_date", "version", "review_channel (email|whatsapp)", "created_at", "updated_at"],
+        "notes": "review_channel tracks whether client responded via email or WhatsApp — unified source of truth."
+      },
+      "chasers": {
+        "columns": ["id (uuid)", "script_id", "client_id", "draft_content", "status (pending_hitl|approved|edited|rejected|sent)", "team_lead_edits", "hitl_state (JSONB)", "sent_at", "critique_scores (JSONB)", "revision_count", "node_execution_log (JSONB array)", "created_at"],
+        "notes": "critique_scores stores self-critique rubric results. node_execution_log stores each LangGraph node's execution summary for live trace UI."
+      },
+      "audit_log": {
+        "columns": ["id (uuid)", "entity_type", "entity_id", "action", "actor", "metadata (JSONB)", "created_at"]
+      },
+      "client_memories": {
+        "columns": ["id (uuid)", "client_id", "content", "embedding (vector 1536)", "memory_type (feedback|approval|rejection|behavioral_pattern|communication_style)", "metadata (JSONB)", "created_at"],
+        "notes": "Stores all client behavioral patterns as vector embeddings for RAG retrieval during chaser generation."
+      },
+      "performance_reports": {
+        "columns": ["id (uuid)", "client_id", "report_month", "instagram_data (JSONB)", "youtube_data (JSONB)", "ai_summary", "sent_at", "status (draft|sent)", "created_at"],
+        "notes": "NEW TABLE for performance reporting feature. Stores scraped data + Claude-generated summary."
+      },
+      "whatsapp_messages": {
+        "columns": ["id (uuid)", "script_id", "client_id", "direction (outbound|inbound)", "message_body", "twilio_sid", "parsed_intent (approved|rejected|changes_requested|unclear)", "parsed_feedback", "created_at"],
+        "notes": "NEW TABLE. Logs all WhatsApp interactions for audit trail and future RAG training."
+      }
+    },
+    "functions": {
+      "match_client_memories": "RPC function using pgvector <=> cosine similarity. Returns top N memories for a given client and query embedding.",
+      "signature": "match_client_memories(query_embedding vector(1536), match_client_id uuid, match_count int DEFAULT 5)"
+    }
+  },
+
+  "agent_architecture": {
+    "framework": "LangGraph TypeScript StateGraph",
+    "pattern": "ReAct loop with self-critique — agent iterates until quality threshold met or max revisions reached",
+    "nodes": {
+      "1_monitor": {
+        "file": "lib/agent/nodes/monitor.ts",
+        "purpose": "Query Supabase for scripts overdue >48hrs with no chaser sent in last 24hrs",
+        "output": "List of scriptIds to process"
+      },
+      "2_ragRetrieval": {
+        "file": "lib/agent/nodes/ragRetrieval.ts",
+        "purpose": "Generate embedding for client context query. Call match_client_memories RPC. Returns top 5 semantic matches about client communication style, past approvals/rejections, tone preferences.",
+        "embedding_model": "OpenAI text-embedding-3-small (1536 dimensions)",
+        "fallback": "If no memories exist (new client), use recent scripts as context"
+      },
+      "3_sentimentAnalysis": {
+        "file": "lib/agent/nodes/sentimentAnalysis.ts",
+        "purpose": "NEW NODE. Analyze urgency level based on: hours overdue, client historical response time, deadline proximity. Output urgency score 1-10. Tone recommendation: formal/casual/urgent.",
+        "output": "{ urgencyScore, toneRecommendation, reasoning }"
+      },
+      "4_contextAssembly": {
+        "file": "lib/agent/nodes/contextAssembly.ts",
+        "purpose": "Build ChatPromptTemplate combining: script details, hours overdue, client memory context, urgency score, tone recommendation.",
+        "template_variables": ["scriptTitle", "clientName", "hoursOverdue", "dueDate", "clientMemories", "urgencyScore", "toneRecommendation"]
+      },
+      "5_generation": {
+        "file": "lib/agent/nodes/generation.ts",
+        "purpose": "Call Claude claude-sonnet-4-5. Parse SUBJECT/BODY from response. Store chaser as pending_hitl in Supabase.",
+        "model": "claude-sonnet-4-5 via @langchain/anthropic"
+      },
+      "6_selfCritique": {
+        "file": "lib/agent/nodes/selfCritique.ts",
+        "purpose": "NEW NODE. Score draft against rubric using Claude as judge. Rubric: personalization (0-10), urgency clarity (0-10), tone match to client profile (0-10), call-to-action strength (0-10). If avgScore < 7: set needsRevision=true with critique notes.",
+        "output": "{ scores: {personalization, urgencyClarity, toneMatch, ctaStrength}, avgScore, needsRevision, critiqueNotes }"
+      },
+      "7_revision": {
+        "file": "lib/agent/nodes/revision.ts",
+        "purpose": "NEW NODE. If needsRevision=true AND revisionCount < 2: call Claude again with original draft + critique notes. Output revised draft. Increment revisionCount.",
+        "max_revisions": 2,
+        "loop_back_to": "selfCritique node"
+      },
+      "8_memoryUpdate": {
+        "file": "lib/agent/nodes/memoryUpdate.ts",
+        "purpose": "After chaser approved and sent: embed the interaction as a new client memory. Stores: what tone was used, client response time, whether they approved/rejected/requested changes."
+      }
+    },
+    "graph_flow": "START → ragRetrieval → sentimentAnalysis → contextAssembly → generation → selfCritique → [if needsRevision && revisionCount < 2] → revision → selfCritique (loop) → [if score >= 7 OR maxRevisions] → memoryUpdate → END",
+    "state_interface": {
+      "file": "lib/agent/types.ts",
+      "fields": ["scriptId", "clientId", "clientMemories", "urgencyScore", "toneRecommendation", "generatedEmail", "chaserId", "critiqueResult", "needsRevision", "revisionCount", "nodeExecutionLog: Array<{node, timestamp, summary}>", "error"]
+    },
+    "sse_streaming": {
+      "endpoint": "GET /api/agent/stream/[scriptId]",
+      "mechanism": "Each node pushes event to SSE stream: data: {node, status, summary, timestamp}\\n\\n",
+      "storage": "In-memory Map<scriptId, SSEWriter> for active streams (fine for demo)",
+      "client": "EventSource in AgentTracePanel.tsx"
+    }
+  },
+
+  "whatsapp_integration": {
+    "service": "Twilio WhatsApp Business API",
+    "pricing": "$0.005/message in production, free sandbox for demo",
+    "sandbox_setup": "Client texts 'join [sandbox-code]' to +1-415-523-8886 to opt into sandbox",
+    "demo_approach": "Use Twilio sandbox. For Loom: show outbound message sent, then simulate inbound reply via Twilio webhook test tool.",
+    "flow": {
+      "step_1": "Script created → POST /api/scripts triggers sendReviewEmail AND sendWhatsAppMessage",
+      "step_2": "Twilio sends WhatsApp to client.whatsapp_number: 'Hi [name], your script [title] is ready for review. Quick reply: APPROVE, REJECT, or type your feedback. Full review: [magic_link]'",
+      "step_3": "Client replies on WhatsApp → Twilio hits webhook POST /api/webhooks/whatsapp",
+      "step_4": "Webhook calls Claude to parse intent: approved / rejected / changes_requested + extract feedback text",
+      "step_5": "Update scripts table: status, client_feedback, review_channel='whatsapp', reviewed_at",
+      "step_6": "Store WhatsApp message in whatsapp_messages table for audit trail",
+      "step_7": "Supabase Realtime updates dashboard Kanban in real-time"
+    },
+    "intent_parsing_prompt": "You are parsing a WhatsApp reply from a content client. Reply: '[message]'. Classify intent as: APPROVED, REJECTED, CHANGES_REQUESTED, or UNCLEAR. If CHANGES_REQUESTED or REJECTED, extract the specific feedback. Return JSON: {intent, feedback, confidence}",
+    "unified_inbox": "Both email (magic link click) and WhatsApp (webhook parsed) write to same scripts.status field. Dashboard shows one unified view with review_channel badge showing how client responded.",
+    "files_to_create": [
+      "lib/twilio/sendWhatsApp.ts",
+      "app/api/webhooks/whatsapp/route.ts",
+      "lib/twilio/parseIntent.ts"
+    ],
+    "env_vars": ["TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_WHATSAPP_FROM"]
+  },
+
+  "performance_reporting": {
+    "section": "/reports in Greenlit dashboard",
+    "headline_stat": "22 clients × 2.5hrs = 55 hrs/month saved",
+    "data_sources": {
+      "instagram": {
+        "approach": "Apify Instagram Post Scraper API — input client's Instagram handle, get last 30 posts with likes, comments, views, engagement rate",
+        "api": "Apify Actor: apify/instagram-post-scraper",
+        "endpoint": "POST https://api.apify.com/v2/acts/apify~instagram-post-scraper/run-sync-get-dataset-items",
+        "input": "{ usernames: [client.instagram_handle], resultsLimit: 30 }",
+        "cost": "$0.0027/result = ~$0.08 per client per month (negligible)",
+        "fields_returned": ["likesCount", "commentsCount", "videoViewCount", "timestamp", "caption", "url", "type (post/reel/carousel)"],
+        "free_tier": "~2000 results free on Apify free plan",
+        "auth": "APIFY_API_TOKEN env var"
+      },
+      "youtube": {
+        "approach": "YouTube Data API v3 — official Google API, free, no scraping needed",
+        "api": "GET https://www.googleapis.com/youtube/v3/videos + channels + search",
+        "quota": "10,000 units/day free. Channel stats = 1 unit. Video list = 1 unit per page. More than enough for 22 clients.",
+        "input": "client.youtube_channel_id (e.g. UCxxxxxx from YouTube URL)",
+        "fields_returned": ["viewCount", "likeCount", "commentCount", "subscriberCount", "videoCount", "publishedAt", "title"],
+        "auth": "YOUTUBE_API_KEY env var (Google Cloud Console, free)"
+      }
+    },
+    "report_generation_flow": {
+      "step_1": "Team clicks 'Generate Reports' button in /reports page",
+      "step_2": "POST /api/reports/generate → loops through all active clients",
+      "step_3": "For each client: fetch Instagram data via Apify + YouTube data via Google API in parallel (Promise.all)",
+      "step_4": "Call Claude with: raw metrics + client's past reports (from performance_reports table) + client_memories (brand voice RAG) to generate narrative summary",
+      "step_5": "Claude prompt: 'You are a social media analyst at Scrollhouse. Write a monthly performance report for [client_name]. Use their brand voice. Data: [metrics]. Past reports: [history]. Keep it under 200 words, highlight wins, explain drops, end with next month recommendation.'",
+      "step_6": "Store in performance_reports table with status='draft'",
+      "step_7": "Team reviews in /reports page — sees all client reports side by side",
+      "step_8": "Click 'Send All' → Resend emails each report to respective client"
+    },
+    "ui_pages": {
+      "reports_list": "app/reports/page.tsx — grid of client cards showing: last report date, status (draft/sent), key metrics at a glance",
+      "report_detail": "app/reports/[clientId]/page.tsx — full report view with Instagram + YouTube metrics visualized (recharts), Claude summary, edit textarea, Send button",
+      "generate_button": "Dashboard header: 'Generate Reports' button (only visible to authenticated team)"
+    },
+    "files_to_create": [
+      "lib/scraping/instagramScraper.ts",
+      "lib/scraping/youtubeScraper.ts",
+      "app/api/reports/generate/route.ts",
+      "app/api/reports/[clientId]/route.ts",
+      "app/reports/page.tsx",
+      "app/reports/[clientId]/page.tsx",
+      "components/reports/ReportCard.tsx",
+      "components/reports/MetricsChart.tsx"
+    ],
+    "env_vars": ["APIFY_API_TOKEN", "YOUTUBE_API_KEY"]
+  },
+
+  "live_agent_trace_ui": {
+    "component": "components/agent/AgentTracePanel.tsx",
+    "trigger": "'▶ Run Agent' button in dashboard header (green, triggers most overdue script)",
+    "design": {
+      "layout": "Slide-in panel from right, dark overlay, z-50",
+      "node_pipeline": "Horizontal nodes connected by animated lines: [Monitor] →→→ [RAG] →→→ [Sentiment] →→→ [Context] →→→ [Generate] →→→ [Critique] →→→ [Revise?] →→→ [Memory]",
+      "node_states": {
+        "pending": "gray circle",
+        "active": "blue pulsing ring animation",
+        "complete": "green checkmark with tick animation",
+        "failed": "red X"
+      },
+      "execution_log": "Scrolling log below pipeline showing nodeExecutionLog entries as they stream in via SSE",
+      "critique_scores": "When selfCritique node completes, show score bars: Personalization 8/10, Urgency Clarity 6/10, etc."
+    },
+    "sse_implementation": {
+      "endpoint": "GET /api/agent/stream/[scriptId]",
+      "headers": "Content-Type: text/event-stream, Cache-Control: no-cache, Connection: keep-alive",
+      "event_format": "data: {node: 'ragRetrieval', status: 'complete', summary: 'Retrieved 4 memories for Nike. Top: prefers formal tone (0.89 similarity)', timestamp: 1234567890}\\n\\n",
+      "client_code": "const es = new EventSource('/api/agent/stream/'+scriptId); es.onmessage = (e) => updateNodeState(JSON.parse(e.data))"
+    }
+  },
+
+  "client_intelligence_page": {
+    "route": "/intelligence",
+    "purpose": "Makes RAG memory system visible and tangible to non-technical evaluator",
+    "pages": {
+      "list": "app/intelligence/page.tsx — grid of all clients with: response speed badge, approval rate bar, top behavioral insight",
+      "detail": "app/intelligence/[clientId]/page.tsx — full profile with AI-generated behavioral summary, all memories as chips, timeline of past scripts"
+    },
+    "ai_behavioral_profile": {
+      "prompt": "Based on these client interaction memories, write a 3-sentence behavioral profile for [client_name]: [memories]. Cover: 1) Communication style and preferences 2) What content they approve vs reject 3) Optimal outreach timing and tone.",
+      "displayed_as": "Highlighted card with typewriter animation"
+    },
+    "memory_chips": "All client_memories displayed as color-coded chips: feedback=blue, approval=green, rejection=red, behavioral_pattern=purple"
+  },
+
+  "analytics_dashboard": {
+    "tab": "Second tab in dashboard: 'Overview' (kanban) | 'Analytics'",
+    "component": "components/dashboard/AnalyticsTab.tsx",
+    "kpi_cards": [
+      "Total scripts this month",
+      "Avg client response time (hours)",
+      "Overall approval rate (%)",
+      "Time saved: (chasers_sent × 15min) displayed as 'X hrs Y min'"
+    ],
+    "charts": [
+      "Bar chart: Scripts by status (recharts)",
+      "Line chart: Scripts sent per day last 30 days",
+      "Horizontal bar chart: Response time by client (slowest at top)"
+    ],
+    "scripts_at_risk_table": {
+      "definition": "Scripts overdue AND client has avg_response_hours > 48",
+      "columns": ["Script title", "Client", "Hours overdue", "Historical avg response", "Risk score"],
+      "risk_score": "(hours_overdue / avg_response_hours) × 100, shown as red progress bar"
+    },
+    "api_route": "GET /api/analytics — single aggregation query"
+  },
+
+  "hitl_timeline": {
+    "component": "Updated ChaserCard.tsx",
+    "timeline_stages": [
+      {"stage": "AI Generated", "icon": "sparkles", "color": "blue"},
+      {"stage": "Pending Review", "icon": "clock", "color": "yellow"},
+      {"stage": "Approved / Edited", "icon": "check", "color": "green"},
+      {"stage": "Sent to Client", "icon": "send", "color": "green"}
+    ],
+    "design": "Horizontal stepper below chaser email preview. Active stage has filled circle, future stages are outlined. Timestamps shown under each completed stage."
+  },
+
+  "login_page_animations": {
+    "library": "Framer Motion (already installed)",
+    "sequence": {
+      "container": "staggerChildren: 0.15",
+      "pill_tag": "fadeIn from y:-10, delay: 0",
+      "headline": "fadeIn from y:20, scale from 0.95 to 1, delay: 0.15",
+      "subtext": "fadeIn, delay: 0.3",
+      "divider": "scaleX from 0 to 1, transformOrigin: center, delay: 0.45",
+      "card": "fadeIn from y:30, delay: 0.6",
+      "button": "fadeIn, delay: 0.75"
+    }
+  },
+
+  "deployment": {
+    "platform": "Vercel",
+    "domain": "greenlit.ruskaruma.me",
+    "steps": [
+      "1. Push to GitHub (public repo)",
+      "2. Connect Vercel to GitHub repo",
+      "3. Add all env vars in Vercel dashboard",
+      "4. Update GitHub OAuth app callback URL to https://greenlit.ruskaruma.me/api/auth/callback/github",
+      "5. Update NEXTAUTH_URL=https://greenlit.ruskaruma.me",
+      "6. Update Twilio webhook URL to https://greenlit.ruskaruma.me/api/webhooks/whatsapp",
+      "7. Deploy"
+    ],
+    "vercel_cron": "vercel.json: { crons: [{ path: '/api/agent/run', schedule: '0 * * * *' }] }",
+    "seed_reset": "GET /api/seed?reset=true — clears and re-seeds for clean demo state"
+  },
+
+  "env_vars_complete": {
+    "supabase": ["NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_ANON_KEY", "SUPABASE_SERVICE_ROLE_KEY"],
+    "auth": ["GITHUB_ID", "GITHUB_CLIENT_SECRET", "NEXTAUTH_SECRET", "NEXTAUTH_URL", "ALLOWED_EMAILS"],
+    "ai": ["ANTHROPIC_API_KEY", "OPENAI_API_KEY"],
+    "email": ["RESEND_API_KEY", "RESEND_FROM_EMAIL"],
+    "whatsapp": ["TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_WHATSAPP_FROM"],
+    "scraping": ["APIFY_API_TOKEN", "YOUTUBE_API_KEY"],
+    "observability": ["LANGCHAIN_TRACING_V2=true", "LANGCHAIN_API_KEY", "LANGCHAIN_PROJECT=greenlit"],
+    "security": ["CRON_SECRET"]
+  },
+
+  "build_phases_remaining": {
+    "phase_visual_features": {
+      "estimate_hours": 6,
+      "items": [
+        "Login page Framer Motion entrance animations",
+        "Live agent trace panel with SSE streaming",
+        "HITL timeline stepper on ChaserCard",
+        "sentimentAnalysis node added to LangGraph agent",
+        "selfCritique + revision nodes (ReAct loop)",
+        "nodeExecutionLog populated in each node"
+      ]
+    },
+    "phase_whatsapp": {
+      "estimate_hours": 3,
+      "items": [
+        "lib/twilio/sendWhatsApp.ts",
+        "app/api/webhooks/whatsapp/route.ts with Claude intent parsing",
+        "lib/twilio/parseIntent.ts",
+        "Update POST /api/scripts to trigger WhatsApp alongside email",
+        "Add review_channel field to scripts table",
+        "Dashboard: show channel badge (Email/WhatsApp) on script cards",
+        "Twilio sandbox setup + test end-to-end"
+      ]
+    },
+    "phase_performance_reporting": {
+      "estimate_hours": 3,
+      "items": [
+        "lib/scraping/instagramScraper.ts — Apify API call",
+        "lib/scraping/youtubeScraper.ts — YouTube Data API v3",
+        "app/api/reports/generate/route.ts",
+        "app/reports/page.tsx + [clientId]/page.tsx",
+        "ReportCard.tsx + MetricsChart.tsx (recharts)",
+        "Claude report generation prompt",
+        "Resend email integration for sending reports",
+        "Add instagram_handle + youtube_channel_id to clients table",
+        "performance_reports table in Supabase"
+      ]
+    },
+    "phase_intelligence_analytics": {
+      "estimate_hours": 3,
+      "items": [
+        "app/intelligence/page.tsx + [clientId]/page.tsx",
+        "Analytics tab with KPI cards + recharts",
+        "Scripts at risk table",
+        "GET /api/analytics route",
+        "GET /api/intelligence/[clientId] route"
+      ]
+    },
+    "phase_deploy": {
+      "estimate_hours": 2,
+      "items": [
+        "Push to GitHub",
+        "Vercel deploy",
+        "Update OAuth callback URL",
+        "Update Twilio webhook URL",
+        "Seed reset endpoint",
+        "Smoke test all features on production URL"
+      ]
+    },
+    "phase_writeup_loom": {
+      "estimate_hours": 6,
+      "items": [
+        "Submission writeup doc (problem reasoning + architecture + agent design + impact + what next)",
+        "Loom script (10-12 min video)",
+        "README polish"
+      ]
+    }
+  },
+
+  "loom_demo_script": {
+    "total_duration_minutes": "10-12",
+    "sections": [
+      {
+        "section": "Hook (30 sec)",
+        "content": "Open with the problem stat: '125 manual chases per month. Scripts sitting unseen. Missed deadlines. I built Greenlit to eliminate this entirely.'"
+      },
+      {
+        "section": "Login page (30 sec)",
+        "content": "Show beautiful login, GitHub OAuth flow, smooth animations"
+      },
+      {
+        "section": "Dashboard (1 min)",
+        "content": "Show live Kanban. Point out: overdue cards with red glow, Live indicator, HITL badge count, theme toggle"
+      },
+      {
+        "section": "Script upload + dual channel send (1.5 min)",
+        "content": "Upload new script. Show email sent (Resend). Show WhatsApp message sent (Twilio). Explain: 'client can respond on either channel — both update the same system'"
+      },
+      {
+        "section": "WhatsApp approval (1 min)",
+        "content": "Simulate WhatsApp reply. Show Claude parsing intent. Dashboard updates in real time via Supabase Realtime."
+      },
+      {
+        "section": "Live agent trace (2 min)",
+        "content": "Trigger agent manually for overdue script. Show AgentTracePanel: nodes lighting up one by one. Show critique scores. Show revision happening if score < 7. Narrate each node."
+      },
+      {
+        "section": "HITL panel (1 min)",
+        "content": "Go to /hitl. Show AI-generated chaser with HITL timeline. Edit it, approve it. Show email sends."
+      },
+      {
+        "section": "Client Intelligence (1 min)",
+        "content": "Go to /intelligence. Show Nike's behavioral profile. Show memories as chips. 'The agent knows Nike prefers formal tone because it learned from 6 past interactions.'"
+      },
+      {
+        "section": "Performance Reports (1.5 min)",
+        "content": "Go to /reports. Click 'Generate Reports'. Show Instagram + YouTube metrics loading. Show Claude-generated report in brand voice. One-click send vs 2.5 hours manually."
+      },
+      {
+        "section": "LangSmith (30 sec)",
+        "content": "Switch to LangSmith tab. Show full agent trace: every node, every token, every decision. 'Full observability baked in from day one.'"
+      },
+      {
+        "section": "What Next (30 sec)",
+        "content": "Brief-to-Script pipeline using same LangGraph infrastructure. Same nodes, different context. Full content lifecycle in one system."
+      }
+    ]
+  },
+
+  "writeup_key_points": {
+    "problem_selection_reasoning": "Content Approval Loop has the highest blast radius: client relationships are the agency's only asset. A missed approval = a damaged relationship = churn. 125 manual chases/month = a full-time job that exists only because of missing infrastructure.",
+    "why_two_problems": "While building the approval loop, the same Supabase + scraping + Claude infrastructure naturally solved Performance Reporting. Same client data model, same RAG memory, same email delivery. Showing this connection demonstrates systems thinking.",
+    "agent_design_decisions": [
+      "TypeScript LangGraph over Python: single-repo Vercel deploy, no separate service to manage",
+      "Self-critique ReAct loop: agent evaluates own output quality before human review — reduces HITL load by catching bad drafts automatically",
+      "RAG over static prompts: agent learns from every client interaction. The more it runs, the better it gets.",
+      "HITL as escalation not default: agent only escalates when confidence is high enough that human time is worth spending"
+    ],
+    "omnichannel_insight": "Binge Labs clients communicate on WhatsApp. Building email-only would solve 40% of the problem. Twilio webhook + Claude intent parsing solves 100% — and the unification insight (single source of truth regardless of channel) is the real architectural win.",
+    "what_next": "Brief-to-Script Pipeline (Problem 2): client submits brief via form → same LangGraph agent rewrites into internal format → assigns to scriptwriter → tracks status. Same infrastructure, 40-60 briefs/month automated. Full content lifecycle: Brief → Script → Approval → Report — all in Greenlit."
+  },
+
+  "competitive_differentiation": {
+    "vs_typical_submission": "Most candidates build a form with a database. Greenlit has: stateful AI agent with self-critique loop, omnichannel client communication (Email + WhatsApp), RAG memory that improves over time, HITL with full audit trail, performance reporting with automated scraping, and LangSmith observability.",
+    "evaluation_criteria_coverage": {
+      "problem_selection_20pct": "Highest-damage problem + extends to solve Problem 4 as bonus",
+      "agent_quality_30pct": "LangGraph ReAct loop with self-critique, pgvector RAG, OpenAI Agents SDK HITL, LangSmith tracing",
+      "architecture_tool_choices_20pct": "Every tool justified, TypeScript for single-repo deploy, Supabase eliminates need for separate vector DB",
+      "clarity_of_explanation_15pct": "Beautiful UI, live agent trace makes AI visible, LangSmith for non-technical founder",
+      "thinking_beyond_15pct": "Performance Reporting solved as bonus, Brief-to-Script pipeline outlined as next phase"
+    }
+  }
+}

@@ -5,7 +5,13 @@ import type { Client, Script } from "@/lib/supabase/types";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type SupabaseAny = any;
 
-export async function GET() {
+export async function GET(request: Request) {
+  const authHeader = request.headers.get("authorization");
+  const cronSecret = process.env.CRON_SECRET;
+  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const supabase: SupabaseAny = createServiceClientDirect();
 
   // Clear existing data (order matters for FK constraints)
@@ -20,42 +26,42 @@ export async function GET() {
     .insert([
       {
         name: "Sarah Chen",
-        email: "sarah.chen@nike.com",
+        email: "ishaan.sinha10@gmail.com",
         company: "Nike",
         avg_response_hours: 12.5,
         total_scripts: 8,
         approved_count: 6,
         rejected_count: 1,
         changes_requested_count: 1,
-        whatsapp_number: "+919876543210",
-        preferred_channel: "email",
+        whatsapp_number: "+918340121267",
+        preferred_channel: "both",
         instagram_handle: "nikecreative",
         youtube_channel_id: "UC_nike_placeholder",
       },
       {
         name: "Marcus Weber",
-        email: "m.weber@adidas.com",
+        email: "marcus@adidas-demo.com",
         company: "Adidas",
         avg_response_hours: 72.0,
         total_scripts: 5,
         approved_count: 2,
         rejected_count: 1,
         changes_requested_count: 2,
-        whatsapp_number: "+919876543211",
-        preferred_channel: "both",
+        whatsapp_number: null,
+        preferred_channel: "email",
         instagram_handle: "adidasoriginals",
         youtube_channel_id: "UC_adidas_placeholder",
       },
       {
         name: "Priya Patel",
-        email: "priya@puma.com",
+        email: "priya@puma-demo.com",
         company: "Puma",
         avg_response_hours: 36.0,
         total_scripts: 4,
         approved_count: 3,
         rejected_count: 0,
         changes_requested_count: 1,
-        whatsapp_number: "+919876543212",
+        whatsapp_number: null,
         preferred_channel: "email",
         instagram_handle: "pumaindia",
         youtube_channel_id: "UC_puma_placeholder",
