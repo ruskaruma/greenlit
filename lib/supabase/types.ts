@@ -4,7 +4,8 @@ export type ScriptStatus =
   | "changes_requested"
   | "approved"
   | "rejected"
-  | "overdue";
+  | "overdue"
+  | "closed";
 
 export type ChaserStatus =
   | "pending_hitl"

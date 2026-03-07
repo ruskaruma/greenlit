@@ -1,46 +1,89 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Clock, Calendar, AlertTriangle, Archive, Bot, Loader2 } from "lucide-react";
+import { Clock, Calendar, AlertTriangle, MoreHorizontal, Bot, Archive, XCircle, CheckCircle, Ban, Loader2 } from "lucide-react";
 import StatusBadge from "@/components/ui/StatusBadge";
 import { cn, formatTimeAgo, isOverdue, getScriptAge } from "@/lib/utils";
-import type { ScriptWithClient } from "@/lib/supabase/types";
+import type { ScriptWithClient, ScriptStatus } from "@/lib/supabase/types";
 
 interface ScriptCardProps {
   script: ScriptWithClient;
   onClick?: () => void;
   onArchive?: (id: string) => void;
+  onStatusChange?: (id: string, status: ScriptStatus) => void;
   onRunAgent?: (script: { id: string; title: string; client_name: string; due_date: string | null }) => void;
 }
 
-export default function ScriptCard({ script, onClick, onArchive, onRunAgent }: ScriptCardProps) {
+export default function ScriptCard({ script, onClick, onArchive, onStatusChange, onRunAgent }: ScriptCardProps) {
   const overdue = isOverdue(script.sent_at, script.status) || script.status === "overdue";
   const displayStatus = overdue ? "overdue" as const : script.status;
   const clientInitial = script.client.name.charAt(0).toUpperCase();
   const noContact = !script.client.email && !script.client.whatsapp_number;
-  const [archiving, setArchiving] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [loading, setLoading] = useState<string | null>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   const hoursOverdue = overdue && script.sent_at ? getScriptAge(script.sent_at) : 0;
   const daysOverdue = Math.round(hoursOverdue / 24);
   const isCritical = daysOverdue >= 7;
   const isSevere = daysOverdue >= 3;
 
-  const canArchive = script.status === "approved" || script.status === "rejected";
-
-  async function handleArchive(e: React.MouseEvent) {
-    e.stopPropagation();
-    if (!onArchive) return;
-    setArchiving(true);
-    try {
-      const res = await fetch(`/api/scripts/${script.id}/archive`, { method: "PATCH" });
-      if (res.ok) onArchive(script.id);
-    } catch {
-      // silent
-    } finally {
-      setArchiving(false);
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
     }
+    if (menuOpen) document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [menuOpen]);
+
+  async function handleAction(action: string, e: React.MouseEvent) {
+    e.stopPropagation();
+    setMenuOpen(false);
+
+    if (action === "run_agent" && onRunAgent) {
+      onRunAgent({ id: script.id, title: script.title, client_name: script.client.name, due_date: script.due_date });
+      return;
+    }
+
+    if (action === "archive") {
+      setLoading("archive");
+      try {
+        const res = await fetch(`/api/scripts/${script.id}/archive`, { method: "PATCH" });
+        if (res.ok) onArchive?.(script.id);
+      } catch { /* silent */ } finally { setLoading(null); }
+      return;
+    }
+
+    const statusMap: Record<string, ScriptStatus> = {
+      close: "closed",
+      approve: "approved",
+      reject: "rejected",
+    };
+
+    const newStatus = statusMap[action];
+    if (!newStatus) return;
+
+    setLoading(action);
+    try {
+      const res = await fetch(`/api/scripts/${script.id}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: newStatus }),
+      });
+      if (res.ok) onStatusChange?.(script.id, newStatus);
+    } catch { /* silent */ } finally { setLoading(null); }
   }
+
+  const menuItems: { key: string; label: string; icon: React.ReactNode; show: boolean }[] = [
+    { key: "run_agent", label: "Run Agent", icon: <Bot size={12} />, show: script.status !== "closed" },
+    { key: "archive", label: "Archive", icon: <Archive size={12} />, show: !script.archived },
+    { key: "close", label: "Close", icon: <XCircle size={12} />, show: script.status !== "closed" },
+    { key: "approve", label: "Mark Approved", icon: <CheckCircle size={12} />, show: script.status !== "approved" },
+    { key: "reject", label: "Mark Rejected", icon: <Ban size={12} />, show: script.status !== "rejected" },
+  ].filter(item => item.show);
 
   return (
     <motion.div
@@ -77,6 +120,32 @@ export default function ScriptCard({ script, onClick, onArchive, onRunAgent }: S
             v{script.version}
           </span>
           <StatusBadge status={displayStatus} />
+          <div className="relative" ref={menuRef}>
+            {loading ? (
+              <Loader2 size={14} className="text-[var(--muted)] animate-spin" />
+            ) : (
+              <button
+                onClick={(e) => { e.stopPropagation(); setMenuOpen(!menuOpen); }}
+                className="p-0.5 rounded text-[var(--muted)] opacity-50 hover:opacity-100 hover:bg-[var(--surface-elevated)]"
+              >
+                <MoreHorizontal size={14} />
+              </button>
+            )}
+            {menuOpen && (
+              <div className="absolute right-0 top-6 z-50 w-44 bg-[var(--card)] border border-[var(--border)] rounded-lg shadow-lg py-1 overflow-hidden">
+                {menuItems.map((item) => (
+                  <button
+                    key={item.key}
+                    onClick={(e) => handleAction(item.key, e)}
+                    className="flex items-center gap-2 w-full px-3 py-1.5 text-[11px] text-[var(--muted)] hover:bg-[var(--surface-elevated)] hover:text-[var(--text)] text-left"
+                  >
+                    {item.icon}
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -116,35 +185,6 @@ export default function ScriptCard({ script, onClick, onArchive, onRunAgent }: S
           <Calendar size={11} />
           <span>Due {new Date(script.due_date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
         </div>
-      )}
-
-      {overdue && onRunAgent && (
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onRunAgent({
-              id: script.id,
-              title: script.title,
-              client_name: script.client.name,
-              due_date: script.due_date,
-            });
-          }}
-          className="flex items-center gap-1.5 mt-3 px-2.5 py-1.5 rounded text-[10px] font-medium border border-[var(--border)] text-[var(--muted)] hover:text-[var(--text)] hover:bg-[var(--surface-elevated)] w-full justify-center"
-        >
-          <Bot size={11} />
-          Run Agent
-        </button>
-      )}
-
-      {canArchive && !script.archived && onArchive && (
-        <button
-          onClick={handleArchive}
-          disabled={archiving}
-          className="flex items-center gap-1.5 mt-3 px-2.5 py-1 rounded text-[10px] text-[var(--muted)] opacity-50 hover:opacity-100 w-full justify-center"
-        >
-          {archiving ? <Loader2 size={10} className="animate-spin" /> : <Archive size={10} />}
-          Archive
-        </button>
       )}
     </motion.div>
   );

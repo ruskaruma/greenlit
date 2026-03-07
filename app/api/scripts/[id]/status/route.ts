@@ -15,6 +15,7 @@ const validStatuses: ScriptStatus[] = [
   "changes_requested",
   "approved",
   "rejected",
+  "closed",
 ];
 
 export async function PATCH(

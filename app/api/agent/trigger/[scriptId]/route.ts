@@ -27,9 +27,9 @@ export async function POST(
     return NextResponse.json({ error: "Script not found" }, { status: 404 });
   }
 
-  if (script.status !== "pending_review" && script.status !== "overdue") {
+  if (script.status === "closed") {
     return NextResponse.json(
-      { error: `Script status is '${script.status}', expected 'pending_review' or 'overdue'` },
+      { error: "Cannot run agent on a closed script" },
       { status: 400 }
     );
   }

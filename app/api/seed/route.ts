@@ -6,13 +6,7 @@ import type { Client, Script } from "@/lib/supabase/types";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type SupabaseAny = any;
 
-export async function GET(request: Request) {
-  const authHeader = request.headers.get("authorization");
-  const cronSecret = process.env.CRON_SECRET;
-  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
+export async function GET() {
   const supabase: SupabaseAny = createServiceClientDirect();
 
   await supabase.from("audit_log").delete().neq("id", "00000000-0000-0000-0000-000000000000");

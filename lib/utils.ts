@@ -13,7 +13,7 @@ export function getScriptAge(sentAt: string): number {
 
 export function isOverdue(sentAt: string | null, status: ScriptStatus): boolean {
   if (!sentAt) return false;
-  if (status === "approved" || status === "rejected" || status === "draft") return false;
+  if (status === "approved" || status === "rejected" || status === "draft" || status === "closed") return false;
   return getScriptAge(sentAt) > 48;
 }
 
@@ -31,6 +31,8 @@ export function getStatusColor(status: ScriptStatus): string {
       return "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/15";
     case "draft":
       return "bg-[var(--text)]/5 text-[var(--muted)] border-[var(--text)]/5";
+    case "closed":
+      return "bg-zinc-500/10 text-zinc-400 border-zinc-500/15";
     default:
       return "bg-[var(--text)]/5 text-[var(--muted)] border-[var(--text)]/5";
   }

@@ -21,6 +21,7 @@ const columns: { key: ColumnKey; label: string }[] = [
 ];
 
 function categorizeScript(script: ScriptWithClient): ColumnKey | null {
+  if (script.status === "closed") return null;
   if (script.status === "draft") return "draft";
   if (script.status === "overdue") return "overdue";
   if (isOverdue(script.sent_at, script.status)) return "overdue";
@@ -36,9 +37,11 @@ interface KanbanBoardProps {
   onConnectionChange?: (connected: boolean) => void;
   refreshKey?: number;
   showArchived?: boolean;
+  showClosed?: boolean;
+  onRunAgent?: (script: { id: string; title: string; client_name: string; due_date: string | null }) => void;
 }
 
-export default function KanbanBoard({ initialScripts, onConnectionChange, refreshKey, showArchived }: KanbanBoardProps) {
+export default function KanbanBoard({ initialScripts, onConnectionChange, refreshKey, showArchived, showClosed, onRunAgent }: KanbanBoardProps) {
   const [scripts, setScripts] = useState<ScriptWithClient[]>(initialScripts);
   const [selectedScript, setSelectedScript] = useState<ScriptWithClient | null>(null);
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -148,7 +151,10 @@ export default function KanbanBoard({ initialScripts, onConnectionChange, refres
     setScripts((prev) => prev.map((s) => s.id === id ? { ...s, archived: true } : s));
   }, []);
 
-  const visibleScripts = showArchived ? scripts : scripts.filter((s) => !s.archived);
+  let visibleScripts = showArchived ? scripts : scripts.filter((s) => !s.archived);
+  if (!showClosed) {
+    visibleScripts = visibleScripts.filter((s) => s.status !== "closed");
+  }
 
   const grouped = columns.reduce<Record<ColumnKey, ScriptWithClient[]>>(
     (acc, col) => {
@@ -158,7 +164,13 @@ export default function KanbanBoard({ initialScripts, onConnectionChange, refres
     {} as Record<ColumnKey, ScriptWithClient[]>
   );
 
+  const closedScripts: ScriptWithClient[] = [];
+
   for (const script of visibleScripts) {
+    if (script.status === "closed") {
+      closedScripts.push(script);
+      continue;
+    }
     const col = categorizeScript(script);
     if (col) grouped[col].push(script);
   }
@@ -206,6 +218,8 @@ export default function KanbanBoard({ initialScripts, onConnectionChange, refres
                     script={script}
                     onClick={() => setSelectedScript(script)}
                     onArchive={handleArchive}
+                    onStatusChange={handleStatusChange}
+                    onRunAgent={onRunAgent}
                   />
                 ))
               )}
@@ -213,6 +227,33 @@ export default function KanbanBoard({ initialScripts, onConnectionChange, refres
           </div>
         </div>
       ))}
+
+      {showClosed && closedScripts.length > 0 && (
+        <div className="flex flex-col border-l border-[var(--border)] pl-4 w-[280px] shrink-0">
+          <div className="flex items-center gap-2.5 mb-3">
+            <div className="w-1.5 h-1.5 bg-zinc-500 opacity-50" />
+            <h2 className="text-[11px] font-medium uppercase tracking-widest text-[var(--muted)]">
+              Closed
+            </h2>
+            <span className="ml-auto text-[10px] text-[var(--muted)] opacity-60 bg-[var(--card)] border border-[var(--border)] px-1.5 py-0.5 rounded">
+              {closedScripts.length}
+            </span>
+          </div>
+          <div className="flex flex-col gap-2 min-h-[200px]">
+            <AnimatePresence mode="popLayout">
+              {closedScripts.map((script) => (
+                <ScriptCard
+                  key={script.id}
+                  script={script}
+                  onClick={() => setSelectedScript(script)}
+                  onArchive={handleArchive}
+                  onStatusChange={handleStatusChange}
+                />
+              ))}
+            </AnimatePresence>
+          </div>
+        </div>
+      )}
     </div>
 
     <AnimatePresence>
