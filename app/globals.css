@@ -1,0 +1,125 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  --bg: #F7F7F7;
+  --card: #FFFFFF;
+  --text: #0A0A0A;
+  --muted: #888888;
+  --border: #E5E5E5;
+  --accent: #E8E8E8;
+  --input-bg: #F0F0F0;
+  --surface-elevated: #EFEFEF;
+}
+
+.dark {
+  --bg: #0A0A0A;
+  --card: #111111;
+  --text: #F5F5F5;
+  --muted: #555555;
+  --border: #1E1E1E;
+  --accent: #E8E8E8;
+  --input-bg: #0A0A0A;
+  --surface-elevated: #161616;
+}
+
+@theme inline {
+  --color-background: var(--bg);
+  --color-foreground: var(--text);
+  --color-accent: var(--accent);
+  --color-card: var(--card);
+  --color-border: var(--border);
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+}
+
+html {
+  transition: color 150ms ease, background-color 150ms ease;
+}
+
+/* Noise texture overlay */
+.noise-bg::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+}
+
+/* Custom scrollbar */
+.dark ::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.dark ::-webkit-scrollbar-track {
+  background: #0A0A0A;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: #1E1E1E;
+  border-radius: 3px;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: #333333;
+}
+
+/* Green glow for live indicator */
+.glow-green {
+  box-shadow: 0 0 8px rgba(52, 211, 153, 0.4);
+}
+
+/* Overdue card pulse */
+@keyframes pulse-red {
+  0%, 100% {
+    box-shadow: 0 0 4px rgba(239, 68, 68, 0.15);
+  }
+  50% {
+    box-shadow: 0 0 12px rgba(239, 68, 68, 0.3);
+  }
+}
+
+.animate-pulse-red {
+  animation: pulse-red 2s ease-in-out infinite;
+}
+
+/* Overdue subtle opacity pulse */
+@keyframes pulse-subtle {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
+
+.animate-pulse-subtle {
+  animation: pulse-subtle 2.5s ease-in-out infinite;
+}
+
+/* Status badge pulse for overdue */
+@keyframes badge-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
+
+.animate-badge-pulse {
+  animation: badge-pulse 1.5s ease-in-out infinite;
+}
+
+/* All transitions default to 150ms */
+* {
+  transition-duration: 150ms;
+  transition-timing-function: ease;
+}
