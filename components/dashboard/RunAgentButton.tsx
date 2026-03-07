@@ -69,30 +69,12 @@ export default function RunAgentButton({ scripts }: RunAgentButtonProps) {
   const runAgent = useCallback(async () => {
     if (!selected) return;
 
-    try {
-      const triggerRes = await fetch(`/api/agent/trigger/${selected.id}`, { method: "POST" });
-      if (triggerRes.status === 409) {
-        toast("info", "Draft already exists in HITL panel");
-        setConfirmOpen(false);
-        return;
-      }
-      if (!triggerRes.ok) {
-        const data = await triggerRes.json();
-        toast("error", data.error || "Failed to trigger agent");
-        setConfirmOpen(false);
-        return;
-      }
-    } catch {
-      toast("error", "Failed to trigger agent");
-      setConfirmOpen(false);
-      return;
-    }
-
     setRunning(true);
     setCurrentNode(null);
     setCompletedNodes([]);
     setDone(false);
 
+    // Connect SSE first so we catch events as the agent runs
     const es = new EventSource(`/api/agent/stream/${selected.id}`);
     eventSourceRef.current = es;
 
@@ -136,6 +118,27 @@ export default function RunAgentButton({ scripts }: RunAgentButtonProps) {
       setDone(true);
       es.close();
     };
+
+    // Queue and immediately process via process-queue
+    try {
+      const res = await fetch(`/api/agent/process-queue?scriptId=${selected.id}`);
+      if (!res.ok) {
+        const data = await res.json();
+        if (data.skipped && data.reason === "chaser_exists") {
+          toast("info", "Draft already exists in HITL panel");
+        } else if (data.error) {
+          toast("error", data.error);
+        }
+        setRunning(false);
+        setDone(true);
+        es.close();
+      }
+    } catch {
+      toast("error", "Failed to trigger agent");
+      setRunning(false);
+      setDone(true);
+      es.close();
+    }
   }, [selected, toast]);
 
   function close() {
