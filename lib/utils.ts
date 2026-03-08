@@ -19,27 +19,6 @@ export function isOverdue(sentAt: string | null, status: ScriptStatus, responseD
   return getScriptAge(sentAt) > deadlineHours;
 }
 
-export function getStatusColor(status: ScriptStatus): string {
-  switch (status) {
-    case "pending_review":
-      return "bg-amber-500/15 text-amber-400 border-amber-500/20";
-    case "approved":
-      return "bg-[var(--accent-success)]/10 text-[var(--accent-success)] border-[var(--accent-success)]/20";
-    case "rejected":
-      return "bg-red-500/10 text-red-400 border-red-500/20";
-    case "overdue":
-      return "bg-red-500/10 text-red-400 border-red-500/20";
-    case "changes_requested":
-      return "bg-amber-500/10 text-amber-400 border-amber-500/20";
-    case "draft":
-      return "bg-[var(--surface-elevated)] text-[var(--muted)] border-[var(--border)]";
-    case "closed":
-      return "bg-[var(--surface-elevated)] text-[var(--muted)] border-[var(--border)]";
-    default:
-      return "bg-[var(--surface-elevated)] text-[var(--muted)] border-[var(--border)]";
-  }
-}
-
 export function formatTimeAgo(date: string): string {
   return formatDistanceToNow(new Date(date), { addSuffix: true });
 }

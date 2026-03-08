@@ -1,16 +1,31 @@
 import type { NextAuthOptions } from "next-auth";
-import GitHubProvider from "next-auth/providers/github";
-
-const allowedEmails = (process.env.ALLOWED_EMAILS ?? "")
-  .split(",")
-  .map((e) => e.trim().toLowerCase())
-  .filter(Boolean);
+import CredentialsProvider from "next-auth/providers/credentials";
 
 export const authOptions: NextAuthOptions = {
   providers: [
-    GitHubProvider({
-      clientId: process.env.GITHUB_ID!,
-      clientSecret: process.env.GITHUB_CLIENT_SECRET!,
+    CredentialsProvider({
+      name: "Credentials",
+      credentials: {
+        username: { label: "Username", type: "text" },
+        password: { label: "Password", type: "password" },
+      },
+      async authorize(credentials) {
+        const validUsername = process.env.ADMIN_USERNAME;
+        const validPassword = process.env.ADMIN_PASSWORD;
+
+        if (!validUsername || !validPassword) {
+          throw new Error("Admin credentials not configured");
+        }
+
+        if (
+          credentials?.username === validUsername &&
+          credentials?.password === validPassword
+        ) {
+          return { id: "1", name: validUsername, email: `${validUsername}@greenlit.local` };
+        }
+
+        return null;
+      },
     }),
   ],
   session: {
@@ -20,20 +35,15 @@ export const authOptions: NextAuthOptions = {
     signIn: "/login",
   },
   callbacks: {
-    async signIn({ user }) {
-      if (allowedEmails.length === 0) return true;
-      const email = user.email?.toLowerCase();
-      return email ? allowedEmails.includes(email) : false;
-    },
     async session({ session, token }) {
-      if (session.user && token.email) {
-        session.user.email = token.email;
+      if (session.user && token.name) {
+        session.user.name = token.name;
       }
       return session;
     },
     async jwt({ token, user }) {
-      if (user?.email) {
-        token.email = user.email;
+      if (user?.name) {
+        token.name = user.name;
       }
       return token;
     },

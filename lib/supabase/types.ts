@@ -106,6 +106,30 @@ export interface ClientMemory {
   created_at: string;
 }
 
+export type ReportPlatform = "Instagram" | "YouTube" | "LinkedIn" | "TikTok";
+export type ReportContentType = "Video" | "Photo" | "Carousel" | "Story" | "Reel" | "Post";
+
+export interface Report {
+  id: string;
+  script_id: string | null;
+  client_id: string;
+  platform: ReportPlatform | null;
+  content_type: ReportContentType | null;
+  content_title: string | null;
+  post_url: string | null;
+  post_date: string | null;
+  metrics: Record<string, number>;
+  previous_metrics: Record<string, number> | null;
+  generated_summary: string | null;
+  recommendations: string | null;
+  sent_at: string | null;
+  created_at: string;
+}
+
+export interface ReportWithClient extends Report {
+  client: Client;
+}
+
 export interface Database {
   public: {
     Tables: {

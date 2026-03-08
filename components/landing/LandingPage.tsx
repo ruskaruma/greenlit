@@ -2,7 +2,7 @@
 
 import { motion } from "framer-motion";
 import Link from "next/link";
-import { signIn } from "next-auth/react";
+
 import { Bot, ShieldCheck, BarChart3 } from "lucide-react";
 import ThemeToggle from "@/components/dashboard/ThemeToggle";
 
@@ -47,9 +47,9 @@ export default function LandingPage() {
         </div>
         <div className="flex items-center gap-3">
           <ThemeToggle />
-          <button onClick={() => signIn("github", { callbackUrl: "/dashboard" })} className="px-4 py-1.5 rounded-md text-[11px] font-semibold tracking-wide border border-[var(--accent-primary)] text-[var(--accent-primary)] hover:bg-[var(--accent-primary)] hover:text-white transition-colors cursor-pointer">
+          <Link href="/login" className="px-4 py-1.5 rounded-md text-[11px] font-semibold tracking-wide border border-[var(--accent-primary)] text-[var(--accent-primary)] hover:bg-[var(--accent-primary)] hover:text-white transition-colors cursor-pointer">
             GET STARTED
-          </button>
+          </Link>
         </div>
       </nav>
 
@@ -111,14 +111,15 @@ export default function LandingPage() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.9, duration: 0.4 }}
             >
-              <motion.button
-                onClick={() => signIn("github", { callbackUrl: "/dashboard" })}
-                className="px-8 py-3.5 rounded-xl font-semibold text-base bg-[var(--accent-primary)] text-white cursor-pointer glow-primary"
-                whileHover={{ scale: 1.03, y: -1 }}
-                whileTap={{ scale: 0.98 }}
-              >
-                use greenlit
-              </motion.button>
+              <Link href="/login">
+                <motion.span
+                  className="inline-block px-8 py-3.5 rounded-xl font-semibold text-base bg-[var(--accent-primary)] text-white cursor-pointer glow-primary"
+                  whileHover={{ scale: 1.03, y: -1 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  use greenlit
+                </motion.span>
+              </Link>
             </motion.div>
           </div>
 

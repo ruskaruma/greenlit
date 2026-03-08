@@ -1,8 +1,37 @@
 "use client";
 
 import { signIn } from "next-auth/react";
+import { useState } from "react";
+import { useSearchParams } from "next/navigation";
 
 export const FullScreenSignup = () => {
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const searchParams = useSearchParams();
+  const callbackUrl = searchParams.get("callbackUrl") || "/dashboard";
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+
+    const result = await signIn("credentials", {
+      username,
+      password,
+      redirect: false,
+      callbackUrl,
+    });
+
+    if (result?.error) {
+      setError("Invalid username or password");
+      setLoading(false);
+    } else if (result?.ok) {
+      window.location.href = callbackUrl;
+    }
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center overflow-hidden p-4">
       <div className="w-full relative max-w-5xl overflow-hidden flex flex-col md:flex-row shadow-xl rounded-3xl">
@@ -28,28 +57,62 @@ export const FullScreenSignup = () => {
         <div className="p-8 md:p-12 md:w-1/2 flex flex-col bg-[var(--card)] z-99 text-[var(--text)]">
           <div className="flex flex-col items-left mb-8">
             <h2 className="text-3xl font-medium mb-2 tracking-tight" style={{ fontFamily: "var(--font-playfair), serif" }}>
-              Get Started
+              Sign In
             </h2>
             <p className="text-left text-[var(--muted)]">
-              Sign in to Greenlit with your GitHub account.
+              Enter your credentials to access Greenlit.
             </p>
           </div>
 
-          <div className="flex flex-col gap-4">
+          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="username" className="text-xs font-medium text-[var(--muted)]">
+                Username
+              </label>
+              <input
+                id="username"
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                required
+                autoComplete="username"
+                className="w-full px-3 py-2.5 rounded-lg bg-[var(--bg)] border border-[var(--border)] text-[var(--text)] text-sm placeholder:text-[var(--muted)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)] focus:border-transparent transition-all"
+                placeholder="Enter username"
+              />
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="password" className="text-xs font-medium text-[var(--muted)]">
+                Password
+              </label>
+              <input
+                id="password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                autoComplete="current-password"
+                className="w-full px-3 py-2.5 rounded-lg bg-[var(--bg)] border border-[var(--border)] text-[var(--text)] text-sm placeholder:text-[var(--muted)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)] focus:border-transparent transition-all"
+                placeholder="Enter password"
+              />
+            </div>
+
+            {error && (
+              <p className="text-red-400 text-sm">{error}</p>
+            )}
+
             <button
-              onClick={() => signIn("github", { callbackUrl: "/dashboard" })}
-              className="w-full flex items-center justify-center gap-3 bg-[var(--accent-primary)] hover:opacity-90 text-white font-medium py-3 px-4 rounded-lg transition-opacity cursor-pointer"
+              type="submit"
+              disabled={loading}
+              className="w-full flex items-center justify-center gap-3 bg-[var(--accent-primary)] hover:opacity-90 text-white font-medium py-3 px-4 rounded-lg transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor">
-                <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z" />
-              </svg>
-              Continue with GitHub
+              {loading ? "Signing in..." : "Sign In"}
             </button>
 
             <p className="text-center text-[var(--muted)] text-sm">
               Access restricted to Scrollhouse team members.
             </p>
-          </div>
+          </form>
         </div>
       </div>
     </div>

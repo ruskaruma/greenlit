@@ -13,7 +13,7 @@ const resend = process.env.RESEND_API_KEY
   : null;
 
 async function notifyAgentFailure(scriptId: string, title: string, clientName: string, errorMsg: string) {
-  const teamEmail = process.env.ALLOWED_EMAIL;
+  const teamEmail = process.env.TEAM_EMAIL;
   if (!teamEmail || !resend) return;
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";

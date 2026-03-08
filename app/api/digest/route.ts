@@ -172,7 +172,7 @@ export async function GET(request: Request) {
     const digestText = lines.join("\n");
 
     // Send email digest
-    const teamEmail = process.env.ALLOWED_EMAIL;
+    const teamEmail = process.env.TEAM_EMAIL;
     if (teamEmail && resend) {
       try {
         await resend.emails.send({

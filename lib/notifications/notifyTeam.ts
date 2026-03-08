@@ -25,7 +25,7 @@ export async function notifyTeam({
   feedback,
   channel,
 }: NotifyTeamParams): Promise<void> {
-  const teamEmail = process.env.ALLOWED_EMAIL;
+  const teamEmail = process.env.TEAM_EMAIL;
   const founderWhatsApp = process.env.FOUNDER_WHATSAPP || process.env.DEMO_WHATSAPP_NUMBER;
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
