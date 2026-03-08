@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/components/ui/ToastProvider";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 
 
@@ -43,6 +44,7 @@ const STEPS = ["Client Basics", "Contract Details", "Brand Intelligence", "Revie
 
 export default function OnboardingForm() {
   const { toast } = useToast();
+  const router = useRouter();
   const [step, setStep] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<OnboardingResult | null>(null);
@@ -109,9 +111,9 @@ export default function OnboardingForm() {
         return;
       }
 
-      const data = await res.json();
-      setResult(data);
+      await res.json();
       toast("success", `${form.name} onboarded successfully`);
+      router.push("/dashboard");
     } catch {
       toast("error", "Something went wrong");
     } finally {
