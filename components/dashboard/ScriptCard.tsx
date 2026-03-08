@@ -152,7 +152,7 @@ export default function ScriptCard({ script, onClick, onArchive, onStatusChange,
               </button>
             )}
             {menuOpen && (
-              <div className="absolute right-0 top-6 z-50 w-44 bg-zinc-900 border border-zinc-700 rounded-lg shadow-xl py-1 overflow-hidden">
+              <div className="absolute right-0 top-6 z-50 w-44 bg-[var(--card)] border border-[var(--border)] rounded-lg shadow-xl py-1 overflow-hidden">
                 {menuItems.map((item) => (
                   <button
                     key={item.key}

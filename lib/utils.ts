@@ -32,11 +32,11 @@ export function getStatusColor(status: ScriptStatus): string {
     case "changes_requested":
       return "bg-amber-500/10 text-amber-400 border-amber-500/20";
     case "draft":
-      return "bg-zinc-700/30 text-zinc-400 border-zinc-700/30";
+      return "bg-[var(--surface-elevated)] text-[var(--muted)] border-[var(--border)]";
     case "closed":
-      return "bg-zinc-700/20 text-zinc-500 border-zinc-700/20";
+      return "bg-[var(--surface-elevated)] text-[var(--muted)] border-[var(--border)]";
     default:
-      return "bg-zinc-700/30 text-zinc-400 border-zinc-700/30";
+      return "bg-[var(--surface-elevated)] text-[var(--muted)] border-[var(--border)]";
   }
 }
 

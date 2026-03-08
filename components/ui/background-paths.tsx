@@ -1,180 +1,208 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Button } from "@/components/ui/button";
 import Link from "next/link";
 
 function FloatingPaths({ position }: { position: number }) {
-    const paths = Array.from({ length: 36 }, (_, i) => ({
-        id: i,
-        d: `M-${380 - i * 5 * position} -${189 + i * 6}C-${
-            380 - i * 5 * position
-        } -${189 + i * 6} -${312 - i * 5 * position} ${216 - i * 6} ${
-            152 - i * 5 * position
-        } ${343 - i * 6}C${616 - i * 5 * position} ${470 - i * 6} ${
-            684 - i * 5 * position
-        } ${875 - i * 6} ${684 - i * 5 * position} ${875 - i * 6}`,
-        width: 0.5 + i * 0.03,
-    }));
+  const paths = Array.from({ length: 36 }, (_, i) => ({
+    id: i,
+    d: `M-${380 - i * 5 * position} -${189 + i * 6}C-${
+      380 - i * 5 * position
+    } -${189 + i * 6} -${312 - i * 5 * position} ${216 - i * 6} ${
+      152 - i * 5 * position
+    } ${343 - i * 6}C${616 - i * 5 * position} ${470 - i * 6} ${
+      684 - i * 5 * position
+    } ${875 - i * 6} ${684 - i * 5 * position} ${875 - i * 6}`,
+    width: 0.5 + i * 0.03,
+  }));
 
-    return (
-        <div className="absolute inset-0 pointer-events-none">
-            <svg
-                className="w-full h-full"
-                viewBox="0 0 696 316"
-                fill="none"
-            >
-                <title>Background Paths</title>
-                {paths.map((path) => (
-                    <motion.path
-                        key={path.id}
-                        d={path.d}
-                        stroke="url(#lime-gradient)"
-                        strokeWidth={path.width}
-                        strokeOpacity={0.04 + path.id * 0.015}
-                        initial={{ pathLength: 0.3, opacity: 0.6 }}
-                        animate={{
-                            pathLength: 1,
-                            opacity: [0.15, 0.4, 0.15],
-                            pathOffset: [0, 1, 0],
-                        }}
-                        transition={{
-                            duration: 20 + Math.random() * 10,
-                            repeat: Number.POSITIVE_INFINITY,
-                            ease: "linear",
-                        }}
-                    />
-                ))}
-                <defs>
-                    <linearGradient id="lime-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                        <stop offset="0%" stopColor="#D4FF00" stopOpacity="0.6" />
-                        <stop offset="50%" stopColor="#00FFA3" stopOpacity="0.3" />
-                        <stop offset="100%" stopColor="#D4FF00" stopOpacity="0.1" />
-                    </linearGradient>
-                </defs>
-            </svg>
-        </div>
-    );
+  return (
+    <div className="absolute inset-0 pointer-events-none">
+      <svg className="w-full h-full" viewBox="0 0 696 316" fill="none">
+        <title>Background Paths</title>
+        {paths.map((path) => (
+          <motion.path
+            key={path.id}
+            d={path.d}
+            stroke="url(#hero-lime-gradient)"
+            strokeWidth={path.width}
+            strokeOpacity={0.06 + path.id * 0.018}
+            initial={{ pathLength: 0.3, opacity: 0.6 }}
+            animate={{
+              pathLength: 1,
+              opacity: [0.2, 0.5, 0.2],
+              pathOffset: [0, 1, 0],
+            }}
+            transition={{
+              duration: 20 + Math.random() * 10,
+              repeat: Number.POSITIVE_INFINITY,
+              ease: "linear",
+            }}
+          />
+        ))}
+        <defs>
+          <linearGradient id="hero-lime-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#D4FF00" stopOpacity="0.7" />
+            <stop offset="50%" stopColor="#00FFA3" stopOpacity="0.4" />
+            <stop offset="100%" stopColor="#D4FF00" stopOpacity="0.15" />
+          </linearGradient>
+        </defs>
+      </svg>
+    </div>
+  );
 }
 
-export function BackgroundPaths({
-    title = "Greenlit",
-}: {
-    title?: string;
-}) {
-    const words = title.split(" ");
+const spring = { type: "spring" as const, stiffness: 150, damping: 25 };
 
-    return (
-        <div className="relative min-h-screen w-full flex items-center justify-center overflow-hidden bg-[var(--bg)]">
-            <div className="absolute inset-0">
-                <FloatingPaths position={1} />
-                <FloatingPaths position={-1} />
-            </div>
+export function BackgroundPaths({ title = "Greenlit" }: { title?: string }) {
+  const words = title.split(" ");
 
-            <div className="relative z-10 container mx-auto px-4 md:px-6 text-center">
-                <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ duration: 2 }}
-                    className="max-w-4xl mx-auto"
-                >
-                    {/* Pill tag */}
-                    <motion.div
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.2, type: "spring", stiffness: 200, damping: 30 }}
-                        className="mb-8"
-                    >
-                        <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-[var(--border)] text-[11px] tracking-[0.15em] uppercase text-[var(--muted)]">
-                            <span className="w-1.5 h-1.5 rounded-full bg-[#00FFA3] animate-pulse" />
-                            AI-Powered Approval Engine
-                        </span>
-                    </motion.div>
+  return (
+    <div className="relative min-h-screen w-full flex items-center justify-center overflow-hidden bg-zinc-950">
+      {/* Radial glow behind center */}
+      <div className="absolute inset-0 pointer-events-none">
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[600px] rounded-full bg-[#D4FF00]/[0.03] blur-[120px]" />
+        <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] rounded-full bg-[#00FFA3]/[0.04] blur-[100px]" />
+      </div>
 
-                    {/* Per-letter animated title */}
-                    <h1 className="text-5xl sm:text-7xl md:text-8xl font-bold mb-4 tracking-tighter" style={{ fontFamily: "var(--font-playfair), serif" }}>
-                        {words.map((word, wordIndex) => (
-                            <span
-                                key={wordIndex}
-                                className="inline-block mr-4 last:mr-0"
-                            >
-                                {word.split("").map((letter, letterIndex) => (
-                                    <motion.span
-                                        key={`${wordIndex}-${letterIndex}`}
-                                        initial={{ y: 100, opacity: 0 }}
-                                        animate={{ y: 0, opacity: 1 }}
-                                        transition={{
-                                            delay:
-                                                wordIndex * 0.1 +
-                                                letterIndex * 0.03,
-                                            type: "spring",
-                                            stiffness: 150,
-                                            damping: 25,
-                                        }}
-                                        className="inline-block text-transparent bg-clip-text bg-gradient-to-r from-[#D4FF00] to-[#D4FF00]/70"
-                                    >
-                                        {letter}
-                                    </motion.span>
-                                ))}
-                            </span>
-                        ))}
-                    </h1>
+      {/* Animated paths */}
+      <div className="absolute inset-0">
+        <FloatingPaths position={1} />
+        <FloatingPaths position={-1} />
+      </div>
 
-                    {/* Subtext */}
-                    <motion.p
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.5, type: "spring", stiffness: 150, damping: 25 }}
-                        className="text-base md:text-lg text-[var(--muted)] mb-10 max-w-md mx-auto leading-relaxed"
-                    >
-                        AI-orchestrated video script approvals. Chase clients, not deadlines.
-                    </motion.p>
+      {/* Noise overlay */}
+      <div
+        className="absolute inset-0 pointer-events-none opacity-[0.03]"
+        style={{
+          backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='1'/%3E%3C/svg%3E")`,
+        }}
+      />
 
-                    {/* CTA Button */}
-                    <motion.div
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.7, type: "spring", stiffness: 150, damping: 25 }}
-                    >
-                        <div
-                            className="inline-block group relative bg-gradient-to-b from-[#D4FF00]/20 to-transparent
-                            p-px rounded-2xl backdrop-blur-lg
-                            overflow-hidden shadow-lg hover:shadow-xl hover:shadow-[#D4FF00]/10 transition-shadow duration-300"
-                        >
-                            <Link href="/login">
-                                <Button
-                                    variant="ghost"
-                                    className="rounded-[1.15rem] px-8 py-6 text-lg font-semibold backdrop-blur-md
-                                    bg-[var(--bg)]/95 hover:bg-[var(--bg)]/100
-                                    text-[#D4FF00] transition-all duration-300
-                                    group-hover:-translate-y-0.5 border border-[#D4FF00]/20 hover:border-[#D4FF00]/40
-                                    hover:shadow-md"
-                                >
-                                    <span className="opacity-90 group-hover:opacity-100 transition-opacity">
-                                        Start Chasing Clients
-                                    </span>
-                                    <span
-                                        className="ml-3 opacity-70 group-hover:opacity-100 group-hover:translate-x-1.5
-                                        transition-all duration-300"
-                                    >
-                                        &rarr;
-                                    </span>
-                                </Button>
-                            </Link>
-                        </div>
-                    </motion.div>
+      <div className="relative z-10 container mx-auto px-4 md:px-6 text-center">
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 2 }}
+          className="max-w-4xl mx-auto"
+        >
+          {/* Pill tag */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2, ...spring }}
+            className="mb-8"
+          >
+            <span className="inline-flex items-center gap-2.5 px-4 py-1.5 rounded-full border border-zinc-800 bg-zinc-900/60 backdrop-blur-sm text-[11px] tracking-[0.15em] uppercase text-zinc-500">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#00FFA3] shadow-[0_0_6px_rgba(0,255,163,0.6)] animate-pulse" />
+              AI-Powered Approval Engine
+            </span>
+          </motion.div>
 
-                    {/* Footer */}
-                    <motion.p
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        transition={{ delay: 1.2, duration: 1 }}
-                        className="mt-20 text-xs text-[var(--muted)] opacity-40"
-                    >
-                        by ruskaruma &middot; for Scrollhouse
-                    </motion.p>
-                </motion.div>
-            </div>
-        </div>
-    );
+          {/* Per-letter animated title */}
+          <h1
+            className="text-5xl sm:text-7xl md:text-8xl font-bold mb-5 tracking-tighter"
+            style={{ fontFamily: "var(--font-playfair), serif" }}
+          >
+            {words.map((word, wordIndex) => (
+              <span key={wordIndex} className="inline-block mr-4 last:mr-0">
+                {word.split("").map((letter, letterIndex) => (
+                  <motion.span
+                    key={`${wordIndex}-${letterIndex}`}
+                    initial={{ y: 100, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    transition={{
+                      delay: wordIndex * 0.1 + letterIndex * 0.03,
+                      ...spring,
+                    }}
+                    className="inline-block text-transparent bg-clip-text"
+                    style={{
+                      backgroundImage: "linear-gradient(135deg, #D4FF00 0%, #00FFA3 50%, #D4FF00 100%)",
+                      WebkitBackgroundClip: "text",
+                      filter: "drop-shadow(0 0 30px rgba(212, 255, 0, 0.15))",
+                    }}
+                  >
+                    {letter}
+                  </motion.span>
+                ))}
+              </span>
+            ))}
+          </h1>
+
+          {/* Subtext */}
+          <motion.p
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.5, ...spring }}
+            className="text-base md:text-lg text-zinc-500 mb-12 max-w-md mx-auto leading-relaxed"
+          >
+            AI-orchestrated video script approvals. Chase clients, not deadlines.
+          </motion.p>
+
+          {/* CTA Button */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.7, ...spring }}
+          >
+            <Link href="/login" className="inline-block group">
+              <motion.div
+                className="relative px-8 py-4 rounded-2xl font-semibold text-lg
+                  bg-[#D4FF00] text-zinc-950 cursor-pointer
+                  shadow-[0_0_30px_rgba(212,255,0,0.2),0_0_60px_rgba(212,255,0,0.1)]
+                  hover:shadow-[0_0_40px_rgba(212,255,0,0.3),0_0_80px_rgba(212,255,0,0.15)]
+                  transition-shadow duration-500"
+                whileHover={{ scale: 1.03, y: -2 }}
+                whileTap={{ scale: 0.98 }}
+              >
+                <span className="relative z-10 flex items-center gap-3">
+                  Start Chasing Clients
+                  <motion.span
+                    className="inline-block"
+                    animate={{ x: [0, 4, 0] }}
+                    transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+                  >
+                    &rarr;
+                  </motion.span>
+                </span>
+              </motion.div>
+            </Link>
+          </motion.div>
+
+          {/* Secondary info */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 1.0, duration: 1 }}
+            className="mt-16 flex items-center justify-center gap-6 text-[11px] text-zinc-600 uppercase tracking-[0.2em]"
+          >
+            <span className="flex items-center gap-2">
+              <span className="w-1 h-1 rounded-full bg-zinc-700" />
+              Auto-Chase
+            </span>
+            <span className="w-px h-3 bg-zinc-800" />
+            <span className="flex items-center gap-2">
+              <span className="w-1 h-1 rounded-full bg-zinc-700" />
+              HITL Review
+            </span>
+            <span className="w-px h-3 bg-zinc-800" />
+            <span className="flex items-center gap-2">
+              <span className="w-1 h-1 rounded-full bg-zinc-700" />
+              AI Scoring
+            </span>
+          </motion.div>
+
+          {/* Footer */}
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 1.2, duration: 1 }}
+            className="mt-12 text-xs text-zinc-700"
+          >
+            by ruskaruma &middot; for Scrollhouse
+          </motion.p>
+        </motion.div>
+      </div>
+    </div>
+  );
 }

@@ -178,7 +178,7 @@ export default function KanbanBoard({ initialScripts, onConnectionChange, refres
             <h2 className="text-[11px] font-medium uppercase tracking-widest text-[var(--muted)]">
               {col.label}
             </h2>
-            <span className="ml-auto text-[10px] text-[var(--muted)] opacity-60 bg-zinc-800/50 border border-[var(--border)] px-1.5 py-0.5 rounded">
+            <span className="ml-auto text-[10px] text-[var(--muted)] opacity-60 bg-[var(--surface-elevated)] border border-[var(--border)] px-1.5 py-0.5 rounded">
               {grouped[col.key].length}
             </span>
           </div>
