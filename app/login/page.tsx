@@ -33,65 +33,16 @@ const dividerExpand = {
   show: { opacity: 1, scaleX: 1, transition: { ...spring, delay: 0.55 } },
 };
 
-function FloatingPaths({ position }: { position: number }) {
-  const paths = Array.from({ length: 36 }, (_, i) => ({
-    id: i,
-    d: `M-${380 - i * 5 * position} -${189 + i * 6}C-${
-      380 - i * 5 * position
-    } -${189 + i * 6} -${312 - i * 5 * position} ${216 - i * 6} ${
-      152 - i * 5 * position
-    } ${343 - i * 6}C${616 - i * 5 * position} ${470 - i * 6} ${
-      684 - i * 5 * position
-    } ${875 - i * 6} ${684 - i * 5 * position} ${875 - i * 6}`,
-    width: 0.5 + i * 0.03,
-  }));
-
-  return (
-    <div className="absolute inset-0 pointer-events-none">
-      <svg className="w-full h-full" viewBox="-400 -300 1400 1200" fill="none" preserveAspectRatio="xMidYMid slice">
-        <title>Background Paths</title>
-        {paths.map((path) => (
-          <motion.path
-            key={path.id}
-            d={path.d}
-            stroke="url(#login-lime-gradient)"
-            strokeWidth={path.width}
-            strokeOpacity={0.06 + path.id * 0.018}
-            initial={{ pathLength: 0.3, opacity: 0.6 }}
-            animate={{
-              pathLength: 1,
-              opacity: [0.2, 0.5, 0.2],
-              pathOffset: [0, 1, 0],
-            }}
-            transition={{
-              duration: 20 + Math.random() * 10,
-              repeat: Number.POSITIVE_INFINITY,
-              ease: "linear",
-            }}
-          />
-        ))}
-        <defs>
-          <linearGradient id="login-lime-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#D4FF00" stopOpacity="0.7" />
-            <stop offset="50%" stopColor="#00FFA3" stopOpacity="0.4" />
-            <stop offset="100%" stopColor="#D4FF00" stopOpacity="0.15" />
-          </linearGradient>
-        </defs>
-      </svg>
-    </div>
-  );
-}
-
 function LoginForm() {
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get("callbackUrl") ?? "/dashboard";
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center px-6 relative bg-[var(--bg)] transition-colors duration-300 overflow-hidden">
-      {/* Animated paths */}
-      <div className="absolute inset-0">
-        <FloatingPaths position={1} />
-        <FloatingPaths position={-1} />
+      {/* Simple static decorative circles */}
+      <div className="absolute inset-0 pointer-events-none overflow-hidden">
+        <div className="absolute -top-32 -right-32 w-[500px] h-[500px] rounded-full border border-[#D4FF00]/[0.06]" />
+        <div className="absolute -bottom-32 -left-32 w-[400px] h-[400px] rounded-full border border-[#00FFA3]/[0.05]" />
       </div>
 
       {/* Theme toggle */}
@@ -107,7 +58,7 @@ function LoginForm() {
       >
         {/* Pill tag */}
         <motion.div className="mb-8" variants={fadeUp}>
-          <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[var(--surface-elevated)]/60 border border-[var(--border)] backdrop-blur-sm text-[11px] tracking-[0.15em] uppercase text-[var(--muted)]">
+          <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[var(--surface-elevated)]/60 border border-[var(--border)] text-[11px] tracking-[0.15em] uppercase text-[var(--muted)]">
             <span className="w-1.5 h-1.5 rounded-full bg-[#00FFA3] shadow-[0_0_6px_rgba(0,255,163,0.6)] animate-pulse" />
             Internal Tool
           </span>
@@ -115,14 +66,8 @@ function LoginForm() {
 
         {/* Headline */}
         <motion.h1
-          className="text-6xl font-bold mb-4 tracking-tight"
-          style={{
-            fontFamily: "var(--font-playfair), serif",
-            backgroundImage: "linear-gradient(135deg, #D4FF00 0%, #00FFA3 50%, #D4FF00 100%)",
-            WebkitBackgroundClip: "text",
-            color: "transparent",
-            filter: "drop-shadow(0 0 30px rgba(212, 255, 0, 0.15))",
-          }}
+          className="text-6xl font-bold mb-4 tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-[#D4FF00] to-[#00FFA3]"
+          style={{ fontFamily: "var(--font-playfair), serif" }}
           variants={fadeUp}
         >
           Greenlit
@@ -144,16 +89,12 @@ function LoginForm() {
 
         {/* Card */}
         <motion.div
-          className="w-full max-w-[380px] bg-[var(--card)]/80 backdrop-blur-md rounded-2xl border border-[var(--border)] p-8 shadow-lg"
+          className="w-full max-w-[380px] bg-[var(--card)] backdrop-blur-md rounded-2xl border border-[var(--border)] p-8 shadow-lg"
           variants={scaleFade}
         >
           <motion.button
             onClick={() => signIn("github", { callbackUrl })}
-            className="w-full flex items-center justify-center gap-3 px-5 py-3.5 rounded-xl
-              bg-[#D4FF00] text-zinc-950 text-sm font-bold
-              shadow-[0_0_20px_rgba(212,255,0,0.2),0_0_40px_rgba(212,255,0,0.1)]
-              hover:shadow-[0_0_30px_rgba(212,255,0,0.3),0_0_60px_rgba(212,255,0,0.15)]
-              hover:-translate-y-0.5 transition-all duration-300"
+            className="w-full flex items-center justify-center gap-3 px-5 py-3.5 rounded-xl bg-[#D4FF00] text-zinc-950 text-sm font-bold glow-lime hover:-translate-y-0.5 transition-transform duration-200"
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
           >

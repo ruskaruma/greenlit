@@ -4,7 +4,7 @@ const columns = ["Draft", "Pending Review", "Changes Requested", "Approved", "Ov
 
 export default function DashboardLoading() {
   return (
-    <div className="noise-bg min-h-screen bg-[var(--bg)] flex">
+    <div className="min-h-screen bg-[var(--bg)] flex">
       {/* Sidebar skeleton */}
       <aside className="fixed left-0 top-0 h-screen w-[220px] bg-[var(--card)] border-r border-[var(--border)] z-40">
         <div className="px-4 pt-5 pb-6">

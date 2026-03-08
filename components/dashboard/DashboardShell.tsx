@@ -211,7 +211,7 @@ function DashboardShellInner({
   }
 
   return (
-    <div className="noise-bg min-h-screen bg-[var(--bg)] flex">
+    <div className="min-h-screen bg-[var(--bg)] flex">
       <Sidebar
         clients={clients}
         onClientFilter={setActiveClientId}
