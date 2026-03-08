@@ -109,17 +109,29 @@ export interface ClientMemory {
 export type ReportPlatform = "Instagram" | "YouTube" | "LinkedIn" | "TikTok";
 export type ReportContentType = "Video" | "Photo" | "Carousel" | "Story" | "Reel" | "Post";
 
+export interface ReportEntry {
+  title: string;
+  platform: ReportPlatform;
+  content_type: ReportContentType;
+  post_url: string;
+  post_date: string;
+  metrics: Record<string, number>;
+}
+
+export interface AggregateMetrics {
+  overall: Record<string, number>;
+  [platform: string]: Record<string, number>;
+}
+
 export interface Report {
   id: string;
-  script_id: string | null;
   client_id: string;
-  platform: ReportPlatform | null;
-  content_type: ReportContentType | null;
-  content_title: string | null;
-  post_url: string | null;
-  post_date: string | null;
-  metrics: Record<string, number>;
-  previous_metrics: Record<string, number> | null;
+  report_title: string;
+  period_start: string;
+  period_end: string;
+  entries: ReportEntry[];
+  aggregate_metrics: AggregateMetrics | null;
+  previous_aggregate: AggregateMetrics | null;
   generated_summary: string | null;
   recommendations: string | null;
   sent_at: string | null;

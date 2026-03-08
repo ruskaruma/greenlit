@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  LayoutDashboard, Shield, BarChart3, FileText, Brain,
+  LayoutDashboard, Shield, BarChart3,
   ChevronLeft, ChevronRight, Plus, MoreHorizontal, Trash2, X, Loader2,
   Mail, Phone,
 } from "lucide-react";
@@ -22,11 +22,9 @@ interface SidebarProps {
 }
 
 const navItems = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/dashboard", label: "Content Approval", icon: LayoutDashboard },
   { href: "/hitl", label: "HITL", icon: Shield },
   { href: "/analytics", label: "Analytics", icon: BarChart3 },
-  { href: "/reports", label: "Reports", icon: FileText },
-  { href: "/intelligence", label: "Intelligence", icon: Brain },
 ];
 
 export default function Sidebar({ clients, onClientFilter, activeClientId, onClientsChange }: SidebarProps) {

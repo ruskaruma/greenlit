@@ -1,24 +1,66 @@
-import { BarChart3 } from "lucide-react";
+import { createServiceClientDirect } from "@/lib/supabase/server";
+import ReportsPanel from "@/components/reports/ReportsPanel";
 import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
 
-export default function AnalyticsPage() {
+export const dynamic = "force-dynamic";
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type SupabaseAny = any;
+
+async function getClients() {
+  const supabase: SupabaseAny = createServiceClientDirect();
+  const { data, error } = await supabase
+    .from("clients")
+    .select("id, name, email, company")
+    .order("name", { ascending: true });
+
+  if (error) return [];
+  return data ?? [];
+}
+
+async function getReports() {
+  const supabase: SupabaseAny = createServiceClientDirect();
+  const { data, error } = await supabase
+    .from("reports")
+    .select("*, clients(name, email, company)")
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.error("[analytics] Failed to fetch:", error.message);
+    return [];
+  }
+
+  return (data ?? []).map((row: Record<string, unknown>) => ({
+    ...row,
+    client: row.clients,
+  }));
+}
+
+export default async function AnalyticsPage() {
+  const [clients, reports] = await Promise.all([getClients(), getReports()]);
+
   return (
-    <div className="min-h-screen bg-[var(--bg)] flex items-center justify-center">
-      <div className="text-center max-w-sm">
-        <div className="w-12 h-12 rounded-full bg-[var(--surface-elevated)] border border-[var(--border)] flex items-center justify-center mx-auto mb-4">
-          <BarChart3 size={20} className="text-[var(--muted)]" />
-        </div>
-        <h1 className="text-lg font-semibold text-[var(--text)] mb-2">Analytics</h1>
-        <p className="text-sm text-[var(--muted)] mb-6">
-          Response times, approval rates, and client engagement metrics. Coming soon.
-        </p>
+    <div className="min-h-screen bg-[var(--bg)] transition-colors duration-300">
+      <header className="flex items-center gap-4 px-6 py-4 border-b border-[var(--border)]">
         <Link
           href="/dashboard"
-          className="text-xs text-[var(--text)] border border-[var(--border)] px-3 py-1.5 rounded hover:bg-[var(--surface-elevated)]"
+          className="flex items-center gap-1.5 text-xs text-[var(--muted)] hover:text-[var(--text)] transition-colors"
         >
-          Back to Dashboard
+          <ArrowLeft size={14} />
+          Dashboard
         </Link>
-      </div>
+        <div className="h-4 w-px bg-[var(--border)]" />
+        <h1 className="text-lg font-semibold text-[var(--text)]">Analytics</h1>
+      </header>
+
+      {clients.length === 0 ? (
+        <div className="flex items-center justify-center h-[60vh]">
+          <p className="text-sm text-[var(--muted)]">No clients found. Add clients from the dashboard first.</p>
+        </div>
+      ) : (
+        <ReportsPanel clients={clients} initialReports={reports} />
+      )}
     </div>
   );
 }

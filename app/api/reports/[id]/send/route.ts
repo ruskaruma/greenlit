@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createServiceClientDirect } from "@/lib/supabase/server";
 import { requireSession } from "@/lib/auth/requireSession";
 import { sendReportEmail } from "@/lib/resend/sendReportEmail";
+import type { ReportEntry, AggregateMetrics } from "@/lib/supabase/types";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type SupabaseAny = any;
@@ -35,7 +36,6 @@ export async function POST(
     return NextResponse.json({ error: "Client has no email" }, { status: 400 });
   }
 
-  // Parse stored summary back into overview + comparison
   const storedSummary = report.generated_summary as string;
   const parts = storedSummary.split("\n\n---COMPARISON---\n");
   const overview = parts[0] ?? storedSummary;
@@ -44,13 +44,12 @@ export async function POST(
   const result = await sendReportEmail({
     to: clientEmail,
     clientName: report.clients?.name ?? "Client",
-    contentTitle: report.content_title ?? "Content",
-    platform: report.platform ?? "Platform",
-    contentType: report.content_type ?? "Content",
-    postUrl: report.post_url ?? null,
-    postDate: report.post_date ?? null,
-    metrics: report.metrics as Record<string, number>,
-    previousMetrics: report.previous_metrics as Record<string, number> | null,
+    reportTitle: report.report_title as string,
+    periodStart: report.period_start as string,
+    periodEnd: report.period_end as string,
+    entries: report.entries as ReportEntry[],
+    aggregate: report.aggregate_metrics as AggregateMetrics | null,
+    previousAggregate: report.previous_aggregate as AggregateMetrics | null,
     overview,
     comparison,
     recommendations: report.recommendations ?? "",
@@ -70,7 +69,7 @@ export async function POST(
     entity_id: id,
     action: "report_sent",
     actor: "team_lead",
-    metadata: { client_email: clientEmail, platform: report.platform },
+    metadata: { client_email: clientEmail, entry_count: (report.entries as ReportEntry[]).length },
   });
 
   return NextResponse.json({ success: true });
