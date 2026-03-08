@@ -1,6 +1,5 @@
 "use client";
 
-import { Leaf } from "lucide-react";
 import { signIn } from "next-auth/react";
 
 export const FullScreenSignup = () => {
@@ -22,15 +21,12 @@ export const FullScreenSignup = () => {
 
         <div className="bg-[#1C1917] text-white p-8 md:p-12 md:w-1/2 relative rounded-bl-3xl overflow-hidden">
           <h1 className="text-2xl md:text-3xl font-medium leading-tight z-10 tracking-tight relative" style={{ fontFamily: "var(--font-playfair), serif" }}>
-            AI-orchestrated script approvals for video production teams.
+            Power your agency and boost productivity by AI agents while being in the loop.
           </h1>
         </div>
 
         <div className="p-8 md:p-12 md:w-1/2 flex flex-col bg-[var(--card)] z-99 text-[var(--text)]">
           <div className="flex flex-col items-left mb-8">
-            <div className="text-[var(--accent-primary)] mb-4">
-              <Leaf className="h-10 w-10" />
-            </div>
             <h2 className="text-3xl font-medium mb-2 tracking-tight" style={{ fontFamily: "var(--font-playfair), serif" }}>
               Get Started
             </h2>
