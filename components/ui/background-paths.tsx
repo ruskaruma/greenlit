@@ -2,6 +2,7 @@
 
 import { motion } from "framer-motion";
 import Link from "next/link";
+import ThemeToggle from "@/components/dashboard/ThemeToggle";
 
 function FloatingPaths({ position }: { position: number }) {
   const paths = Array.from({ length: 36 }, (_, i) => ({
@@ -18,7 +19,7 @@ function FloatingPaths({ position }: { position: number }) {
 
   return (
     <div className="absolute inset-0 pointer-events-none">
-      <svg className="w-full h-full" viewBox="0 0 696 316" fill="none">
+      <svg className="w-full h-full" viewBox="-400 -300 1400 1200" fill="none" preserveAspectRatio="xMidYMid slice">
         <title>Background Paths</title>
         {paths.map((path) => (
           <motion.path
@@ -58,26 +59,17 @@ export function BackgroundPaths({ title = "Greenlit" }: { title?: string }) {
   const words = title.split(" ");
 
   return (
-    <div className="relative min-h-screen w-full flex items-center justify-center overflow-hidden bg-zinc-950">
-      {/* Radial glow behind center */}
-      <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[600px] rounded-full bg-[#D4FF00]/[0.03] blur-[120px]" />
-        <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] rounded-full bg-[#00FFA3]/[0.04] blur-[100px]" />
-      </div>
-
+    <div className="relative min-h-screen w-full flex items-center justify-center overflow-hidden bg-[var(--bg)] transition-colors duration-300">
       {/* Animated paths */}
       <div className="absolute inset-0">
         <FloatingPaths position={1} />
         <FloatingPaths position={-1} />
       </div>
 
-      {/* Noise overlay */}
-      <div
-        className="absolute inset-0 pointer-events-none opacity-[0.03]"
-        style={{
-          backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='1'/%3E%3C/svg%3E")`,
-        }}
-      />
+      {/* Theme toggle */}
+      <div className="absolute top-4 right-4 z-20">
+        <ThemeToggle />
+      </div>
 
       <div className="relative z-10 container mx-auto px-4 md:px-6 text-center">
         <motion.div
@@ -93,7 +85,7 @@ export function BackgroundPaths({ title = "Greenlit" }: { title?: string }) {
             transition={{ delay: 0.2, ...spring }}
             className="mb-8"
           >
-            <span className="inline-flex items-center gap-2.5 px-4 py-1.5 rounded-full border border-zinc-800 bg-zinc-900/60 backdrop-blur-sm text-[11px] tracking-[0.15em] uppercase text-zinc-500">
+            <span className="inline-flex items-center gap-2.5 px-4 py-1.5 rounded-full border border-[var(--border)] bg-[var(--surface-elevated)]/60 backdrop-blur-sm text-[11px] tracking-[0.15em] uppercase text-[var(--muted)]">
               <span className="w-1.5 h-1.5 rounded-full bg-[#00FFA3] shadow-[0_0_6px_rgba(0,255,163,0.6)] animate-pulse" />
               AI-Powered Approval Engine
             </span>
@@ -134,7 +126,7 @@ export function BackgroundPaths({ title = "Greenlit" }: { title?: string }) {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.5, ...spring }}
-            className="text-base md:text-lg text-zinc-500 mb-12 max-w-md mx-auto leading-relaxed"
+            className="text-base md:text-lg text-[var(--muted)] mb-12 max-w-md mx-auto leading-relaxed"
           >
             AI-orchestrated video script approvals. Chase clients, not deadlines.
           </motion.p>
@@ -174,20 +166,20 @@ export function BackgroundPaths({ title = "Greenlit" }: { title?: string }) {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 1.0, duration: 1 }}
-            className="mt-16 flex items-center justify-center gap-6 text-[11px] text-zinc-600 uppercase tracking-[0.2em]"
+            className="mt-16 flex items-center justify-center gap-6 text-[11px] text-[var(--muted)] uppercase tracking-[0.2em]"
           >
             <span className="flex items-center gap-2">
-              <span className="w-1 h-1 rounded-full bg-zinc-700" />
+              <span className="w-1 h-1 rounded-full bg-[var(--muted)] opacity-40" />
               Auto-Chase
             </span>
-            <span className="w-px h-3 bg-zinc-800" />
+            <span className="w-px h-3 bg-[var(--border)]" />
             <span className="flex items-center gap-2">
-              <span className="w-1 h-1 rounded-full bg-zinc-700" />
+              <span className="w-1 h-1 rounded-full bg-[var(--muted)] opacity-40" />
               HITL Review
             </span>
-            <span className="w-px h-3 bg-zinc-800" />
+            <span className="w-px h-3 bg-[var(--border)]" />
             <span className="flex items-center gap-2">
-              <span className="w-1 h-1 rounded-full bg-zinc-700" />
+              <span className="w-1 h-1 rounded-full bg-[var(--muted)] opacity-40" />
               AI Scoring
             </span>
           </motion.div>
@@ -197,7 +189,7 @@ export function BackgroundPaths({ title = "Greenlit" }: { title?: string }) {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 1.2, duration: 1 }}
-            className="mt-12 text-xs text-zinc-700"
+            className="mt-12 text-xs text-[var(--muted)] opacity-40"
           >
             by ruskaruma &middot; for Scrollhouse
           </motion.p>

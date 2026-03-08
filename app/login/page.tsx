@@ -4,6 +4,7 @@ import { signIn } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { motion } from "framer-motion";
+import ThemeToggle from "@/components/dashboard/ThemeToggle";
 
 const spring = { type: "spring" as const, stiffness: 300, damping: 30 };
 
@@ -47,7 +48,7 @@ function FloatingPaths({ position }: { position: number }) {
 
   return (
     <div className="absolute inset-0 pointer-events-none">
-      <svg className="w-full h-full" viewBox="0 0 696 316" fill="none">
+      <svg className="w-full h-full" viewBox="-400 -300 1400 1200" fill="none" preserveAspectRatio="xMidYMid slice">
         <title>Background Paths</title>
         {paths.map((path) => (
           <motion.path
@@ -86,26 +87,17 @@ function LoginForm() {
   const callbackUrl = searchParams.get("callbackUrl") ?? "/dashboard";
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center px-6 relative bg-zinc-950 overflow-hidden">
-      {/* Radial glow */}
-      <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[500px] rounded-full bg-[#D4FF00]/[0.025] blur-[120px]" />
-        <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[300px] h-[300px] rounded-full bg-[#00FFA3]/[0.03] blur-[80px]" />
-      </div>
-
+    <div className="min-h-screen flex flex-col items-center justify-center px-6 relative bg-[var(--bg)] transition-colors duration-300 overflow-hidden">
       {/* Animated paths */}
       <div className="absolute inset-0">
         <FloatingPaths position={1} />
         <FloatingPaths position={-1} />
       </div>
 
-      {/* Noise overlay */}
-      <div
-        className="absolute inset-0 pointer-events-none opacity-[0.03]"
-        style={{
-          backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='1'/%3E%3C/svg%3E")`,
-        }}
-      />
+      {/* Theme toggle */}
+      <div className="absolute top-4 right-4 z-20">
+        <ThemeToggle />
+      </div>
 
       <motion.div
         className="relative z-10 w-full max-w-md flex flex-col items-center"
@@ -115,7 +107,7 @@ function LoginForm() {
       >
         {/* Pill tag */}
         <motion.div className="mb-8" variants={fadeUp}>
-          <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-zinc-900/60 border border-zinc-800 backdrop-blur-sm text-[11px] tracking-[0.15em] uppercase text-zinc-500">
+          <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[var(--surface-elevated)]/60 border border-[var(--border)] backdrop-blur-sm text-[11px] tracking-[0.15em] uppercase text-[var(--muted)]">
             <span className="w-1.5 h-1.5 rounded-full bg-[#00FFA3] shadow-[0_0_6px_rgba(0,255,163,0.6)] animate-pulse" />
             Internal Tool
           </span>
@@ -138,7 +130,7 @@ function LoginForm() {
 
         {/* Subtext */}
         <motion.p
-          className="text-sm tracking-[0.2em] uppercase text-zinc-500 mb-10"
+          className="text-sm tracking-[0.2em] uppercase text-[var(--muted)] mb-10"
           variants={fadeUp}
         >
           Content approval, automated.
@@ -146,14 +138,13 @@ function LoginForm() {
 
         {/* Divider */}
         <motion.div
-          className="w-full max-w-[400px] h-px bg-gradient-to-r from-transparent via-zinc-700 to-transparent mb-10 origin-center"
+          className="w-full max-w-[400px] h-px bg-gradient-to-r from-transparent via-[var(--border)] to-transparent mb-10 origin-center"
           variants={dividerExpand}
         />
 
         {/* Card */}
         <motion.div
-          className="w-full max-w-[380px] bg-zinc-900/70 backdrop-blur-md rounded-2xl border border-zinc-800 p-8
-            shadow-[0_0_40px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.03)]"
+          className="w-full max-w-[380px] bg-[var(--card)]/80 backdrop-blur-md rounded-2xl border border-[var(--border)] p-8 shadow-lg"
           variants={scaleFade}
         >
           <motion.button
@@ -172,14 +163,14 @@ function LoginForm() {
             Sign in with GitHub
           </motion.button>
 
-          <p className="text-[11px] text-zinc-600 text-center mt-5">
+          <p className="text-[11px] text-[var(--muted)] text-center mt-5 opacity-60">
             Access restricted to Scrollhouse team members
           </p>
         </motion.div>
       </motion.div>
 
       {/* Footer */}
-      <p className="fixed bottom-6 left-1/2 -translate-x-1/2 text-xs text-zinc-700">
+      <p className="fixed bottom-6 left-1/2 -translate-x-1/2 text-xs text-[var(--muted)] opacity-60">
         by ruskaruma
       </p>
     </div>
