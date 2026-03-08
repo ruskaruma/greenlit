@@ -94,7 +94,7 @@ function LoginForm() {
         >
           <motion.button
             onClick={() => signIn("github", { callbackUrl })}
-            className="w-full flex items-center justify-center gap-3 px-5 py-3.5 rounded-xl bg-[#D4FF00] text-zinc-950 text-sm font-bold glow-lime hover:-translate-y-0.5 transition-transform duration-200"
+            className="w-full flex items-center justify-center gap-3 px-5 py-3.5 rounded-xl bg-[#FAFF00] text-zinc-950 text-sm font-bold hover:-translate-y-0.5 transition-transform duration-200"
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
           >
