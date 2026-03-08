@@ -4,8 +4,8 @@ import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  LayoutDashboard, Shield, BarChart3,
-  ChevronLeft, ChevronRight, Plus, MoreHorizontal, Trash2, X, Loader2,
+  LayoutDashboard, Shield, BarChart3, UserPlus,
+  ChevronLeft, ChevronRight, Plus, MoreHorizontal, Trash2,
   Mail, Phone,
 } from "lucide-react";
 import LogoutButton from "./LogoutButton";
@@ -22,6 +22,7 @@ interface SidebarProps {
 }
 
 const navItems = [
+  { href: "/onboarding", label: "Onboarding", icon: UserPlus },
   { href: "/dashboard", label: "Content Approval", icon: LayoutDashboard },
   { href: "/hitl", label: "HITL", icon: Shield },
   { href: "/analytics", label: "Analytics", icon: BarChart3 },
@@ -29,7 +30,6 @@ const navItems = [
 
 export default function Sidebar({ clients, onClientFilter, activeClientId, onClientsChange }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
-  const [addOpen, setAddOpen] = useState(false);
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
   const pathname = usePathname();
   const { toast } = useToast();
@@ -116,13 +116,13 @@ export default function Sidebar({ clients, onClientFilter, activeClientId, onCli
             ))}
           </div>
 
-          <button
-            onClick={() => setAddOpen(true)}
+          <Link
+            href="/onboarding"
             className="flex items-center gap-1.5 px-2 py-1.5 mt-2 rounded text-[11px] text-[var(--muted)] hover:text-[var(--text)] hover:bg-[var(--surface-elevated)] w-full"
           >
             <Plus size={12} />
             Add Client
-          </button>
+          </Link>
         </div>
       )}
 
@@ -144,17 +144,6 @@ export default function Sidebar({ clients, onClientFilter, activeClientId, onCli
           {collapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
         </button>
       </div>
-
-      {addOpen && (
-        <AddClientModal
-          onClose={() => setAddOpen(false)}
-          onCreated={(name: string) => {
-            setAddOpen(false);
-            onClientsChange();
-            toast("success", `${name} added`);
-          }}
-        />
-      )}
     </aside>
   );
 }
@@ -221,101 +210,6 @@ function ClientRow({
           </button>
         </div>
       )}
-    </div>
-  );
-}
-
-function AddClientModal({ onClose, onCreated }: { onClose: () => void; onCreated: (name: string) => void }) {
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [company, setCompany] = useState("");
-  const [whatsapp, setWhatsapp] = useState("");
-  const [channel, setChannel] = useState("email");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!name || !email) return;
-    setLoading(true);
-    setError("");
-
-    try {
-      const res = await fetch("/api/clients", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name,
-          email,
-          company: company || undefined,
-          whatsapp: whatsapp || undefined,
-          preferred_channel: channel,
-        }),
-      });
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || "Failed to add client");
-      }
-      onCreated(name);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-sm bg-[var(--card)] border border-[var(--border)] rounded-xl">
-        <div className="flex items-center justify-between p-4 border-b border-[var(--border)]">
-          <h2 className="text-sm font-semibold text-[var(--text)]">Add Client</h2>
-          <button onClick={onClose} className="text-[var(--muted)] hover:text-[var(--text)]">
-            <X size={16} />
-          </button>
-        </div>
-        <form onSubmit={handleSubmit} className="p-4 space-y-3">
-          <input
-            type="text" value={name} onChange={(e) => setName(e.target.value)} required
-            placeholder="Name *"
-            className="w-full px-3 py-2 bg-[var(--input-bg)] border border-[var(--border)] rounded-lg text-sm text-[var(--text)] placeholder:text-[var(--muted)]/50 focus:outline-none focus:border-[var(--muted)]"
-          />
-          <input
-            type="email" value={email} onChange={(e) => setEmail(e.target.value)} required
-            placeholder="client@brand.com *"
-            className="w-full px-3 py-2 bg-[var(--input-bg)] border border-[var(--border)] rounded-lg text-sm text-[var(--text)] placeholder:text-[var(--muted)]/50 focus:outline-none focus:border-[var(--muted)]"
-          />
-          <input
-            type="text" value={company} onChange={(e) => setCompany(e.target.value)}
-            placeholder="Company"
-            className="w-full px-3 py-2 bg-[var(--input-bg)] border border-[var(--border)] rounded-lg text-sm text-[var(--text)] placeholder:text-[var(--muted)]/50 focus:outline-none focus:border-[var(--muted)]"
-          />
-          <input
-            type="text" value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)}
-            placeholder="+91XXXXXXXXXX or +1XXXXXXXXXX"
-            className="w-full px-3 py-2 bg-[var(--input-bg)] border border-[var(--border)] rounded-lg text-sm text-[var(--text)] placeholder:text-[var(--muted)]/50 focus:outline-none focus:border-[var(--muted)]"
-          />
-          <div>
-            <label className="block text-xs font-medium text-[var(--muted)] mb-1.5">Preferred Channel</label>
-            <select
-              value={channel} onChange={(e) => setChannel(e.target.value)}
-              className="w-full px-3 py-2 bg-[var(--input-bg)] border border-[var(--border)] rounded-lg text-sm text-[var(--text)] focus:outline-none focus:border-[var(--muted)]"
-            >
-              <option value="email">Email</option>
-              <option value="whatsapp">WhatsApp</option>
-              <option value="both">Both</option>
-            </select>
-          </div>
-          {error && <p className="text-xs text-red-400">{error}</p>}
-          <button
-            type="submit" disabled={loading || !name || !email}
-            className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-[4px] bg-[var(--text)] text-[var(--bg)] text-sm font-semibold hover:opacity-80 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {loading ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
-            {loading ? "Adding..." : "Add Client"}
-          </button>
-        </form>
-      </div>
     </div>
   );
 }

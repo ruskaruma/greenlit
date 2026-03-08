@@ -38,6 +38,12 @@ export interface Client {
   approved_count: number;
   rejected_count: number;
   changes_requested_count: number;
+  brand_voice: string | null;
+  account_manager: string | null;
+  contract_start: string | null;
+  monthly_volume: number | null;
+  platform_focus: string[] | null;
+  onboarding_checklist: Record<string, boolean> | null;
   created_at: string;
   updated_at: string;
 }
