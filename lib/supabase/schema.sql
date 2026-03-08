@@ -26,7 +26,7 @@ create table public.scripts (
   content text not null,
   client_id uuid not null references public.clients(id) on delete cascade,
   status text not null default 'draft'
-    check (status in ('draft', 'pending_review', 'changes_requested', 'approved', 'rejected', 'overdue')),
+    check (status in ('draft', 'pending_review', 'changes_requested', 'approved', 'rejected', 'overdue', 'closed')),
   review_token uuid not null default gen_random_uuid() unique,
   client_feedback text,
   sent_at timestamptz,
