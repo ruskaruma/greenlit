@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServiceClientDirect } from "@/lib/supabase/server";
 import { requireSession } from "@/lib/auth/requireSession";
-import { sendReviewEmail } from "@/lib/resend/sendReviewEmail";
-import { sendWhatsApp } from "@/lib/twilio/sendWhatsApp";
+import { scoreScript } from "@/lib/scorer/scoreScript";
 import type { Script, ScriptWithClient } from "@/lib/supabase/types";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -84,7 +83,7 @@ export async function POST(request: Request) {
       title,
       content,
       client_id,
-      status: "pending_review",
+      status: "draft",
       due_date: due_date ?? null,
       expires_at: expiresAt,
       response_deadline_minutes: response_deadline_minutes ?? 2880,
@@ -105,50 +104,31 @@ export async function POST(request: Request) {
     .update({ total_scripts: (client.total_scripts ?? 0) + 1 })
     .eq("id", client_id);
 
-  // Send review notifications
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-  const reviewUrl = `${appUrl}/review/${typedScript.review_token}`;
-  const channel: string = review_channel || client.preferred_channel || "email";
-
-  let anySendSucceeded = false;
-
-  if (channel === "email" || channel === "both") {
-    const emailResult = await sendReviewEmail({
-      to: client.email,
-      clientName: client.name,
-      scriptTitle: typedScript.title,
-      reviewUrl,
-      expiresAt: typedScript.expires_at,
+  // Score the script synchronously
+  let qualityScore: Script["quality_score"] = null;
+  try {
+    qualityScore = await scoreScript({
+      content,
+      clientId: client_id,
+      supabase,
     });
-    if (emailResult.success) {
-      anySendSucceeded = true;
-    } else {
-      console.error("[scripts/POST] Review email failed:", emailResult.error);
+
+    if (qualityScore) {
+      await supabase
+        .from("scripts")
+        .update({ quality_score: qualityScore })
+        .eq("id", typedScript.id);
     }
+  } catch (err) {
+    console.error("[scripts/POST] Scorer failed (non-blocking):", err);
   }
 
-  if ((channel === "whatsapp" || channel === "both") && client.whatsapp_number) {
-    const waResult = await sendWhatsApp({
-      to: client.whatsapp_number,
-      clientName: client.name,
-      scriptTitle: typedScript.title,
-      reviewUrl,
-      clientEmail: client.email,
-      scriptId: typedScript.id,
-    });
-    if (waResult.success) {
-      anySendSucceeded = true;
-    } else {
-      console.error("[scripts/POST] WhatsApp failed:", waResult.error);
-    }
-  }
-
-  if (anySendSucceeded) {
-    await supabase
-      .from("scripts")
-      .update({ sent_at: new Date().toISOString() })
-      .eq("id", typedScript.id);
-  }
-
-  return NextResponse.json(typedScript, { status: 201 });
+  return NextResponse.json(
+    {
+      ...typedScript,
+      quality_score: qualityScore,
+      review_channel: review_channel || client.preferred_channel || "email",
+    },
+    { status: 201 }
+  );
 }

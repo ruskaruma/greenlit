@@ -1,16 +1,12 @@
 import { createServiceClientDirect } from "@/lib/supabase/server";
-import { Resend } from "resend";
 import Anthropic from "@anthropic-ai/sdk";
 import { storeClientMemory, buildClientResponseMemory } from "@/lib/agent/nodes/memoryUpdate";
+import { notifyTeam } from "@/lib/notifications/notifyTeam";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type SupabaseAny = any;
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-
-const resend = process.env.RESEND_API_KEY
-  ? new Resend(process.env.RESEND_API_KEY)
-  : null;
 
 type Intent = "approve" | "reject" | "feedback";
 
@@ -57,34 +53,6 @@ JSON:`,
       intent: "feedback",
       feedback: "Client replied but intent unclear — please review manually",
     };
-  }
-}
-
-async function notifyTeam(
-  clientName: string,
-  intent: Intent,
-  scriptTitle: string,
-  feedback: string | null
-) {
-  const teamEmail = process.env.ALLOWED_EMAIL;
-  if (!teamEmail || !resend) return;
-
-  const actionLabel =
-    intent === "approve" ? "approved" :
-    intent === "reject" ? "rejected" :
-    "requested changes on";
-
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-
-  try {
-    await resend.emails.send({
-      from: `Greenlit <${process.env.RESEND_FROM_EMAIL || "greenlit@ruskaruma.me"}>`,
-      to: [teamEmail],
-      subject: `[Greenlit] ${clientName} ${actionLabel} '${scriptTitle}'`,
-      text: `Client ${clientName} replied via WhatsApp.\n\nDecision: ${intent}\nFeedback: ${feedback || "none"}\n\nView in dashboard: ${appUrl}/dashboard`,
-    });
-  } catch (err) {
-    console.error("[whatsapp-webhook] Team notification email failed:", err);
   }
 }
 
@@ -195,7 +163,8 @@ export async function POST(request: Request) {
     metadata: { phone: phoneNumber, message: body, intent },
   });
 
-  await notifyTeam(client.name, intent, script.title, feedback);
+  const actionLabel = intent === "approve" ? "approved" : intent === "reject" ? "rejected" : "requested changes on";
+  await notifyTeam({ clientName: client.name, action: actionLabel, scriptTitle: script.title, feedback, channel: "both" });
 
   storeClientMemory(
     client.id,

@@ -1,12 +1,19 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { X, Upload, Loader2, Check } from "lucide-react";
+import { X, Upload, Loader2, Check, AlertTriangle, FileText } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import type { ClientItem } from "./DashboardShell";
 
 type ToastState = { type: "success" | "error"; message: string } | null;
+
+interface QualityScore {
+  hook_strength: number;
+  cta_clarity: number;
+  tone_consistency?: number;
+  average: number;
+}
 
 function Toast({ toast, onDismiss }: { toast: NonNullable<ToastState>; onDismiss: () => void }) {
   useEffect(() => {
@@ -39,7 +46,9 @@ interface UploadModalProps {
 export default function UploadModal({ clients, onScriptUploaded }: UploadModalProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isSending, setIsSending] = useState(false);
   const [toast, setToast] = useState<ToastState>(null);
+  const [scoreResult, setScoreResult] = useState<{ score: QualityScore; scriptId: string; reviewChannel: string } | null>(null);
 
   const [title, setTitle] = useState("");
   const [clientId, setClientId] = useState("");
@@ -65,6 +74,7 @@ export default function UploadModal({ clients, onScriptUploaded }: UploadModalPr
     setDueDate("");
     setReviewChannel("email");
     setResponseDeadline("2880");
+    setScoreResult(null);
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -93,9 +103,23 @@ export default function UploadModal({ clients, onScriptUploaded }: UploadModalPr
         throw new Error(data.error || "Failed to create script");
       }
 
+      const data = await res.json();
+      const score = data.quality_score as QualityScore | null;
+      const returnedChannel = data.review_channel as string;
+
+      // If score is low, show warning instead of auto-sending
+      if (score && score.average < 6) {
+        setScoreResult({ score, scriptId: data.id, reviewChannel: returnedChannel });
+        setIsLoading(false);
+        return;
+      }
+
+      // Score is good (or no score) — send immediately
+      await sendScript(data.id, returnedChannel);
+
       setIsOpen(false);
       resetForm();
-      setToast({ type: "success", message: "Script sent for review" });
+      setToast({ type: "success", message: score ? `Script scored ${score.average}/10 — sent for review` : "Script sent for review" });
       onScriptUploaded?.();
     } catch (err) {
       const message = err instanceof Error ? err.message : "Something went wrong";
@@ -103,6 +127,43 @@ export default function UploadModal({ clients, onScriptUploaded }: UploadModalPr
     } finally {
       setIsLoading(false);
     }
+  }
+
+  async function sendScript(scriptId: string, channel: string) {
+    const res = await fetch(`/api/scripts/${scriptId}/send`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ review_channel: channel }),
+    });
+
+    if (!res.ok) {
+      const data = await res.json();
+      throw new Error(data.error || "Failed to send script");
+    }
+  }
+
+  async function handleSendAnyway() {
+    if (!scoreResult) return;
+    setIsSending(true);
+    try {
+      await sendScript(scoreResult.scriptId, scoreResult.reviewChannel);
+      setIsOpen(false);
+      resetForm();
+      setToast({ type: "success", message: `Script scored ${scoreResult.score.average}/10 — sent anyway` });
+      onScriptUploaded?.();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Something went wrong";
+      setToast({ type: "error", message });
+    } finally {
+      setIsSending(false);
+    }
+  }
+
+  function handleKeepAsDraft() {
+    setIsOpen(false);
+    resetForm();
+    setToast({ type: "success", message: "Script saved as draft" });
+    onScriptUploaded?.();
   }
 
   return (
@@ -253,23 +314,86 @@ export default function UploadModal({ clients, onScriptUploaded }: UploadModalPr
                   <p className="text-xs text-amber-400">This client has no contact info configured. Delivery will fail.</p>
                 )}
 
-                <button
-                  type="submit"
-                  disabled={isLoading || !title || !clientId || !content}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-[4px] bg-[var(--text)] text-[var(--bg)] text-sm font-semibold hover:opacity-80 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isLoading ? (
-                    <>
-                      <Loader2 size={14} className="animate-spin" />
-                      Sending...
-                    </>
-                  ) : (
-                    <>
-                      <Check size={14} />
-                      Send for Review
-                    </>
-                  )}
-                </button>
+                {scoreResult ? (
+                  <div className="space-y-3">
+                    <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                      <div className="flex items-center gap-2 mb-2">
+                        <AlertTriangle size={14} className="text-amber-400" />
+                        <span className="text-sm font-medium text-amber-400">
+                          Quality Score: {scoreResult.score.average}/10
+                        </span>
+                      </div>
+                      <div className="space-y-1 text-xs text-[var(--muted)]">
+                        <div className="flex justify-between">
+                          <span>Hook Strength</span>
+                          <span className={cn(scoreResult.score.hook_strength < 6 ? "text-red-400" : "text-[var(--text)]")}>
+                            {scoreResult.score.hook_strength}/10
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>CTA Clarity</span>
+                          <span className={cn(scoreResult.score.cta_clarity < 6 ? "text-red-400" : "text-[var(--text)]")}>
+                            {scoreResult.score.cta_clarity}/10
+                          </span>
+                        </div>
+                        {scoreResult.score.tone_consistency !== undefined && (
+                          <div className="flex justify-between">
+                            <span>Tone Consistency</span>
+                            <span className={cn(scoreResult.score.tone_consistency < 6 ? "text-red-400" : "text-[var(--text)]")}>
+                              {scoreResult.score.tone_consistency}/10
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={handleKeepAsDraft}
+                        className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-[4px] bg-[var(--surface-elevated)] text-[var(--text)] text-sm font-medium border border-[var(--border)] hover:bg-[var(--border)]"
+                      >
+                        <FileText size={14} />
+                        Keep as Draft
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleSendAnyway}
+                        disabled={isSending}
+                        className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-[4px] bg-amber-500/20 text-amber-400 text-sm font-semibold border border-amber-500/30 hover:bg-amber-500/30 disabled:opacity-50"
+                      >
+                        {isSending ? (
+                          <>
+                            <Loader2 size={14} className="animate-spin" />
+                            Sending...
+                          </>
+                        ) : (
+                          <>
+                            <AlertTriangle size={14} />
+                            Send Anyway
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    type="submit"
+                    disabled={isLoading || !title || !clientId || !content}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-[4px] bg-[var(--text)] text-[var(--bg)] text-sm font-semibold hover:opacity-80 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isLoading ? (
+                      <>
+                        <Loader2 size={14} className="animate-spin" />
+                        Scoring &amp; saving...
+                      </>
+                    ) : (
+                      <>
+                        <Check size={14} />
+                        Send for Review
+                      </>
+                    )}
+                  </button>
+                )}
               </form>
             </motion.div>
           </motion.div>

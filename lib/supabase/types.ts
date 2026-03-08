@@ -21,7 +21,8 @@ export type MemoryType =
   | "rejection"
   | "behavioral_pattern"
   | "chaser_sent"
-  | "client_response";
+  | "client_response"
+  | "hitl_instruction";
 
 export interface Client {
   id: string;
@@ -59,6 +60,7 @@ export interface Script {
   review_channel: string;
   response_deadline_minutes: number;
   archived: boolean;
+  quality_score: { hook_strength: number; cta_clarity: number; tone_consistency?: number; average: number } | null;
   created_at: string;
   updated_at: string;
 }
@@ -163,6 +165,7 @@ export interface Database {
           review_channel?: string;
           response_deadline_minutes?: number;
           archived?: boolean;
+          quality_score?: Record<string, unknown> | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -183,6 +186,7 @@ export interface Database {
           review_channel?: string;
           response_deadline_minutes?: number;
           archived?: boolean;
+          quality_score?: Record<string, unknown> | null;
           updated_at?: string;
         };
         Relationships: [

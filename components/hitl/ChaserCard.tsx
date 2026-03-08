@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import {
   Check, X, Loader2, Clock, User, FileText, RotateCcw,
   ChevronDown, ChevronUp, Mail, Phone, Send, Save,
+  AlertTriangle, MessageSquare, Zap,
 } from "lucide-react";
 import { cn, formatTimeAgo } from "@/lib/utils";
 import { useToast } from "@/components/ui/ToastProvider";
@@ -23,6 +24,17 @@ const SCORE_LABELS: Record<string, string> = {
   persuasiveness: "Urgency",
 };
 
+const TONE_OPTIONS = ["gentle", "neutral", "firm", "urgent"] as const;
+type Tone = (typeof TONE_OPTIONS)[number];
+
+const QUICK_CHIPS = [
+  "Too long — make it shorter",
+  "More urgent",
+  "Add the deadline date",
+  "More personal",
+  "Change tone to firm",
+] as const;
+
 export default function ChaserCard({ chaser, memories, onActionComplete }: ChaserCardProps) {
   const { id, script_id: scriptId, client, script, hitl_state: hitlState } = chaser;
   const [editedContent, setEditedContent] = useState(chaser.draft_content);
@@ -33,14 +45,33 @@ export default function ChaserCard({ chaser, memories, onActionComplete }: Chase
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { toast } = useToast();
 
+  // Regeneration state
+  const [instruction, setInstruction] = useState("");
+  const [regenerating, setRegenerating] = useState(false);
+  const [previousDraft, setPreviousDraft] = useState<string | null>(null);
+  const [newDraft, setNewDraft] = useState<string | null>(null);
+  const [newSubject, setNewSubject] = useState<string | null>(null);
+
+  // Tone state
+  const initialTone = (hitlState?.tone_recommendation as Tone) ?? "neutral";
+  const [selectedTone, setSelectedTone] = useState<Tone>(initialTone);
+
+  // Channel state
+  const [selectedChannel, setSelectedChannel] = useState<"email" | "whatsapp" | "both">(
+    (client.preferred_channel === "whatsapp" || client.preferred_channel === "both")
+      ? client.preferred_channel as "email" | "whatsapp" | "both"
+      : "email"
+  );
+
   const isSaved = chaser.status === "draft_saved";
   const hasEdits = editedContent !== chaser.draft_content;
   const scores = hitlState?.critique_scores;
   const daysSinceSent = script.sent_at
     ? Math.round((Date.now() - new Date(script.sent_at).getTime()) / 86400000)
     : null;
-  const deliveryChannel = client.preferred_channel === "both" ? "email & WhatsApp" : client.preferred_channel;
-  const deliveryTarget = client.preferred_channel === "whatsapp" ? client.whatsapp_number : client.email;
+
+  // Side-by-side comparison active
+  const comparing = previousDraft !== null && newDraft !== null;
 
   const debouncedSave = useCallback(
     (content: string) => {
@@ -68,17 +99,75 @@ export default function ChaserCard({ chaser, memories, onActionComplete }: Chase
     debouncedSave(value);
   }
 
+  async function handleRegenerate(instructionText?: string) {
+    const text = instructionText ?? instruction;
+    if (!text && selectedTone === initialTone) return;
+
+    setRegenerating(true);
+    setPreviousDraft(editedContent);
+    setNewDraft(null);
+
+    try {
+      const res = await fetch(`/api/hitl/${id}/regenerate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          instruction: text || undefined,
+          tone: selectedTone !== initialTone ? selectedTone : undefined,
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        toast("error", data.error ?? "Regeneration failed");
+        setPreviousDraft(null);
+        return;
+      }
+
+      const data = await res.json();
+      setNewDraft(data.draft_content);
+      if (data.email_subject) setNewSubject(data.email_subject);
+      setInstruction("");
+    } catch {
+      toast("error", "Failed to regenerate");
+      setPreviousDraft(null);
+    } finally {
+      setRegenerating(false);
+    }
+  }
+
+  function pickDraft(version: "old" | "new") {
+    if (version === "new" && newDraft) {
+      setEditedContent(newDraft);
+      debouncedSave(newDraft);
+      toast("success", "New draft selected");
+    } else {
+      toast("info", "Kept original draft");
+    }
+    setPreviousDraft(null);
+    setNewDraft(null);
+    setNewSubject(null);
+  }
+
   async function handleApprove() {
     setLoadingAction("approve");
     try {
       const res = await fetch(`/api/hitl/${id}/approve`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ editedContent: hasEdits ? editedContent : undefined }),
+        body: JSON.stringify({
+          editedContent: hasEdits ? editedContent : undefined,
+          channel: selectedChannel,
+        }),
       });
       if (!res.ok) throw new Error("Failed");
+      const data = await res.json();
       setResult({ action: hasEdits ? "edited" : "approved", success: true });
-      toast("success", hasEdits ? "Edited draft sent" : "Draft approved and sent");
+      if (data.warning) {
+        toast("info", data.warning);
+      } else {
+        toast("success", hasEdits ? "Edited draft sent" : "Draft approved and sent");
+      }
       setTimeout(onActionComplete, 1500);
     } catch {
       toast("error", "Failed to approve draft");
@@ -118,7 +207,7 @@ export default function ChaserCard({ chaser, memories, onActionComplete }: Chase
     }
   }
 
-  async function handleRegenerate() {
+  async function handleLegacyRegenerate() {
     setLoadingAction("regenerate");
     try {
       await fetch(`/api/hitl/${id}/reject`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({}) });
@@ -148,7 +237,7 @@ export default function ChaserCard({ chaser, memories, onActionComplete }: Chase
         {result.action === "rejected" && (
           <div className="flex justify-center">
             <button
-              onClick={handleRegenerate}
+              onClick={handleLegacyRegenerate}
               disabled={loadingAction === "regenerate"}
               className="flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-medium border border-[var(--border)] text-[var(--muted)] hover:text-[var(--text)] hover:bg-[var(--surface-elevated)] disabled:opacity-40"
             >
@@ -162,6 +251,10 @@ export default function ChaserCard({ chaser, memories, onActionComplete }: Chase
   }
 
   const scriptPreview = script.content.length > 300 ? script.content.slice(0, 300) + "..." : script.content;
+  const chaserLabel = chaser.chaser_count > 0 ? `Chaser #${chaser.chaser_count + 1}` : "First chaser";
+  const approvalRate = client.total_scripts > 0
+    ? Math.round((client.approved_count / client.total_scripts) * 100)
+    : null;
 
   return (
     <motion.div layout initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="bg-[var(--card)] border border-[var(--border)] rounded-xl overflow-hidden">
@@ -179,6 +272,36 @@ export default function ChaserCard({ chaser, memories, onActionComplete }: Chase
         <span className="text-[11px] text-[var(--muted)] opacity-50">
           Generated {formatTimeAgo(chaser.created_at)}
         </span>
+      </div>
+
+      {/* Client Risk Panel */}
+      <div className="px-6 py-3 bg-amber-500/5 border-b border-amber-500/10">
+        <div className="flex items-center gap-4 flex-wrap">
+          <div className="flex items-center gap-1.5">
+            <AlertTriangle size={11} className="text-amber-400" />
+            <span className="text-[11px] font-medium text-amber-400">{chaserLabel}</span>
+          </div>
+          {daysSinceSent !== null && (
+            <span className="text-[11px] text-[var(--muted)]">
+              <span className="text-red-400 font-medium">{daysSinceSent}d</span> since sent
+            </span>
+          )}
+          {client.avg_response_hours != null && (
+            <span className="text-[11px] text-[var(--muted)]">
+              Avg response: <span className="text-[var(--text)] font-medium">{Math.round(client.avg_response_hours)}hrs</span>
+            </span>
+          )}
+          {approvalRate !== null && (
+            <span className="text-[11px] text-[var(--muted)]">
+              Approval rate: <span className={cn("font-medium", approvalRate >= 70 ? "text-emerald-400" : approvalRate >= 40 ? "text-amber-400" : "text-red-400")}>{approvalRate}%</span>
+            </span>
+          )}
+          {client.changes_requested_count > 0 && (
+            <span className="text-[11px] text-[var(--muted)]">
+              Changes requested: <span className="text-amber-400 font-medium">{client.changes_requested_count}x</span>
+            </span>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 divide-y lg:divide-y-0 lg:divide-x divide-[var(--border)]">
@@ -214,21 +337,8 @@ export default function ChaserCard({ chaser, memories, onActionComplete }: Chase
                   <span className="flex items-center gap-1"><Phone size={10} /> {client.whatsapp_number}</span>
                 )}
               </div>
-              <div className="flex items-center gap-4 text-[11px] text-[var(--muted)]">
-                {client.avg_response_hours != null && (
-                  <span className="flex items-center gap-1">
-                    <Clock size={10} /> Usually responds in ~{Math.round(client.avg_response_hours)}hrs
-                  </span>
-                )}
-                {script.assigned_writer && (
-                  <span>Writer: {script.assigned_writer}</span>
-                )}
-              </div>
-              {daysSinceSent !== null && (
-                <div className="flex items-center gap-1 text-[11px] text-red-400">
-                  <Clock size={10} />
-                  <span>{daysSinceSent} days since sent</span>
-                </div>
+              {script.assigned_writer && (
+                <div className="text-[11px] text-[var(--muted)]">Writer: {script.assigned_writer}</div>
               )}
             </div>
           </div>
@@ -282,42 +392,186 @@ export default function ChaserCard({ chaser, memories, onActionComplete }: Chase
           )}
         </div>
 
-        {/* Right: Draft */}
+        {/* Right: Draft + Controls */}
         <div className="p-6 flex flex-col">
+          {/* Tone Selector */}
+          <div className="mb-4">
+            <p className="text-[10px] uppercase tracking-widest text-[var(--muted)] opacity-50 mb-2">Tone</p>
+            <div className="flex gap-1.5">
+              {TONE_OPTIONS.map((t) => (
+                <button
+                  key={t}
+                  onClick={() => {
+                    setSelectedTone(t);
+                    if (t !== selectedTone) {
+                      handleRegenerate(`Rewrite with ${t} tone`);
+                    }
+                  }}
+                  disabled={regenerating}
+                  className={cn(
+                    "px-3 py-1.5 rounded text-[11px] font-medium capitalize transition-colors disabled:opacity-40",
+                    selectedTone === t
+                      ? "bg-[var(--text)] text-[var(--bg)]"
+                      : "border border-[var(--border)] text-[var(--muted)] hover:text-[var(--text)] hover:bg-[var(--surface-elevated)]"
+                  )}
+                >
+                  {t}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Draft label */}
           <div className="flex items-center justify-between mb-2">
             <p className="text-[10px] uppercase tracking-widest text-[var(--muted)] opacity-50">
               {isSaved ? "Saved Draft" : hasEdits ? "Edited Draft" : "AI-Generated Draft"}
             </p>
             {saving && <span className="text-[10px] text-[var(--muted)] opacity-50">Saving...</span>}
-          </div>
-
-          {hitlState?.email_subject && (
-            <div className="mb-3">
-              <p className="text-[10px] text-[var(--muted)] opacity-50 mb-0.5">Subject</p>
-              <p className="text-sm text-[var(--text)] opacity-80">{hitlState.email_subject}</p>
-            </div>
-          )}
-
-          <textarea
-            value={editedContent}
-            onChange={(e) => handleEditChange(e.target.value)}
-            rows={10}
-            className="flex-1 w-full px-4 py-3 bg-[var(--input-bg)] border border-[var(--border)] rounded-lg text-sm text-[var(--text)] opacity-80 leading-relaxed focus:outline-none focus:border-[var(--muted)]/40 resize-y min-h-[200px]"
-          />
-
-          <div className="flex items-center justify-between mt-2 mb-4">
-            <span className="text-[10px] text-[var(--muted)] opacity-40">{editedContent.length} characters</span>
-            {deliveryTarget && (
-              <span className="text-[10px] text-[var(--muted)] opacity-40">
-                Will send via {deliveryChannel} to {deliveryTarget}
+            {regenerating && (
+              <span className="flex items-center gap-1 text-[10px] text-amber-400">
+                <Loader2 size={10} className="animate-spin" />
+                Regenerating...
               </span>
             )}
           </div>
 
+          {hitlState?.email_subject && !comparing && (
+            <div className="mb-3">
+              <p className="text-[10px] text-[var(--muted)] opacity-50 mb-0.5">Subject</p>
+              <p className="text-sm text-[var(--text)] opacity-80">{newSubject ?? (hitlState.email_subject as string)}</p>
+            </div>
+          )}
+
+          {/* Side-by-side comparison OR single draft */}
+          {comparing ? (
+            <div className="grid grid-cols-2 gap-3 mb-3">
+              <div className="flex flex-col">
+                <p className="text-[10px] uppercase text-[var(--muted)] opacity-50 mb-1">Previous</p>
+                <div className="flex-1 px-3 py-2.5 bg-[var(--input-bg)] border border-[var(--border)] rounded-lg text-xs text-[var(--text)] opacity-70 leading-relaxed whitespace-pre-wrap overflow-y-auto max-h-[300px]">
+                  {previousDraft}
+                </div>
+                <button
+                  onClick={() => pickDraft("old")}
+                  className="mt-2 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded text-[11px] font-medium border border-[var(--border)] text-[var(--muted)] hover:text-[var(--text)] hover:bg-[var(--surface-elevated)]"
+                >
+                  <RotateCcw size={10} />
+                  Keep original
+                </button>
+              </div>
+              <div className="flex flex-col">
+                <p className="text-[10px] uppercase text-emerald-400 opacity-80 mb-1">New version</p>
+                <div className="flex-1 px-3 py-2.5 bg-[var(--input-bg)] border border-emerald-500/30 rounded-lg text-xs text-[var(--text)] opacity-80 leading-relaxed whitespace-pre-wrap overflow-y-auto max-h-[300px]">
+                  {newDraft}
+                </div>
+                <button
+                  onClick={() => pickDraft("new")}
+                  className="mt-2 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded text-[11px] font-medium bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20"
+                >
+                  <Check size={10} />
+                  Use this version
+                </button>
+              </div>
+            </div>
+          ) : (
+            <textarea
+              value={editedContent}
+              onChange={(e) => handleEditChange(e.target.value)}
+              rows={8}
+              className="flex-1 w-full px-4 py-3 bg-[var(--input-bg)] border border-[var(--border)] rounded-lg text-sm text-[var(--text)] opacity-80 leading-relaxed focus:outline-none focus:border-[var(--muted)]/40 resize-y min-h-[180px]"
+            />
+          )}
+
+          {/* Quick feedback chips */}
+          {!comparing && (
+            <div className="flex flex-wrap gap-1.5 mt-3">
+              {QUICK_CHIPS.map((chip) => (
+                <button
+                  key={chip}
+                  onClick={() => {
+                    setInstruction(chip);
+                    handleRegenerate(chip);
+                  }}
+                  disabled={regenerating}
+                  className="px-2.5 py-1 rounded-full text-[10px] border border-[var(--border)] text-[var(--muted)] hover:text-[var(--text)] hover:bg-[var(--surface-elevated)] hover:border-[var(--muted)]/40 transition-colors disabled:opacity-30"
+                >
+                  {chip}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Instruction input */}
+          {!comparing && (
+            <div className="flex gap-2 mt-3">
+              <input
+                value={instruction}
+                onChange={(e) => setInstruction(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && instruction.trim()) {
+                    handleRegenerate();
+                  }
+                }}
+                placeholder="Tell the agent what to change..."
+                className="flex-1 px-3 py-2 bg-[var(--input-bg)] border border-[var(--border)] rounded-lg text-xs text-[var(--text)] placeholder:text-[var(--muted)] placeholder:opacity-40 focus:outline-none focus:border-[var(--muted)]/40"
+              />
+              <button
+                onClick={() => handleRegenerate()}
+                disabled={regenerating || !instruction.trim()}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium border border-[var(--border)] text-[var(--muted)] hover:text-[var(--text)] hover:bg-[var(--surface-elevated)] disabled:opacity-30"
+              >
+                {regenerating ? <Loader2 size={11} className="animate-spin" /> : <Zap size={11} />}
+                Regenerate
+              </button>
+            </div>
+          )}
+
+          {/* Send Channel Selector */}
+          <div className="mt-4 mb-3">
+            <p className="text-[10px] uppercase tracking-widest text-[var(--muted)] opacity-50 mb-2">Send via</p>
+            <div className="flex gap-1.5">
+              {(["email", "whatsapp", "both"] as const).map((ch) => {
+                const disabled =
+                  (ch === "whatsapp" && !client.whatsapp_number) ||
+                  (ch === "email" && !client.email) ||
+                  (ch === "both" && (!client.email || !client.whatsapp_number));
+                return (
+                  <button
+                    key={ch}
+                    onClick={() => !disabled && setSelectedChannel(ch)}
+                    disabled={disabled}
+                    className={cn(
+                      "flex items-center gap-1.5 px-3 py-1.5 rounded text-[11px] font-medium capitalize transition-colors",
+                      selectedChannel === ch
+                        ? "bg-[var(--text)] text-[var(--bg)]"
+                        : "border border-[var(--border)] text-[var(--muted)] hover:text-[var(--text)] hover:bg-[var(--surface-elevated)]",
+                      disabled && "opacity-30 cursor-not-allowed"
+                    )}
+                  >
+                    {ch === "email" && <Mail size={10} />}
+                    {ch === "whatsapp" && <MessageSquare size={10} />}
+                    {ch === "both" && <><Mail size={10} /><MessageSquare size={10} /></>}
+                    {ch}
+                  </button>
+                );
+              })}
+            </div>
+            {client.whatsapp_number && client.email && client.avg_response_hours != null && (
+              <p className="text-[10px] text-[var(--muted)] opacity-50 mt-1.5">
+                {client.name} usually responds in ~{Math.round(client.avg_response_hours)}hrs
+              </p>
+            )}
+          </div>
+
+          {/* Character count */}
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-[10px] text-[var(--muted)] opacity-40">{editedContent.length} characters</span>
+          </div>
+
+          {/* Action buttons */}
           <div className="flex items-center gap-2 flex-wrap">
             <button
               onClick={handleApprove}
-              disabled={loadingAction !== null}
+              disabled={loadingAction !== null || comparing}
               className={cn(
                 "flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed",
                 hasEdits
@@ -332,7 +586,7 @@ export default function ChaserCard({ chaser, memories, onActionComplete }: Chase
             {!isSaved && (
               <button
                 onClick={handleSaveDraft}
-                disabled={loadingAction !== null}
+                disabled={loadingAction !== null || comparing}
                 className="flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-medium border border-[var(--border)] text-[var(--muted)] hover:text-[var(--text)] hover:bg-[var(--surface-elevated)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {loadingAction === "save" ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
@@ -342,11 +596,11 @@ export default function ChaserCard({ chaser, memories, onActionComplete }: Chase
 
             <button
               onClick={handleReject}
-              disabled={loadingAction !== null}
+              disabled={loadingAction !== null || comparing}
               className="flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-medium border border-[var(--border)] text-[var(--muted)] hover:border-red-500/50 hover:text-red-400 transition-colors disabled:opacity-40 disabled:cursor-not-allowed ml-auto"
             >
               {loadingAction === "reject" ? <Loader2 size={12} className="animate-spin" /> : <X size={12} />}
-              Reject & Regenerate
+              Reject
             </button>
           </div>
         </div>

@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Clock, Calendar, AlertTriangle, MoreHorizontal, Bot, Archive, ArchiveRestore, XCircle, CheckCircle, Ban, RotateCcw, Loader2 } from "lucide-react";
+import { Clock, Calendar, AlertTriangle, MoreHorizontal, Bot, Archive, ArchiveRestore, XCircle, CheckCircle, Ban, RotateCcw, Loader2, MessageSquare } from "lucide-react";
 import StatusBadge from "@/components/ui/StatusBadge";
 import { cn, formatTimeAgo, isOverdue, getScriptAge, getChaseCountdown } from "@/lib/utils";
 import type { ScriptWithClient, ScriptStatus } from "@/lib/supabase/types";
@@ -124,6 +124,18 @@ export default function ScriptCard({ script, onClick, onArchive, onStatusChange,
               Critical
             </span>
           )}
+          {script.quality_score && (
+            <span className={cn(
+              "text-[9px] font-bold px-1.5 py-0.5 rounded border",
+              script.quality_score.average >= 8
+                ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30"
+                : script.quality_score.average >= 6
+                  ? "bg-amber-500/15 text-amber-400 border-amber-500/30"
+                  : "bg-red-500/15 text-red-400 border-red-500/30"
+            )}>
+              {script.quality_score.average}/10
+            </span>
+          )}
           <span className="text-[9px] font-medium px-1 py-0.5 rounded bg-[var(--surface-elevated)] border border-[var(--border)] text-[var(--muted)]">
             v{script.version}
           </span>
@@ -192,6 +204,15 @@ export default function ScriptCard({ script, onClick, onArchive, onStatusChange,
         <div className="flex items-center gap-1.5 text-[11px] text-[var(--muted)] opacity-60 mt-1">
           <Calendar size={11} />
           <span>Due {new Date(script.due_date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
+        </div>
+      )}
+
+      {script.client_feedback && (script.status === "changes_requested" || script.status === "rejected") && (
+        <div className="flex items-start gap-1.5 text-[11px] mt-1.5">
+          <MessageSquare size={10} className="text-amber-400 opacity-70 mt-0.5 shrink-0" />
+          <span className="text-[var(--muted)] opacity-80 leading-relaxed line-clamp-2">
+            &ldquo;{script.client_feedback}&rdquo;
+          </span>
         </div>
       )}
 

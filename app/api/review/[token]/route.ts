@@ -1,38 +1,11 @@
 import { NextResponse } from "next/server";
 import { createServiceClientDirect } from "@/lib/supabase/server";
-import { Resend } from "resend";
 import { storeClientMemory, buildClientResponseMemory } from "@/lib/agent/nodes/memoryUpdate";
+import { notifyTeam } from "@/lib/notifications/notifyTeam";
 import type { ScriptStatus } from "@/lib/supabase/types";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type SupabaseAny = any;
-
-const resend = process.env.RESEND_API_KEY
-  ? new Resend(process.env.RESEND_API_KEY)
-  : null;
-
-async function notifyTeam(
-  clientName: string,
-  action: string,
-  scriptTitle: string,
-  feedback: string | null
-) {
-  const teamEmail = process.env.ALLOWED_EMAIL;
-  if (!teamEmail || !resend) return;
-
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-
-  try {
-    await resend.emails.send({
-      from: `Greenlit <${process.env.RESEND_FROM_EMAIL || "greenlit@ruskaruma.me"}>`,
-      to: [teamEmail],
-      subject: `[Greenlit] ${clientName} ${action} '${scriptTitle}' via email review`,
-      text: `Client ${clientName} reviewed via magic link.\n\nDecision: ${action}\nFeedback: ${feedback || "none"}\n\nView in dashboard: ${appUrl}/dashboard`,
-    });
-  } catch (err) {
-    console.error("[review] Team notification email failed:", err);
-  }
-}
 
 export async function GET(
   _request: Request,
@@ -171,7 +144,7 @@ export async function PATCH(
   if (scriptForMemory) {
     // Part 3: Notify team
     if (client) {
-      await notifyTeam(client.name, action, scriptForMemory.title, feedback ?? null);
+      await notifyTeam({ clientName: client.name, action, scriptTitle: scriptForMemory.title, feedback: feedback ?? null, channel: "both" });
     }
 
     const sentAt = script.sent_at ? new Date(script.sent_at) : null;

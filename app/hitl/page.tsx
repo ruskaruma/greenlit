@@ -19,6 +19,7 @@ export interface ChaserData {
     email_subject?: string;
     hours_overdue?: number;
     client_email?: string;
+    tone_recommendation?: string;
     critique_scores?: {
       professionalism?: number;
       personalization?: number;
@@ -34,6 +35,10 @@ export interface ChaserData {
     whatsapp_number: string | null;
     preferred_channel: string;
     avg_response_hours: number | null;
+    approved_count: number;
+    rejected_count: number;
+    changes_requested_count: number;
+    total_scripts: number;
   };
   script: {
     title: string;
@@ -42,6 +47,7 @@ export interface ChaserData {
     assigned_writer: string | null;
     sent_at: string | null;
   };
+  chaser_count: number;
 }
 
 async function getPendingChasers(): Promise<ChaserData[]> {
@@ -49,7 +55,7 @@ async function getPendingChasers(): Promise<ChaserData[]> {
 
   const { data, error } = await supabase
     .from("chasers")
-    .select("id, draft_content, created_at, script_id, client_id, status, hitl_state, clients(name, company, email, whatsapp_number, preferred_channel, avg_response_hours), scripts(title, content, platform, assigned_writer, sent_at)")
+    .select("id, draft_content, created_at, script_id, client_id, status, hitl_state, clients(name, company, email, whatsapp_number, preferred_channel, avg_response_hours, approved_count, rejected_count, changes_requested_count, total_scripts), scripts(title, content, platform, assigned_writer, sent_at)")
     .in("status", ["pending_hitl", "draft_saved"])
     .order("created_at", { ascending: false });
 
@@ -62,14 +68,37 @@ async function getPendingChasers(): Promise<ChaserData[]> {
     ...row,
     client: row.clients,
     script: row.scripts,
+    chaser_count: 0,
   })) as ChaserData[];
 
   const seen = new Set<string>();
-  return all.filter((c) => {
+  const deduped = all.filter((c) => {
     if (seen.has(c.script_id)) return false;
     seen.add(c.script_id);
     return true;
   });
+
+  // Fetch sent chaser counts per script
+  if (deduped.length > 0) {
+    const scriptIds = deduped.map((c) => c.script_id);
+    const { data: sentChasers } = await supabase
+      .from("chasers")
+      .select("script_id")
+      .in("script_id", scriptIds)
+      .in("status", ["approved", "edited", "sent"]);
+
+    if (sentChasers) {
+      const counts: Record<string, number> = {};
+      for (const row of sentChasers as { script_id: string }[]) {
+        counts[row.script_id] = (counts[row.script_id] ?? 0) + 1;
+      }
+      for (const c of deduped) {
+        c.chaser_count = counts[c.script_id] ?? 0;
+      }
+    }
+  }
+
+  return deduped;
 }
 
 async function getClientMemories(clientIds: string[]): Promise<Record<string, { content: string; memory_type: string; created_at: string }[]>> {

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createServiceClientDirect } from "@/lib/supabase/server";
 import { requireSession } from "@/lib/auth/requireSession";
 import { sendChaserEmail } from "@/lib/resend/sendChaserEmail";
+import { sendChaserWhatsApp } from "@/lib/twilio/sendChaserWhatsApp";
 import { storeClientMemory, buildChaserSentMemory } from "@/lib/agent/nodes/memoryUpdate";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -17,7 +18,7 @@ export async function POST(
   const { id } = await params;
   const supabase: SupabaseAny = createServiceClientDirect();
 
-  let body: { editedContent?: string; saveOnly?: boolean };
+  let body: { editedContent?: string; saveOnly?: boolean; channel?: "email" | "whatsapp" | "both" };
   try {
     body = await request.json();
   } catch (err) {
@@ -25,7 +26,7 @@ export async function POST(
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
 
-  const { editedContent, saveOnly } = body;
+  const { editedContent, saveOnly, channel } = body;
 
   const { data: chaser, error: fetchError } = await supabase
     .from("chasers")
@@ -84,11 +85,19 @@ export async function POST(
   const hitlSubject = chaser.hitl_state?.email_subject as string | undefined;
   const emailSubject = hitlSubject || `Following up: ${chaser.scripts?.title ?? "your script"}`;
 
-  // Attempt email delivery — failure should not block approval
+  // Determine delivery channel
+  const clientWhatsApp = chaser.clients?.whatsapp_number as string | undefined;
+  const sendChannel = channel ?? (chaser.clients as Record<string, unknown>)?.preferred_channel as string ?? "email";
+  const sendEmail = sendChannel === "email" || sendChannel === "both";
+  const sendWa = sendChannel === "whatsapp" || sendChannel === "both";
+
+  // Attempt delivery — failure should not block approval
   let emailFailed = false;
   let emailError = "";
+  let waFailed = false;
+  let waError = "";
 
-  if (clientEmail) {
+  if (sendEmail && clientEmail) {
     console.log("[hitl/approve] Sending email to:", clientEmail, "subject:", emailSubject);
     try {
       const emailResult = await sendChaserEmail(clientEmail, finalContent, emailSubject, clientName);
@@ -102,14 +111,39 @@ export async function POST(
       emailError = err instanceof Error ? err.message : "Email send threw unexpectedly";
       console.error("[hitl/approve] Email send threw:", emailError);
     }
-  } else {
-    console.warn("[hitl/approve] No client email found for chaser", id, "— skipping delivery");
+  } else if (sendEmail && !clientEmail) {
+    console.warn("[hitl/approve] No client email found for chaser", id, "— skipping email");
   }
 
-  // Always mark the chaser as approved regardless of email outcome
+  if (sendWa && clientWhatsApp) {
+    console.log("[hitl/approve] Sending WhatsApp to:", clientWhatsApp);
+    try {
+      const waResult = await sendChaserWhatsApp({
+        to: clientWhatsApp,
+        clientName,
+        draftContent: finalContent,
+        subject: emailSubject,
+      });
+      if (!waResult.success) {
+        waFailed = true;
+        waError = waResult.error ?? "Unknown WhatsApp error";
+        console.error("[hitl/approve] WhatsApp send failed:", waError);
+      }
+    } catch (err) {
+      waFailed = true;
+      waError = err instanceof Error ? err.message : "WhatsApp send threw unexpectedly";
+      console.error("[hitl/approve] WhatsApp send threw:", waError);
+    }
+  } else if (sendWa && !clientWhatsApp) {
+    console.warn("[hitl/approve] No WhatsApp number for chaser", id, "— skipping WhatsApp");
+  }
+
+  const allDeliveryFailed = (sendEmail ? emailFailed || !clientEmail : true) && (sendWa ? waFailed || !clientWhatsApp : true);
+
+  // Always mark the chaser as approved regardless of delivery outcome
   const updatePayload: Record<string, unknown> = {
     status: newStatus,
-    sent_at: emailFailed ? null : new Date().toISOString(),
+    sent_at: allDeliveryFailed ? null : new Date().toISOString(),
   };
   if (wasEdited) {
     updatePayload.team_lead_edits = editedContent;
@@ -133,8 +167,11 @@ export async function POST(
     metadata: {
       script_id: chaser.script_id,
       was_edited: wasEdited,
-      email_sent: !emailFailed,
+      channel: sendChannel,
+      email_sent: sendEmail ? !emailFailed : undefined,
       email_error: emailFailed ? emailError : undefined,
+      whatsapp_sent: sendWa ? !waFailed : undefined,
+      whatsapp_error: waFailed ? waError : undefined,
     },
   });
 
@@ -163,12 +200,16 @@ export async function POST(
     { chaser_id: id, script_id: chaser.script_id }
   ).catch((err: unknown) => console.error("[hitl/approve] Memory storage failed:", err));
 
-  // Return success with a warning if email failed
-  if (emailFailed) {
+  // Return success with a warning if any delivery failed
+  const warnings: string[] = [];
+  if (emailFailed && sendEmail) warnings.push(`Email failed: ${emailError}`);
+  if (waFailed && sendWa) warnings.push(`WhatsApp failed: ${waError}`);
+
+  if (warnings.length > 0) {
     return NextResponse.json({
       success: true,
       status: newStatus,
-      warning: `Approved but email delivery failed: ${emailError}`,
+      warning: `Approved but: ${warnings.join(". ")}`,
     });
   }
 

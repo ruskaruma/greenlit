@@ -71,6 +71,7 @@ export async function generateChaser(state: AgentState): Promise<AgentState> {
           client_email: state.clientEmail,
           hours_overdue: state.hoursOverdue,
           memories_used: state.clientMemories.length,
+          tone_recommendation: state.toneRecommendation ?? "neutral",
         },
       })
       .select("id")
