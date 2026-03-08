@@ -55,7 +55,7 @@ interface EntryForm {
 
 /* ---------- Constants ---------- */
 
-const PLATFORMS: ReportPlatform[] = ["Instagram", "YouTube", "LinkedIn", "TikTok"];
+const PLATFORMS: ReportPlatform[] = ["Instagram", "YouTube", "LinkedIn", "TikTok", "X/Twitter"];
 const CONTENT_TYPES: ReportContentType[] = ["Video", "Photo", "Carousel", "Story", "Reel", "Post"];
 
 const PLATFORM_METRICS: Record<ReportPlatform, { key: string; label: string; icon: typeof Eye }[]> = {
@@ -94,13 +94,23 @@ const PLATFORM_METRICS: Record<ReportPlatform, { key: string; label: string; ico
     { key: "ctr", label: "CTR (%)", icon: MousePointer },
     { key: "engagement_rate", label: "Engagement Rate (%)", icon: TrendingUp },
   ],
+  "X/Twitter": [
+    { key: "impressions", label: "Impressions", icon: Eye },
+    { key: "likes", label: "Likes", icon: Heart },
+    { key: "replies", label: "Replies", icon: MessageSquare },
+    { key: "reposts", label: "Reposts", icon: Share2 },
+    { key: "bookmarks", label: "Bookmarks", icon: Bookmark },
+    { key: "clicks", label: "Clicks", icon: MousePointer },
+    { key: "engagement_rate", label: "Engagement Rate (%)", icon: TrendingUp },
+  ],
 };
 
 const METRIC_ICON_MAP: Record<string, typeof Eye> = {
   views: Eye, reach: Users, likes: Heart, comments: MessageSquare,
   shares: Share2, saves: Bookmark, engagement_rate: TrendingUp,
   watch_time: Clock, subscribers_gained: Users, ctr: MousePointer,
-  impressions: Eye, clicks: MousePointer, reposts: Share2,
+  impressions: Eye, clicks: MousePointer, reposts: Share2, replies: MessageSquare,
+  bookmarks: Bookmark,
   entry_count: BarChart3,
 };
 
@@ -109,6 +119,7 @@ const PLATFORM_COLORS: Record<string, string> = {
   YouTube: "text-red-400",
   LinkedIn: "text-blue-400",
   TikTok: "text-cyan-400",
+  "X/Twitter": "text-gray-300",
 };
 
 /* ---------- Helpers ---------- */

@@ -112,7 +112,7 @@ export interface ClientMemory {
   created_at: string;
 }
 
-export type ReportPlatform = "Instagram" | "YouTube" | "LinkedIn" | "TikTok";
+export type ReportPlatform = "Instagram" | "YouTube" | "LinkedIn" | "TikTok" | "X/Twitter";
 export type ReportContentType = "Video" | "Photo" | "Carousel" | "Story" | "Reel" | "Post";
 
 export interface ReportEntry {
