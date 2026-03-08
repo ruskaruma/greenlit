@@ -4,6 +4,7 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   User, Mail, Building2, Phone, Globe, Instagram, Youtube,
+  Twitter, Linkedin,
   Mic, UserCheck, Calendar, Hash, ChevronRight, ChevronLeft,
   Loader2, Check, ExternalLink, ArrowRight, Plus, RotateCcw,
   CheckCircle2, Clock, FileText,
@@ -22,6 +23,8 @@ interface FormData {
   preferred_channel: string;
   instagram_handle: string;
   youtube_channel_id: string;
+  twitter_handle: string;
+  linkedin_url: string;
   brand_voice: string;
   account_manager: string;
   contract_start: string;
@@ -34,7 +37,7 @@ interface OnboardingResult {
   results: Record<string, { success: boolean; error?: string }>;
 }
 
-const PLATFORMS = ["Instagram", "YouTube", "LinkedIn", "TikTok"] as const;
+const PLATFORMS = ["Instagram", "YouTube", "LinkedIn", "TikTok", "X/Twitter"] as const;
 const CHANNELS = ["email", "whatsapp", "both"] as const;
 const STEPS = ["Client Basics", "Contract Details", "Brand Intelligence", "Review & Submit"] as const;
 
@@ -61,6 +64,8 @@ export default function OnboardingForm() {
     preferred_channel: "email",
     instagram_handle: "",
     youtube_channel_id: "",
+    twitter_handle: "",
+    linkedin_url: "",
     brand_voice: "",
     account_manager: "",
     contract_start: "",
@@ -120,6 +125,7 @@ export default function OnboardingForm() {
     setForm({
       name: "", email: "", company: "", whatsapp_number: "",
       preferred_channel: "email", instagram_handle: "", youtube_channel_id: "",
+      twitter_handle: "", linkedin_url: "",
       brand_voice: "", account_manager: "", contract_start: "",
       monthly_volume: "", platform_focus: [],
     });
@@ -301,6 +307,12 @@ export default function OnboardingForm() {
               <Field icon={Youtube} label="YouTube Channel ID">
                 <input type="text" value={form.youtube_channel_id} onChange={(e) => update("youtube_channel_id", e.target.value)} placeholder="UC..." className={inputCls} />
               </Field>
+              <Field icon={Twitter} label="X / Twitter Handle">
+                <input type="text" value={form.twitter_handle} onChange={(e) => update("twitter_handle", e.target.value)} placeholder="@handle" className={inputCls} />
+              </Field>
+              <Field icon={Linkedin} label="LinkedIn URL">
+                <input type="text" value={form.linkedin_url} onChange={(e) => update("linkedin_url", e.target.value)} placeholder="https://linkedin.com/in/..." className={inputCls} />
+              </Field>
             </div>
           )}
 
@@ -372,6 +384,8 @@ export default function OnboardingForm() {
                 <ReviewRow label="Channel" value={form.preferred_channel} />
                 <ReviewRow label="Instagram" value={form.instagram_handle} />
                 <ReviewRow label="YouTube" value={form.youtube_channel_id} />
+                <ReviewRow label="X / Twitter" value={form.twitter_handle} />
+                <ReviewRow label="LinkedIn" value={form.linkedin_url} />
                 <ReviewRow label="Account Manager" value={form.account_manager} />
                 <ReviewRow label="Contract Start" value={form.contract_start} />
                 <ReviewRow label="Monthly Volume" value={form.monthly_volume ? `${form.monthly_volume} pieces` : ""} />

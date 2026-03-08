@@ -2,7 +2,7 @@ import { getToken } from "next-auth/jwt";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-const protectedPaths = ["/dashboard", "/hitl", "/analytics", "/onboarding"];
+const protectedPaths = ["/dashboard", "/hitl", "/analytics", "/onboarding", "/clients"];
 const publicApiPaths = ["/api/seed"];
 
 export async function middleware(request: NextRequest) {
@@ -30,5 +30,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/dashboard/:path*", "/hitl/:path*", "/analytics/:path*", "/onboarding/:path*"],
+  matcher: ["/dashboard/:path*", "/hitl/:path*", "/analytics/:path*", "/onboarding/:path*", "/clients/:path*"],
 };

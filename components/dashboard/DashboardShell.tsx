@@ -11,6 +11,7 @@ import RunAgentButton from "./RunAgentButton";
 import StatusBadge from "@/components/ui/StatusBadge";
 import ToastProvider from "@/components/ui/ToastProvider";
 import { useToast } from "@/components/ui/ToastProvider";
+import { useClientEdit } from "@/components/ClientEditProvider";
 import { formatTimeAgo, isOverdue } from "@/lib/utils";
 import type { ScriptWithClient, ScriptStatus } from "@/lib/supabase/types";
 
@@ -65,6 +66,7 @@ function DashboardShellInner({
   const [debouncedQuery, setDebouncedQuery] = useState("");
 
   const { toast } = useToast();
+  const { openEditDrawer } = useClientEdit();
 
   useEffect(() => {
     setLocalScripts(scripts);
@@ -89,6 +91,12 @@ function DashboardShellInner({
       }
     } catch { /* silent */ }
   }, []);
+
+  useEffect(() => {
+    const handler = () => fetchClients();
+    window.addEventListener("client-updated", handler);
+    return () => window.removeEventListener("client-updated", handler);
+  }, [fetchClients]);
 
   useEffect(() => { setClients(initialClients); }, [initialClients]);
 
@@ -207,6 +215,7 @@ function DashboardShellInner({
         onClientFilter={setActiveClientId}
         activeClientId={activeClientId}
         onClientsChange={fetchClients}
+        onEditClient={openEditDrawer}
       />
 
       <main className="flex-1 ml-[220px] min-h-screen">

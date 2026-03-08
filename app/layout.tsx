@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Oxanium, Playfair_Display, Fira_Code, Merriweather } from "next/font/google";
 import ThemeProvider from "@/components/ThemeProvider";
+import ClientEditProvider from "@/components/ClientEditProvider";
 import "./globals.css";
 
 const oxanium = Oxanium({
@@ -52,7 +53,9 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className={`${oxanium.variable} ${playfair.variable} ${firaCode.variable} ${merriweather.variable} font-sans antialiased bg-[var(--bg)] text-[var(--text)]`} suppressHydrationWarning>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
-        <ThemeProvider>{children}</ThemeProvider>
+        <ThemeProvider>
+          <ClientEditProvider>{children}</ClientEditProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

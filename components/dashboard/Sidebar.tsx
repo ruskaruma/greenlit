@@ -5,8 +5,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, Shield, BarChart3, UserPlus,
-  ChevronLeft, ChevronRight, Plus, MoreHorizontal, Trash2,
-  Mail, Phone,
+  ChevronLeft, ChevronRight, Plus, MoreHorizontal, Trash2, Pencil,
+  Mail, Phone, Eye,
 } from "lucide-react";
 import LogoutButton from "./LogoutButton";
 import ThemeToggle from "./ThemeToggle";
@@ -19,6 +19,7 @@ interface SidebarProps {
   onClientFilter: (clientId: string | null) => void;
   activeClientId: string | null;
   onClientsChange: () => void;
+  onEditClient: (clientId: string) => void;
 }
 
 const navItems = [
@@ -28,7 +29,7 @@ const navItems = [
   { href: "/analytics", label: "Analytics", icon: BarChart3 },
 ];
 
-export default function Sidebar({ clients, onClientFilter, activeClientId, onClientsChange }: SidebarProps) {
+export default function Sidebar({ clients, onClientFilter, activeClientId, onClientsChange, onEditClient }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
   const pathname = usePathname();
@@ -100,6 +101,10 @@ export default function Sidebar({ clients, onClientFilter, activeClientId, onCli
                 isMenuOpen={menuOpenId === client.id}
                 onSelect={() => onClientFilter(client.id)}
                 onMenuToggle={() => setMenuOpenId(menuOpenId === client.id ? null : client.id)}
+                onEdit={() => {
+                  setMenuOpenId(null);
+                  onEditClient(client.id);
+                }}
                 onDelete={async () => {
                   try {
                     const res = await fetch(`/api/clients/${client.id}`, { method: "DELETE" });
@@ -154,6 +159,7 @@ function ClientRow({
   isMenuOpen,
   onSelect,
   onMenuToggle,
+  onEdit,
   onDelete,
 }: {
   client: ClientItem;
@@ -161,6 +167,7 @@ function ClientRow({
   isMenuOpen: boolean;
   onSelect: () => void;
   onMenuToggle: () => void;
+  onEdit: () => void;
   onDelete: () => void;
 }) {
   const menuRef = useRef<HTMLDivElement>(null);
@@ -201,6 +208,20 @@ function ClientRow({
       </button>
       {isMenuOpen && (
         <div ref={menuRef} className="absolute right-0 top-full mt-1 z-50 bg-[var(--card)] border border-[var(--border)] rounded shadow-lg py-1 min-w-[120px]">
+          <button
+            onClick={onEdit}
+            className="flex items-center gap-2 px-3 py-1.5 text-[11px] text-[var(--text)] hover:bg-[var(--surface-elevated)] w-full text-left"
+          >
+            <Pencil size={11} />
+            Edit client
+          </button>
+          <Link
+            href={`/clients/${client.id}`}
+            className="flex items-center gap-2 px-3 py-1.5 text-[11px] text-[var(--text)] hover:bg-[var(--surface-elevated)] w-full text-left"
+          >
+            <Eye size={11} />
+            View details
+          </Link>
           <button
             onClick={onDelete}
             className="flex items-center gap-2 px-3 py-1.5 text-[11px] text-red-400 hover:bg-[var(--surface-elevated)] w-full text-left"

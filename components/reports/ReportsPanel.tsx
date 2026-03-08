@@ -164,6 +164,9 @@ export default function ReportsPanel({ clients, initialReports }: ReportsPanelPr
 
   const [reports, setReports] = useState<ReportRow[]>(initialReports);
   const [selectedClientId, setSelectedClientId] = useState<string>(clients[0]?.id ?? "");
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkSending, setBulkSending] = useState(false);
+  const [emailPreview, setEmailPreview] = useState<{ reportId: string; email: string; title: string; period: string; entryCount: number } | null>(null);
   const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
 
   // Form state
@@ -186,12 +189,22 @@ export default function ReportsPanel({ clients, initialReports }: ReportsPanelPr
   } | null>(null);
 
   // Derived
+  const isAllClients = selectedClientId === "";
   const clientReports = useMemo(
-    () => reports.filter((r) => r.client_id === selectedClientId),
-    [reports, selectedClientId]
+    () => isAllClients ? reports : reports.filter((r) => r.client_id === selectedClientId),
+    [reports, selectedClientId, isAllClients]
   );
   const selectedClient = clients.find((c) => c.id === selectedClientId);
   const viewingReport = selectedReportId ? reports.find((r) => r.id === selectedReportId) : null;
+
+  // Cross-client aggregate stats
+  const aggregateStats = useMemo(() => {
+    if (!isAllClients) return null;
+    const totalEntries = clientReports.reduce((sum, r) => sum + r.entries.length, 0);
+    const sentCount = clientReports.filter((r) => r.sent_at).length;
+    const draftCount = clientReports.length - sentCount;
+    return { totalReports: clientReports.length, totalEntries, sentCount, draftCount };
+  }, [isAllClients, clientReports]);
 
   /* ---------- Handlers ---------- */
 
@@ -199,6 +212,7 @@ export default function ReportsPanel({ clients, initialReports }: ReportsPanelPr
     setSelectedClientId(clientId);
     setSelectedReportId(null);
     setGeneratedOutput(null);
+    setSelectedIds(new Set());
     resetForm();
   }
 
@@ -374,7 +388,22 @@ export default function ReportsPanel({ clients, initialReports }: ReportsPanelPr
     } catch { toast("error", "Something went wrong"); } finally { setSaving(false); setGenerating(false); }
   }
 
-  async function handleSendEmail(reportId: string) {
+  function handleSendEmailClick(reportId: string) {
+    const report = reports.find((r) => r.id === reportId);
+    if (!report) return;
+    setEmailPreview({
+      reportId,
+      email: report.client.email,
+      title: report.report_title,
+      period: fmtDateRange(report.period_start, report.period_end),
+      entryCount: report.entries.length,
+    });
+  }
+
+  async function handleConfirmSend() {
+    if (!emailPreview) return;
+    const { reportId } = emailPreview;
+    setEmailPreview(null);
     setSending(true);
     try {
       const res = await fetch(`/api/reports/${reportId}/send`, {
@@ -387,6 +416,26 @@ export default function ReportsPanel({ clients, initialReports }: ReportsPanelPr
         prev.map((r) => r.id === reportId ? { ...r, sent_at: new Date().toISOString() } : r)
       );
     } catch { toast("error", "Failed to send email"); } finally { setSending(false); }
+  }
+
+  async function handleBulkSend() {
+    if (selectedIds.size === 0) return;
+    setBulkSending(true);
+    try {
+      const res = await fetch("/api/reports/send-bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ report_ids: Array.from(selectedIds) }),
+      });
+      if (!res.ok) { toast("error", "Bulk send failed"); return; }
+      const { sent, failed } = await res.json();
+      toast("success", `Sent ${sent} report${sent !== 1 ? "s" : ""}${failed > 0 ? `, ${failed} failed` : ""}`);
+      const now = new Date().toISOString();
+      setReports((prev) =>
+        prev.map((r) => selectedIds.has(r.id) ? { ...r, sent_at: r.sent_at ?? now } : r)
+      );
+      setSelectedIds(new Set());
+    } catch { toast("error", "Bulk send failed"); } finally { setBulkSending(false); }
   }
 
   /* ---------- Render ---------- */
@@ -405,6 +454,7 @@ export default function ReportsPanel({ clients, initialReports }: ReportsPanelPr
               onChange={(e) => handleClientChange(e.target.value)}
               className="w-full appearance-none px-3 py-2.5 pr-8 bg-[var(--bg)] border border-[var(--border)] rounded-lg text-sm text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)] focus:border-transparent cursor-pointer"
             >
+              <option value="">All Clients</option>
               {clients.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name}{c.company ? ` — ${c.company}` : ""}
@@ -415,69 +465,127 @@ export default function ReportsPanel({ clients, initialReports }: ReportsPanelPr
           </div>
         </div>
 
-        <div className="p-4 border-b border-[var(--border)]">
-          <button
-            onClick={handleNewReport}
-            className={cn(
-              "w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-xs font-semibold transition-colors",
-              !selectedReportId
-                ? "bg-[var(--accent-primary)] text-white"
-                : "border border-[var(--border)] text-[var(--muted)] hover:text-[var(--text)] hover:bg-[var(--surface-elevated)]"
-            )}
-          >
-            <BarChart3 size={13} />
-            New Report
-          </button>
-        </div>
+        {!isAllClients && (
+          <div className="p-4 border-b border-[var(--border)]">
+            <button
+              onClick={handleNewReport}
+              className={cn(
+                "w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-xs font-semibold transition-colors",
+                !selectedReportId
+                  ? "bg-[var(--accent-primary)] text-white"
+                  : "border border-[var(--border)] text-[var(--muted)] hover:text-[var(--text)] hover:bg-[var(--surface-elevated)]"
+              )}
+            >
+              <BarChart3 size={13} />
+              New Report
+            </button>
+          </div>
+        )}
 
         <div className="flex-1 overflow-y-auto">
           <div className="p-4">
-            <p className="text-[10px] uppercase tracking-widest text-[var(--muted)] opacity-50 mb-3">
-              History ({clientReports.length})
-            </p>
+            {/* Cross-client aggregate stats */}
+            {aggregateStats && (
+              <div className="grid grid-cols-2 gap-2 mb-4">
+                <div className="bg-[var(--bg)] border border-[var(--border)] rounded-lg p-2.5 text-center">
+                  <p className="text-lg font-semibold text-[var(--text)]">{aggregateStats.totalReports}</p>
+                  <p className="text-[10px] text-[var(--muted)] opacity-60">Reports</p>
+                </div>
+                <div className="bg-[var(--bg)] border border-[var(--border)] rounded-lg p-2.5 text-center">
+                  <p className="text-lg font-semibold text-[var(--text)]">{aggregateStats.totalEntries}</p>
+                  <p className="text-[10px] text-[var(--muted)] opacity-60">Entries</p>
+                </div>
+                <div className="bg-[var(--bg)] border border-[var(--border)] rounded-lg p-2.5 text-center">
+                  <p className="text-lg font-semibold text-[var(--accent-success, #22c55e)]">{aggregateStats.sentCount}</p>
+                  <p className="text-[10px] text-[var(--muted)] opacity-60">Sent</p>
+                </div>
+                <div className="bg-[var(--bg)] border border-[var(--border)] rounded-lg p-2.5 text-center">
+                  <p className="text-lg font-semibold text-amber-400">{aggregateStats.draftCount}</p>
+                  <p className="text-[10px] text-[var(--muted)] opacity-60">Draft</p>
+                </div>
+              </div>
+            )}
+
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-[10px] uppercase tracking-widest text-[var(--muted)] opacity-50">
+                History ({clientReports.length})
+              </p>
+              {selectedIds.size > 0 && (
+                <button
+                  onClick={handleBulkSend}
+                  disabled={bulkSending}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold bg-[var(--accent-primary)] text-white hover:bg-[var(--accent-primary)]/90 transition-colors disabled:opacity-40"
+                >
+                  {bulkSending ? <Loader2 size={11} className="animate-spin" /> : <Send size={11} />}
+                  Send Selected ({selectedIds.size})
+                </button>
+              )}
+            </div>
             {clientReports.length === 0 ? (
               <p className="text-xs text-[var(--muted)] opacity-60">No reports yet.</p>
             ) : (
               <div className="space-y-2">
                 {clientReports.map((report) => {
                   const platforms = [...new Set(report.entries.map((e) => e.platform))];
+                  const canBulkSelect = !report.sent_at && !!report.generated_summary;
                   return (
-                    <button
-                      key={report.id}
-                      onClick={() => handleViewReport(report)}
-                      className={cn(
-                        "w-full text-left p-3 rounded-lg border transition-colors",
-                        selectedReportId === report.id
-                          ? "border-[var(--accent-primary)] bg-[var(--accent-primary)]/5"
-                          : "border-[var(--border)] hover:border-[var(--accent-primary)]/30 hover:bg-[var(--surface-elevated)]"
+                    <div key={report.id} className="flex items-start gap-2">
+                      {canBulkSelect && (
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(report.id)}
+                          onChange={(e) => {
+                            setSelectedIds((prev) => {
+                              const next = new Set(prev);
+                              if (e.target.checked) next.add(report.id);
+                              else next.delete(report.id);
+                              return next;
+                            });
+                          }}
+                          className="mt-3.5 shrink-0 accent-[var(--accent-primary)] cursor-pointer"
+                        />
                       )}
-                    >
-                      <p className="text-xs font-medium text-[var(--text)] truncate">{report.report_title}</p>
-                      <p className="text-[10px] text-[var(--muted)] opacity-60 mt-0.5">
-                        {fmtDateRange(report.period_start, report.period_end)}
-                      </p>
-                      <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                        {platforms.map((p) => (
-                          <span key={p} className={cn("text-[10px] font-medium", PLATFORM_COLORS[p] ?? "text-[var(--muted)]")}>
-                            {p}
-                          </span>
-                        ))}
-                        <span className="text-[10px] text-[var(--muted)] opacity-40">
-                          {report.entries.length} piece{report.entries.length !== 1 ? "s" : ""}
-                        </span>
-                        <span className="ml-auto shrink-0">
-                          {report.sent_at ? (
-                            <span className="flex items-center gap-1 text-[10px] text-[var(--accent-success)]">
-                              <CheckCircle2 size={10} /> Sent
+                      <button
+                        onClick={() => handleViewReport(report)}
+                        className={cn(
+                          "flex-1 text-left p-3 rounded-lg border transition-colors",
+                          selectedReportId === report.id
+                            ? "border-[var(--accent-primary)] bg-[var(--accent-primary)]/5"
+                            : "border-[var(--border)] hover:border-[var(--accent-primary)]/30 hover:bg-[var(--surface-elevated)]"
+                        )}
+                      >
+                        <p className="text-xs font-medium text-[var(--text)] truncate">{report.report_title}</p>
+                        <p className="text-[10px] text-[var(--muted)] opacity-60 mt-0.5">
+                          {fmtDateRange(report.period_start, report.period_end)}
+                        </p>
+                        <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                          {platforms.map((p) => (
+                            <span key={p} className={cn("text-[10px] font-medium", PLATFORM_COLORS[p] ?? "text-[var(--muted)]")}>
+                              {p}
                             </span>
-                          ) : report.generated_summary ? (
-                            <span className="text-[10px] text-amber-400">Draft</span>
-                          ) : (
-                            <span className="text-[10px] text-[var(--muted)] opacity-40">Saved</span>
+                          ))}
+                          <span className="text-[10px] text-[var(--muted)] opacity-40">
+                            {report.entries.length} piece{report.entries.length !== 1 ? "s" : ""}
+                          </span>
+                          {isAllClients && (
+                            <span className="text-[10px] text-[var(--muted)] opacity-50">
+                              {report.client.name}
+                            </span>
                           )}
-                        </span>
-                      </div>
-                    </button>
+                          <span className="ml-auto shrink-0">
+                            {report.sent_at ? (
+                              <span className="flex items-center gap-1 text-[10px] text-[var(--accent-success)]">
+                                <CheckCircle2 size={10} /> Sent
+                              </span>
+                            ) : report.generated_summary ? (
+                              <span className="text-[10px] text-amber-400">Draft</span>
+                            ) : (
+                              <span className="text-[10px] text-[var(--muted)] opacity-40">Saved</span>
+                            )}
+                          </span>
+                        </div>
+                      </button>
+                    </div>
                   );
                 })}
               </div>
@@ -608,7 +716,7 @@ export default function ReportsPanel({ clients, initialReports }: ReportsPanelPr
               {/* Send */}
               <div className="flex items-center gap-3 flex-wrap pb-6">
                 <button
-                  onClick={() => handleSendEmail(generatedOutput.id)}
+                  onClick={() => handleSendEmailClick(generatedOutput.id)}
                   disabled={sending || !!viewingReport.sent_at}
                   className={cn(
                     "flex items-center gap-2 px-5 py-2.5 rounded-lg text-xs font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed",
@@ -856,6 +964,58 @@ export default function ReportsPanel({ clients, initialReports }: ReportsPanelPr
           )}
         </AnimatePresence>
       </div>
+
+      {/* ===== EMAIL PREVIEW MODAL ===== */}
+      <AnimatePresence>
+        {emailPreview && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+            onClick={() => setEmailPreview(null)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-[var(--card)] border border-[var(--border)] rounded-xl p-6 w-full max-w-md mx-4 shadow-2xl"
+            >
+              <p className="text-[10px] uppercase tracking-widest text-[var(--accent-primary)] font-semibold mb-4">Confirm Send</p>
+              <p className="text-sm text-[var(--text)] leading-relaxed mb-4">
+                You&apos;re about to send <span className="font-semibold">{emailPreview.title}</span> to{" "}
+                <span className="font-semibold text-[var(--accent-primary)]">{emailPreview.email}</span>. Proceed?
+              </p>
+              <div className="bg-[var(--bg)] border border-[var(--border)] rounded-lg p-3 mb-5 space-y-1.5">
+                <div className="flex justify-between text-xs">
+                  <span className="text-[var(--muted)]">Period</span>
+                  <span className="text-[var(--text)]">{emailPreview.period}</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-[var(--muted)]">Entries</span>
+                  <span className="text-[var(--text)]">{emailPreview.entryCount}</span>
+                </div>
+              </div>
+              <div className="flex items-center justify-end gap-3">
+                <button
+                  onClick={() => setEmailPreview(null)}
+                  className="px-4 py-2 rounded-lg text-xs font-medium border border-[var(--border)] text-[var(--muted)] hover:text-[var(--text)] hover:bg-[var(--surface-elevated)] transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleConfirmSend}
+                  className="flex items-center gap-2 px-5 py-2 rounded-lg text-xs font-bold bg-[var(--accent-primary)] text-white hover:bg-[var(--accent-primary)]/90 glow-primary transition-colors"
+                >
+                  <Send size={12} />
+                  Confirm Send
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
