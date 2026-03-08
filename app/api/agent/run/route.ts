@@ -40,22 +40,34 @@ export async function GET(request: Request) {
   const supabase: SupabaseAny = createServiceClientDirect();
 
   try {
-    const now = new Date().toISOString();
+    const nowMs = Date.now();
+    const nowIso = new Date(nowMs).toISOString();
 
-    const { data: overdueScripts, error: queryError } = await supabase
+    // Fetch all pending_review scripts that have been sent
+    const { data: candidates, error: queryError } = await supabase
       .from("scripts")
-      .select("id, title")
+      .select("id, title, sent_at, due_date, response_deadline_minutes")
       .eq("status", "pending_review")
-      .lt("due_date", now)
       .not("sent_at", "is", null)
-      .order("due_date", { ascending: true });
+      .order("sent_at", { ascending: true });
 
     if (queryError) {
       console.error("[agent/run] Overdue query failed:", queryError.message);
       return NextResponse.json({ error: queryError.message }, { status: 500 });
     }
 
-    if (!overdueScripts || overdueScripts.length === 0) {
+    // Filter: overdue if due_date passed OR sent_at + response_deadline_minutes passed
+    const overdueScripts = (candidates ?? []).filter(
+      (s: { sent_at: string; due_date: string | null; response_deadline_minutes: number | null }) => {
+        const deadlineMinutes = s.response_deadline_minutes ?? 2880;
+        const sentTime = new Date(s.sent_at).getTime();
+        const deadlinePassed = sentTime + deadlineMinutes * 60 * 1000 < nowMs;
+        const dueDatePassed = s.due_date ? new Date(s.due_date).getTime() < nowMs : false;
+        return deadlinePassed || dueDatePassed;
+      }
+    );
+
+    if (overdueScripts.length === 0) {
       console.log("[agent/run] No overdue scripts found");
       return NextResponse.json({ updated: 0, scriptIds: [], mode });
     }

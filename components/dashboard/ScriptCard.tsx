@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Clock, Calendar, AlertTriangle, MoreHorizontal, Bot, Archive, XCircle, CheckCircle, Ban, Loader2 } from "lucide-react";
 import StatusBadge from "@/components/ui/StatusBadge";
-import { cn, formatTimeAgo, isOverdue, getScriptAge } from "@/lib/utils";
+import { cn, formatTimeAgo, isOverdue, getScriptAge, getChaseCountdown } from "@/lib/utils";
 import type { ScriptWithClient, ScriptStatus } from "@/lib/supabase/types";
 
 interface ScriptCardProps {
@@ -16,7 +16,7 @@ interface ScriptCardProps {
 }
 
 export default function ScriptCard({ script, onClick, onArchive, onStatusChange, onRunAgent }: ScriptCardProps) {
-  const overdue = isOverdue(script.sent_at, script.status) || script.status === "overdue";
+  const overdue = isOverdue(script.sent_at, script.status, script.response_deadline_minutes) || script.status === "overdue";
   const displayStatus = overdue ? "overdue" as const : script.status;
   const clientInitial = script.client.name.charAt(0).toUpperCase();
   const noContact = !script.client.email && !script.client.whatsapp_number;
@@ -186,6 +186,17 @@ export default function ScriptCard({ script, onClick, onArchive, onStatusChange,
           <span>Due {new Date(script.due_date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
         </div>
       )}
+
+      {!overdue && script.status === "pending_review" && script.sent_at && (() => {
+        const countdown = getChaseCountdown(script.sent_at, script.response_deadline_minutes);
+        if (!countdown) return null;
+        return (
+          <div className="flex items-center gap-1.5 text-[11px] mt-1">
+            <AlertTriangle size={10} className="text-amber-400 opacity-70" />
+            <span className="text-amber-400 opacity-80 font-medium">{countdown}</span>
+          </div>
+        );
+      })()}
     </motion.div>
   );
 }

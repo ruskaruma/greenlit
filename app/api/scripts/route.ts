@@ -33,12 +33,13 @@ export async function POST(request: Request) {
   const supabase: SupabaseAny = createServiceClientDirect();
   const body = await request.json();
 
-  const { title, content, client_id, due_date, review_channel } = body as {
+  const { title, content, client_id, due_date, review_channel, response_deadline_minutes } = body as {
     title: string;
     content: string;
     client_id: string;
     due_date?: string;
     review_channel?: string;
+    response_deadline_minutes?: number;
   };
 
   if (!title || !client_id) {
@@ -86,6 +87,7 @@ export async function POST(request: Request) {
       status: "pending_review",
       due_date: due_date ?? null,
       expires_at: expiresAt,
+      response_deadline_minutes: response_deadline_minutes ?? 2880,
       sent_at: null,
     })
     .select()

@@ -14,10 +14,11 @@ interface OverdueScript {
   sent_at: string | null;
   client_name?: string;
   due_date?: string | null;
+  response_deadline_minutes?: number;
 }
 
 interface RunAgentButtonProps {
-  scripts: { id: string; title: string; status: ScriptStatus; sent_at: string | null; client_name?: string; due_date?: string | null }[];
+  scripts: { id: string; title: string; status: ScriptStatus; sent_at: string | null; client_name?: string; due_date?: string | null; response_deadline_minutes?: number }[];
 }
 
 interface StreamEvent {
@@ -46,7 +47,7 @@ export default function RunAgentButton({ scripts }: RunAgentButtonProps) {
   const { toast } = useToast();
 
   const overdueScripts: OverdueScript[] = scripts
-    .filter((s) => isOverdue(s.sent_at, s.status) || s.status === "overdue")
+    .filter((s) => isOverdue(s.sent_at, s.status, s.response_deadline_minutes) || s.status === "overdue")
     .sort((a, b) => {
       const ageA = a.sent_at ? getScriptAge(a.sent_at) : 0;
       const ageB = b.sent_at ? getScriptAge(b.sent_at) : 0;

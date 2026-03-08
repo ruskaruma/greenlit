@@ -49,7 +49,7 @@ export default async function DashboardPage() {
   ).length;
 
   const overdueCount = scripts.filter((s) =>
-    isOverdue(s.sent_at, s.status)
+    isOverdue(s.sent_at, s.status, s.response_deadline_minutes)
   ).length;
 
   const twilioFrom = process.env.TWILIO_WHATSAPP_FROM || "";

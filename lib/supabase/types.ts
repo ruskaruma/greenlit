@@ -57,6 +57,7 @@ export interface Script {
   platform: string | null;
   assigned_writer: string | null;
   review_channel: string;
+  response_deadline_minutes: number;
   archived: boolean;
   created_at: string;
   updated_at: string;
@@ -160,6 +161,7 @@ export interface Database {
           platform?: string | null;
           assigned_writer?: string | null;
           review_channel?: string;
+          response_deadline_minutes?: number;
           archived?: boolean;
           created_at?: string;
           updated_at?: string;
@@ -179,6 +181,7 @@ export interface Database {
           platform?: string | null;
           assigned_writer?: string | null;
           review_channel?: string;
+          response_deadline_minutes?: number;
           archived?: boolean;
           updated_at?: string;
         };

@@ -332,6 +332,7 @@ function DashboardShellInner({
               sent_at: s.sent_at,
               client_name: s.client.name,
               due_date: s.due_date,
+              response_deadline_minutes: s.response_deadline_minutes,
             }))} />
             <UploadModal clients={clients} onScriptUploaded={handleScriptUploaded} />
           </div>

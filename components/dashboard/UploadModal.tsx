@@ -46,6 +46,7 @@ export default function UploadModal({ clients, onScriptUploaded }: UploadModalPr
   const [content, setContent] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [reviewChannel, setReviewChannel] = useState("email");
+  const [responseDeadline, setResponseDeadline] = useState("2880");
 
   const selectedClient = clients.find((c) => c.id === clientId);
 
@@ -63,6 +64,7 @@ export default function UploadModal({ clients, onScriptUploaded }: UploadModalPr
     setContent("");
     setDueDate("");
     setReviewChannel("email");
+    setResponseDeadline("2880");
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -82,6 +84,7 @@ export default function UploadModal({ clients, onScriptUploaded }: UploadModalPr
           client_id: clientId,
           due_date: dueDate || undefined,
           review_channel: reviewChannel,
+          response_deadline_minutes: parseInt(responseDeadline, 10),
         }),
       });
 
@@ -223,6 +226,27 @@ export default function UploadModal({ clients, onScriptUploaded }: UploadModalPr
                       <option value="both">Both</option>
                     </select>
                   </div>
+                </div>
+
+                <div>
+                  <label htmlFor="response_deadline" className="block text-xs font-medium text-[var(--muted)] mb-1.5">
+                    Response Deadline
+                  </label>
+                  <select
+                    id="response_deadline"
+                    value={responseDeadline}
+                    onChange={(e) => setResponseDeadline(e.target.value)}
+                    className="w-full px-3 py-2 bg-[var(--input-bg)] border border-[var(--border)] rounded-lg text-sm text-[var(--text)] focus:outline-none focus:border-[#333333] transition-colors"
+                  >
+                    <option value="5">5 minutes (testing)</option>
+                    <option value="60">1 hour</option>
+                    <option value="240">4 hours</option>
+                    <option value="720">12 hours</option>
+                    <option value="1440">1 day</option>
+                    <option value="2880">2 days</option>
+                    <option value="5760">4 days</option>
+                    <option value="7200">5 days</option>
+                  </select>
                 </div>
 
                 {selectedClient && !selectedClient.email && !selectedClient.whatsapp_number && (
