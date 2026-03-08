@@ -273,16 +273,16 @@ export default function RunAgentButton({ scripts, mode, singleScript, onOpenChan
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-50 flex items-center justify-center p-4"
           >
-            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={close} />
+            <div className="absolute inset-0 bg-zinc-950/80 backdrop-blur-md" onClick={close} />
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="relative w-full max-w-md bg-[var(--card)] border border-[var(--border)] rounded-xl overflow-hidden"
+              className="relative w-full max-w-md bg-zinc-900 border border-zinc-700 rounded-xl overflow-hidden"
             >
-              <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)]">
-                <h3 className="text-sm font-semibold text-[var(--text)]">Run Chase Agent</h3>
-                <button onClick={close} className="text-[var(--muted)] hover:text-[var(--text)]">
+              <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-800">
+                <h3 className="text-sm font-semibold text-zinc-100">Run Chase Agent</h3>
+                <button onClick={close} className="text-zinc-400 hover:text-zinc-100">
                   <X size={14} />
                 </button>
               </div>
@@ -290,7 +290,7 @@ export default function RunAgentButton({ scripts, mode, singleScript, onOpenChan
               <div className="px-5 py-4 space-y-4">
                 {!running && !done && (
                   <>
-                    <div className="bg-[var(--input-bg)] border border-[var(--border)] rounded-lg p-4">
+                    <div className="bg-zinc-950 border border-zinc-800 rounded-lg p-4">
                       <p className="text-sm font-medium text-[var(--text)] mb-1">{singleScript.title}</p>
                       <p className="text-xs text-[var(--muted)] mb-1">Client: {singleScript.client_name}</p>
                       {singleScript.due_date && (
@@ -311,13 +311,13 @@ export default function RunAgentButton({ scripts, mode, singleScript, onOpenChan
               </div>
 
               {!running && !done && (
-                <div className="flex gap-3 px-5 py-4 border-t border-[var(--border)]">
-                  <button onClick={close} className="flex-1 px-4 py-2 rounded text-xs font-medium border border-[var(--border)] text-[var(--muted)] hover:bg-[var(--surface-elevated)]">
+                <div className="flex gap-3 px-5 py-4 border-t border-zinc-800">
+                  <button onClick={close} className="flex-1 px-4 py-2 rounded text-xs font-medium border border-zinc-700 text-zinc-400 hover:bg-zinc-800">
                     Cancel
                   </button>
                   <button
                     onClick={() => runSingle(singleScript.id)}
-                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded text-xs font-medium bg-[var(--text)] text-[var(--bg)] hover:opacity-80"
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded text-xs font-bold bg-[#D4FF00] text-zinc-950 hover:bg-[#bce600] glow-lime"
                   >
                     <Bot size={12} />
                     Run Agent
@@ -326,8 +326,8 @@ export default function RunAgentButton({ scripts, mode, singleScript, onOpenChan
               )}
 
               {done && (
-                <div className="px-5 py-4 border-t border-[var(--border)]">
-                  <button onClick={close} className="w-full px-4 py-2 rounded text-xs font-medium border border-[var(--border)] text-[var(--muted)] hover:bg-[var(--surface-elevated)]">
+                <div className="px-5 py-4 border-t border-zinc-800">
+                  <button onClick={close} className="w-full px-4 py-2 rounded text-xs font-medium border border-zinc-700 text-zinc-400 hover:bg-zinc-800">
                     Close
                   </button>
                 </div>
@@ -366,16 +366,16 @@ export default function RunAgentButton({ scripts, mode, singleScript, onOpenChan
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-50 flex items-center justify-center p-4"
           >
-            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={close} />
+            <div className="absolute inset-0 bg-zinc-950/80 backdrop-blur-md" onClick={close} />
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="relative w-full max-w-lg bg-[var(--card)] border border-[var(--border)] rounded-xl overflow-hidden"
+              className="relative w-full max-w-lg bg-zinc-900 border border-zinc-700 rounded-xl overflow-hidden"
             >
-              <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)]">
-                <h3 className="text-sm font-semibold text-[var(--text)]">Run Chase Agent</h3>
-                <button onClick={close} className="text-[var(--muted)] hover:text-[var(--text)]">
+              <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-800">
+                <h3 className="text-sm font-semibold text-zinc-100">Run Chase Agent</h3>
+                <button onClick={close} className="text-zinc-400 hover:text-zinc-100">
                   <X size={14} />
                 </button>
               </div>
@@ -390,7 +390,7 @@ export default function RunAgentButton({ scripts, mode, singleScript, onOpenChan
                       {overdueScripts.map((s) => {
                         const days = s.sent_at ? Math.round(getScriptAge(s.sent_at) / 24) : 0;
                         return (
-                          <div key={s.id} className="flex items-center justify-between bg-[var(--input-bg)] border border-[var(--border)] rounded-lg px-4 py-2.5">
+                          <div key={s.id} className="flex items-center justify-between bg-zinc-950 border border-zinc-800 rounded-lg px-4 py-2.5">
                             <div className="min-w-0">
                               <p className="text-sm font-medium text-[var(--text)] truncate">{s.title}</p>
                               {s.client_name && <p className="text-xs text-[var(--muted)] truncate">{s.client_name}</p>}
@@ -406,23 +406,23 @@ export default function RunAgentButton({ scripts, mode, singleScript, onOpenChan
                 {(running || done) && (
                   <div className="space-y-3">
                     {batchProgress.map((p) => (
-                      <div key={p.id} className="bg-[var(--input-bg)] border border-[var(--border)] rounded-lg px-4 py-3">
+                      <div key={p.id} className="bg-zinc-950 border border-zinc-800 rounded-lg px-4 py-3">
                         <div className="flex items-center justify-between mb-1.5">
                           <p className="text-xs font-medium text-[var(--text)] truncate">{p.title}</p>
-                          {p.status === "done" && <CheckCircle size={13} className="text-emerald-400 shrink-0" />}
+                          {p.status === "done" && <CheckCircle size={13} className="text-[#00FFA3] shrink-0" />}
                           {p.status === "error" && <AlertCircle size={13} className="text-red-400 shrink-0" />}
-                          {p.status === "running" && <Loader2 size={13} className="text-amber-400 animate-spin shrink-0" />}
-                          {p.status === "queued" && <Circle size={13} className="text-[var(--muted)] opacity-30 shrink-0" />}
+                          {p.status === "running" && <Loader2 size={13} className="text-[#00FFA3] animate-spin shrink-0" />}
+                          {p.status === "queued" && <Circle size={13} className="text-zinc-600 shrink-0" />}
                         </div>
                         <p className="text-[11px] text-[var(--muted)] truncate">{p.client_name}</p>
                         {p.status === "running" && p.currentNode && (
-                          <p className="text-[11px] text-amber-400 mt-1">{NODE_LABELS[p.currentNode] ?? p.currentNode}</p>
+                          <motion.p initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="text-[11px] text-[#00FFA3] mt-1">{NODE_LABELS[p.currentNode] ?? p.currentNode}</motion.p>
                         )}
                         {p.status === "error" && p.error && (
                           <p className="text-[11px] text-red-400 mt-1">{p.error}</p>
                         )}
                         {p.status === "done" && (
-                          <p className="text-[11px] text-emerald-400 mt-1">Draft ready</p>
+                          <motion.p initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="text-[11px] text-[#00FFA3] mt-1">Draft ready</motion.p>
                         )}
                       </div>
                     ))}
@@ -431,13 +431,13 @@ export default function RunAgentButton({ scripts, mode, singleScript, onOpenChan
               </div>
 
               {!running && !done && (
-                <div className="flex gap-3 px-5 py-4 border-t border-[var(--border)]">
-                  <button onClick={close} className="flex-1 px-4 py-2 rounded text-xs font-medium border border-[var(--border)] text-[var(--muted)] hover:bg-[var(--surface-elevated)]">
+                <div className="flex gap-3 px-5 py-4 border-t border-zinc-800">
+                  <button onClick={close} className="flex-1 px-4 py-2 rounded text-xs font-medium border border-zinc-700 text-zinc-400 hover:bg-zinc-800">
                     Cancel
                   </button>
                   <button
                     onClick={runBatch}
-                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded text-xs font-medium bg-[var(--text)] text-[var(--bg)] hover:opacity-80"
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded text-xs font-bold bg-[#D4FF00] text-zinc-950 hover:bg-[#bce600] glow-lime"
                   >
                     <Bot size={12} />
                     Run on All ({overdueScripts.length})
@@ -446,8 +446,8 @@ export default function RunAgentButton({ scripts, mode, singleScript, onOpenChan
               )}
 
               {done && (
-                <div className="px-5 py-4 border-t border-[var(--border)]">
-                  <button onClick={close} className="w-full px-4 py-2 rounded text-xs font-medium border border-[var(--border)] text-[var(--muted)] hover:bg-[var(--surface-elevated)]">
+                <div className="px-5 py-4 border-t border-zinc-800">
+                  <button onClick={close} className="w-full px-4 py-2 rounded text-xs font-medium border border-zinc-700 text-zinc-400 hover:bg-zinc-800">
                     Close
                   </button>
                 </div>
@@ -463,31 +463,42 @@ export default function RunAgentButton({ scripts, mode, singleScript, onOpenChan
 // Shared node progress list for single mode
 function NodeProgressList({ currentNode, completedNodes, done }: { currentNode: string | null; completedNodes: string[]; done: boolean }) {
   return (
-    <div className="space-y-2">
+    <div className="space-y-2.5">
       {Object.entries(NODE_LABELS).map(([key, label]) => {
         const isCompleted = completedNodes.includes(key);
         const isCurrent = currentNode === key;
         return (
-          <div key={key} className="flex items-center gap-2.5">
+          <motion.div
+            key={key}
+            className="flex items-center gap-2.5"
+            initial={isCurrent ? { opacity: 0, y: 10 } : false}
+            animate={{ opacity: 1, y: 0 }}
+          >
             {isCompleted ? (
-              <CheckCircle size={14} className="text-emerald-400 shrink-0" />
+              <CheckCircle size={14} className="text-[#00FFA3] shrink-0" />
             ) : isCurrent ? (
-              <Loader2 size={14} className="text-amber-400 animate-spin shrink-0" />
+              <Loader2 size={14} className="text-[#00FFA3] animate-spin animate-neon-pulse shrink-0" />
             ) : (
-              <Circle size={14} className="text-[var(--muted)] opacity-30 shrink-0" />
+              <Circle size={14} className="text-zinc-600 shrink-0" />
             )}
             <span className={`text-xs ${
-              isCompleted ? "text-[var(--text)] opacity-60" :
-              isCurrent ? "text-amber-400 font-medium" :
-              "text-[var(--muted)] opacity-30"
+              isCompleted ? "text-zinc-300" :
+              isCurrent ? "text-[#00FFA3] font-medium" :
+              "text-zinc-600"
             }`}>
               {label}
             </span>
-          </div>
+          </motion.div>
         );
       })}
       {done && (
-        <p className="text-xs text-emerald-400 font-medium pt-2">Draft ready in HITL panel</p>
+        <motion.p
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="text-xs text-[#00FFA3] font-medium pt-2"
+        >
+          Draft ready in HITL panel
+        </motion.p>
       )}
     </div>
   );

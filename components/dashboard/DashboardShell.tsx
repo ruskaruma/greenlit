@@ -243,7 +243,7 @@ function DashboardShellInner({
               )}
             </div>
             <div className="flex items-center gap-1.5 ml-2">
-              <div className={`w-1.5 h-1.5 rounded-full ${connected ? "bg-emerald-400 animate-pulse glow-green" : "bg-red-400"}`} />
+              <div className={`w-1.5 h-1.5 rounded-full ${connected ? "bg-[#00FFA3] animate-pulse glow-green" : "bg-red-400"}`} />
               <span className="text-[11px] text-[var(--muted)]">{connected ? "Live" : "Disconnected"}</span>
             </div>
             <button

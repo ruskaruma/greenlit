@@ -100,10 +100,10 @@ export default function ScriptCard({ script, onClick, onArchive, onStatusChange,
       animate={{ opacity: script.archived ? 0.5 : 1, y: 0 }}
       exit={{ opacity: 0, y: -8 }}
       transition={{ duration: 0.15 }}
+      whileHover={{ scale: 1.01, borderColor: "#00FFA3" }}
       onClick={onClick}
       className={cn(
-        "p-4 rounded bg-[var(--card)] border border-[var(--border)] cursor-pointer",
-        "hover:border-[var(--muted)]/40 hover:-translate-y-[1px]",
+        "p-4 rounded-lg bg-[var(--card)] border border-[var(--border)] cursor-pointer",
         overdue && isCritical && "border-l-2 border-l-red-500",
         overdue && isSevere && !isCritical && "border-l-2 border-l-red-500/60",
         overdue && !isSevere && "border-l-2 border-l-amber-500/60",
@@ -128,7 +128,7 @@ export default function ScriptCard({ script, onClick, onArchive, onStatusChange,
             <span className={cn(
               "text-[9px] font-bold px-1.5 py-0.5 rounded border",
               script.quality_score.average >= 8
-                ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30"
+                ? "bg-[#00FFA3]/10 text-[#00FFA3] border-[#00FFA3]/25"
                 : script.quality_score.average >= 6
                   ? "bg-amber-500/15 text-amber-400 border-amber-500/30"
                   : "bg-red-500/15 text-red-400 border-red-500/30"
@@ -152,7 +152,7 @@ export default function ScriptCard({ script, onClick, onArchive, onStatusChange,
               </button>
             )}
             {menuOpen && (
-              <div className="absolute right-0 top-6 z-50 w-44 bg-[var(--card)] border border-[var(--border)] rounded-lg shadow-lg py-1 overflow-hidden">
+              <div className="absolute right-0 top-6 z-50 w-44 bg-zinc-900 border border-zinc-700 rounded-lg shadow-xl py-1 overflow-hidden">
                 {menuItems.map((item) => (
                   <button
                     key={item.key}

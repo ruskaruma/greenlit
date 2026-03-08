@@ -228,7 +228,7 @@ export default function ChaserCard({ chaser, memories, onActionComplete }: Chase
 
   if (result?.success) {
     return (
-      <motion.div initial={{ opacity: 1 }} animate={{ opacity: 0.6 }} className="bg-[var(--card)] border border-[var(--border)] rounded-xl p-6">
+      <motion.div initial={{ opacity: 1 }} animate={{ opacity: 0.6 }} className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
         <p className="text-sm text-[var(--muted)] text-center mb-3">
           {result.action === "approved" && "Approved and sent"}
           {result.action === "edited" && "Edited and sent"}
@@ -257,7 +257,7 @@ export default function ChaserCard({ chaser, memories, onActionComplete }: Chase
     : null;
 
   return (
-    <motion.div layout initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="bg-[var(--card)] border border-[var(--border)] rounded-xl overflow-hidden">
+    <motion.div layout initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
       <div className="px-6 py-4 border-b border-[var(--border)] flex items-center justify-between">
         <div className="flex items-center gap-2">
           <FileText size={13} className="text-[var(--muted)]" />
@@ -309,8 +309,8 @@ export default function ChaserCard({ chaser, memories, onActionComplete }: Chase
         <div className="p-6 space-y-5">
           <div>
             <p className="text-[10px] uppercase tracking-widest text-[var(--muted)] opacity-50 mb-2">Script Content</p>
-            <div className="bg-[var(--input-bg)] border border-[var(--border)] rounded-lg px-4 py-3">
-              <p className="text-xs text-[var(--muted)] leading-relaxed whitespace-pre-wrap">
+            <div className="bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3">
+              <p className="text-xs text-zinc-400 leading-relaxed whitespace-pre-wrap">
                 {expanded ? script.content : scriptPreview}
               </p>
               {script.content.length > 300 && (
@@ -371,18 +371,18 @@ export default function ChaserCard({ chaser, memories, onActionComplete }: Chase
                   if (val == null) return null;
                   const num = typeof val === "number" ? val : 0;
                   return (
-                    <div key={key} className="flex items-center justify-between bg-[var(--input-bg)] border border-[var(--border)] rounded px-3 py-1.5">
-                      <span className="text-[11px] text-[var(--muted)]">{label}</span>
-                      <span className={cn("text-xs font-medium", num >= 7 ? "text-emerald-400" : num >= 4 ? "text-amber-400" : "text-red-400")}>
+                    <div key={key} className="flex items-center justify-between bg-zinc-900 border border-zinc-800 rounded px-3 py-1.5">
+                      <span className="text-[11px] text-zinc-400">{label}</span>
+                      <span className={cn("text-xs font-medium", num >= 8 ? "text-[#00FFA3]" : num >= 5 ? "text-amber-400" : "text-red-400")}>
                         {num}/10
                       </span>
                     </div>
                   );
                 })}
                 {scores.average != null && (
-                  <div className="flex items-center justify-between bg-[var(--input-bg)] border border-[var(--border)] rounded px-3 py-1.5 col-span-2">
-                    <span className="text-[11px] text-[var(--muted)]">Average</span>
-                    <span className={cn("text-xs font-semibold", scores.average >= 7 ? "text-emerald-400" : scores.average >= 4 ? "text-amber-400" : "text-red-400")}>
+                  <div className="flex items-center justify-between bg-zinc-900 border border-zinc-800 rounded px-3 py-1.5 col-span-2">
+                    <span className="text-[11px] text-zinc-400">Average</span>
+                    <span className={cn("text-xs font-semibold", scores.average >= 8 ? "text-[#00FFA3]" : scores.average >= 5 ? "text-amber-400" : "text-red-400")}>
                       {scores.average.toFixed(1)}/10
                     </span>
                   </div>
@@ -411,8 +411,8 @@ export default function ChaserCard({ chaser, memories, onActionComplete }: Chase
                   className={cn(
                     "px-3 py-1.5 rounded text-[11px] font-medium capitalize transition-colors disabled:opacity-40",
                     selectedTone === t
-                      ? "bg-[var(--text)] text-[var(--bg)]"
-                      : "border border-[var(--border)] text-[var(--muted)] hover:text-[var(--text)] hover:bg-[var(--surface-elevated)]"
+                      ? "border border-[#D4FF00] text-[#D4FF00] bg-[#D4FF00]/10"
+                      : "bg-zinc-800 text-zinc-300 hover:text-zinc-100 hover:bg-zinc-700"
                   )}
                 >
                   {t}
@@ -426,7 +426,7 @@ export default function ChaserCard({ chaser, memories, onActionComplete }: Chase
             <p className="text-[10px] uppercase tracking-widest text-[var(--muted)] opacity-50">
               {isSaved ? "Saved Draft" : hasEdits ? "Edited Draft" : "AI-Generated Draft"}
             </p>
-            {saving && <span className="text-[10px] text-[var(--muted)] opacity-50">Saving...</span>}
+            {saving && <span className="text-[10px] text-zinc-400 animate-pulse">Saving...</span>}
             {regenerating && (
               <span className="flex items-center gap-1 text-[10px] text-amber-400">
                 <Loader2 size={10} className="animate-spin" />
@@ -477,7 +477,7 @@ export default function ChaserCard({ chaser, memories, onActionComplete }: Chase
               value={editedContent}
               onChange={(e) => handleEditChange(e.target.value)}
               rows={8}
-              className="flex-1 w-full px-4 py-3 bg-[var(--input-bg)] border border-[var(--border)] rounded-lg text-sm text-[var(--text)] opacity-80 leading-relaxed focus:outline-none focus:border-[var(--muted)]/40 resize-y min-h-[180px]"
+              className="flex-1 w-full px-4 py-3 bg-zinc-950 border border-zinc-700 rounded-lg text-sm text-zinc-100 opacity-90 leading-relaxed focus:outline-none focus:border-[#D4FF00] focus:ring-1 focus:ring-[#D4FF00] resize-y min-h-[180px]"
             />
           )}
 
@@ -492,7 +492,7 @@ export default function ChaserCard({ chaser, memories, onActionComplete }: Chase
                     handleRegenerate(chip);
                   }}
                   disabled={regenerating}
-                  className="px-2.5 py-1 rounded-full text-[10px] border border-[var(--border)] text-[var(--muted)] hover:text-[var(--text)] hover:bg-[var(--surface-elevated)] hover:border-[var(--muted)]/40 transition-colors disabled:opacity-30"
+                  className="px-2.5 py-1 rounded-full text-[10px] bg-zinc-800 text-zinc-300 hover:text-[#D4FF00] hover:border-[#D4FF00] border border-zinc-700 transition-colors disabled:opacity-30"
                 >
                   {chip}
                 </button>
@@ -512,7 +512,7 @@ export default function ChaserCard({ chaser, memories, onActionComplete }: Chase
                   }
                 }}
                 placeholder="Tell the agent what to change..."
-                className="flex-1 px-3 py-2 bg-[var(--input-bg)] border border-[var(--border)] rounded-lg text-xs text-[var(--text)] placeholder:text-[var(--muted)] placeholder:opacity-40 focus:outline-none focus:border-[var(--muted)]/40"
+                className="flex-1 px-3 py-2 bg-zinc-950 border border-zinc-700 rounded-lg text-xs text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:border-[#D4FF00] focus:ring-1 focus:ring-[#D4FF00]"
               />
               <button
                 onClick={() => handleRegenerate()}
@@ -542,8 +542,8 @@ export default function ChaserCard({ chaser, memories, onActionComplete }: Chase
                     className={cn(
                       "flex items-center gap-1.5 px-3 py-1.5 rounded text-[11px] font-medium capitalize transition-colors",
                       selectedChannel === ch
-                        ? "bg-[var(--text)] text-[var(--bg)]"
-                        : "border border-[var(--border)] text-[var(--muted)] hover:text-[var(--text)] hover:bg-[var(--surface-elevated)]",
+                        ? "border border-[#D4FF00] text-[#D4FF00] bg-[#D4FF00]/10"
+                        : "bg-zinc-800 text-zinc-300 hover:text-zinc-100 hover:bg-zinc-700",
                       disabled && "opacity-30 cursor-not-allowed"
                     )}
                   >
@@ -573,10 +573,10 @@ export default function ChaserCard({ chaser, memories, onActionComplete }: Chase
               onClick={handleApprove}
               disabled={loadingAction !== null || comparing}
               className={cn(
-                "flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed",
+                "flex items-center gap-2 px-5 py-2.5 rounded-lg text-xs font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed",
                 hasEdits
-                  ? "bg-amber-500 text-[#0a0a0a] hover:bg-amber-400"
-                  : "bg-[#00ff88] text-[#0a0a0a] hover:bg-[#00dd77]"
+                  ? "bg-amber-500 text-zinc-950 hover:bg-amber-400"
+                  : "bg-[#D4FF00] text-zinc-950 hover:bg-[#bce600] glow-lime"
               )}
             >
               {loadingAction === "approve" ? <Loader2 size={12} className="animate-spin" /> : <Send size={12} />}

@@ -22,21 +22,21 @@ export function isOverdue(sentAt: string | null, status: ScriptStatus, responseD
 export function getStatusColor(status: ScriptStatus): string {
   switch (status) {
     case "pending_review":
-      return "bg-amber-500/15 text-amber-400 dark:text-amber-300 border-amber-500/20";
+      return "bg-amber-500/15 text-amber-400 border-amber-500/20";
     case "approved":
-      return "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/20";
+      return "bg-[#00FFA3]/10 text-[#00FFA3] border-[#00FFA3]/20";
     case "rejected":
-      return "bg-red-500/10 text-red-500 dark:text-red-400 border-red-500/15";
+      return "bg-red-500/10 text-red-400 border-red-500/20";
     case "overdue":
-      return "bg-red-500/10 text-red-500 dark:text-red-400 border-red-500/15";
+      return "bg-red-500/10 text-red-400 border-red-500/20";
     case "changes_requested":
-      return "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/15";
+      return "bg-amber-500/10 text-amber-400 border-amber-500/20";
     case "draft":
-      return "bg-[var(--text)]/5 text-[var(--muted)] border-[var(--text)]/5";
+      return "bg-zinc-700/30 text-zinc-400 border-zinc-700/30";
     case "closed":
-      return "bg-zinc-500/10 text-zinc-400 border-zinc-500/15";
+      return "bg-zinc-700/20 text-zinc-500 border-zinc-700/20";
     default:
-      return "bg-[var(--text)]/5 text-[var(--muted)] border-[var(--text)]/5";
+      return "bg-zinc-700/30 text-zinc-400 border-zinc-700/30";
   }
 }
 

@@ -39,7 +39,7 @@ export default function Sidebar({ clients, onClientFilter, activeClientId, onCli
   return (
     <aside
       className={cn(
-        "fixed left-0 top-0 h-screen bg-[var(--card)] border-r border-[var(--border)] flex flex-col z-40",
+        "fixed left-0 top-0 h-screen bg-[var(--bg)] border-r border-[var(--border)] flex flex-col z-40",
         collapsed ? "w-[52px]" : "w-[220px]"
       )}
     >

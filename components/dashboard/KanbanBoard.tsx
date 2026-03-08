@@ -172,21 +172,21 @@ export default function KanbanBoard({ initialScripts, onConnectionChange, refres
     <>
     <div className="flex gap-4 min-w-max">
       {columns.map((col) => (
-        <div key={col.key} className="flex flex-col border-l border-[var(--border)] pl-4 w-[280px] shrink-0">
-          <div className="flex items-center gap-2.5 mb-3">
-            <div className="w-1.5 h-1.5 bg-[var(--muted)] opacity-50" />
+        <div key={col.key} className="flex flex-col w-[280px] shrink-0">
+          <div className="flex items-center gap-2.5 mb-3 px-1">
+            <div className="w-1.5 h-1.5 rounded-sm bg-[var(--muted)] opacity-40" />
             <h2 className="text-[11px] font-medium uppercase tracking-widest text-[var(--muted)]">
               {col.label}
             </h2>
-            <span className="ml-auto text-[10px] text-[var(--muted)] opacity-60 bg-[var(--card)] border border-[var(--border)] px-1.5 py-0.5 rounded">
+            <span className="ml-auto text-[10px] text-[var(--muted)] opacity-60 bg-zinc-800/50 border border-[var(--border)] px-1.5 py-0.5 rounded">
               {grouped[col.key].length}
             </span>
           </div>
 
-          <div className="flex flex-col gap-2 min-h-[200px]">
+          <div className="flex flex-col gap-2 min-h-[200px] bg-[var(--bg)]/50 rounded-lg p-2 border border-[var(--border)]/50">
             <AnimatePresence mode="popLayout">
               {grouped[col.key].length === 0 ? (
-                <div className="flex-1 flex flex-col items-center justify-center border border-dashed border-[var(--border)] rounded min-h-[200px] gap-2">
+                <div className="flex-1 flex flex-col items-center justify-center border border-dashed border-[var(--border)] rounded-lg min-h-[200px] gap-2">
                   {col.key === "draft" ? (
                     <>
                       <FileEdit size={14} className="text-[var(--muted)] opacity-40" />

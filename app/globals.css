@@ -11,17 +11,21 @@
   --accent: #E8E8E8;
   --input-bg: #F0F0F0;
   --surface-elevated: #EFEFEF;
+  --accent-primary: #D4FF00;
+  --accent-success: #00FFA3;
 }
 
 .dark {
-  --bg: #0A0A0A;
-  --card: #111111;
-  --text: #F5F5F5;
-  --muted: #555555;
-  --border: #1E1E1E;
+  --bg: #09090b;
+  --card: #18181b;
+  --text: #f4f4f5;
+  --muted: #a1a1aa;
+  --border: #27272a;
   --accent: #E8E8E8;
-  --input-bg: #0A0A0A;
-  --surface-elevated: #161616;
+  --input-bg: #09090b;
+  --surface-elevated: #18181b;
+  --accent-primary: #D4FF00;
+  --accent-success: #00FFA3;
 }
 
 @theme inline {
@@ -30,6 +34,9 @@
   --color-accent: var(--accent);
   --color-card: var(--card);
   --color-border: var(--border);
+  --color-lime: #D4FF00;
+  --color-lime-hover: #bce600;
+  --color-neon: #00FFA3;
 }
 
 body {
@@ -59,21 +66,31 @@ html {
 }
 
 .dark ::-webkit-scrollbar-track {
-  background: #0A0A0A;
+  background: #09090b;
 }
 
 .dark ::-webkit-scrollbar-thumb {
-  background: #1E1E1E;
+  background: #27272a;
   border-radius: 3px;
 }
 
 .dark ::-webkit-scrollbar-thumb:hover {
-  background: #333333;
+  background: #3f3f46;
 }
 
-/* Green glow for live indicator */
+/* Neon green glow for live indicator */
 .glow-green {
-  box-shadow: 0 0 8px rgba(52, 211, 153, 0.4);
+  box-shadow: 0 0 8px rgba(0, 255, 163, 0.5);
+}
+
+/* Lime CTA glow */
+.glow-lime {
+  box-shadow: 0 0 15px rgba(212, 255, 0, 0.15);
+}
+
+/* Neon success glow */
+.glow-neon {
+  box-shadow: 0 0 12px rgba(0, 255, 163, 0.2);
 }
 
 /* Overdue card pulse */
@@ -118,8 +135,40 @@ html {
   animation: badge-pulse 1.5s ease-in-out infinite;
 }
 
+/* Neon spinner pulse */
+@keyframes neon-pulse {
+  0%, 100% {
+    opacity: 1;
+    filter: drop-shadow(0 0 4px rgba(0, 255, 163, 0.4));
+  }
+  50% {
+    opacity: 0.7;
+    filter: drop-shadow(0 0 8px rgba(0, 255, 163, 0.6));
+  }
+}
+
+.animate-neon-pulse {
+  animation: neon-pulse 1.5s ease-in-out infinite;
+}
+
 /* All transitions default to 150ms */
 * {
   transition-duration: 150ms;
   transition-timing-function: ease;
+}
+
+/* Floating SVG path animation for hero */
+@keyframes float-path {
+  0%, 100% {
+    transform: translateY(0) rotate(0deg);
+    opacity: 0.04;
+  }
+  50% {
+    transform: translateY(-20px) rotate(2deg);
+    opacity: 0.08;
+  }
+}
+
+.animate-float-path {
+  animation: float-path 8s ease-in-out infinite;
 }

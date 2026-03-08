@@ -87,12 +87,12 @@ function LoginForm() {
 
         {/* Card */}
         <motion.div
-          className="w-full max-w-[380px] bg-white/60 dark:bg-white/5 backdrop-blur-sm rounded-2xl shadow-sm dark:border dark:border-white/10 p-8"
+          className="w-full max-w-[380px] bg-white/60 dark:bg-zinc-900/80 backdrop-blur-sm rounded-2xl shadow-sm dark:border dark:border-zinc-800 p-8"
           variants={scaleFade}
         >
           <motion.button
             onClick={() => signIn("github", { callbackUrl })}
-            className="w-full flex items-center justify-center gap-3 px-5 py-3.5 rounded-xl bg-[#1a1a1a] dark:bg-white text-white dark:text-black text-sm font-medium hover:-translate-y-0.5 transition-all duration-200"
+            className="w-full flex items-center justify-center gap-3 px-5 py-3.5 rounded-xl bg-[#D4FF00] text-zinc-950 text-sm font-bold hover:-translate-y-0.5 transition-all duration-200 glow-lime"
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
           >
