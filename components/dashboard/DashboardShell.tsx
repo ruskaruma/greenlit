@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
-import { Loader2, AlertTriangle, Search, X, Lightbulb, Archive, ArchiveRestore } from "lucide-react";
+import { Loader2, AlertTriangle, Search, X, Lightbulb, Archive, ArchiveRestore, XCircle, RotateCcw } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import Sidebar from "./Sidebar";
 import KanbanBoard from "./KanbanBoard";
@@ -11,7 +11,7 @@ import StatusBadge from "@/components/ui/StatusBadge";
 import ToastProvider from "@/components/ui/ToastProvider";
 import { useToast } from "@/components/ui/ToastProvider";
 import { formatTimeAgo } from "@/lib/utils";
-import type { ScriptWithClient } from "@/lib/supabase/types";
+import type { ScriptWithClient, ScriptStatus } from "@/lib/supabase/types";
 
 export interface ClientItem {
   id: string;
@@ -67,12 +67,13 @@ function DashboardShellInner({
   const [localScripts, setLocalScripts] = useState<ScriptWithClient[]>(scripts);
   const [connected, setConnected] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);
-  const [showClosed, setShowClosed] = useState(false);
   const [checkingOverdue, setCheckingOverdue] = useState(false);
   const [themes, setThemes] = useState<Theme[]>([]);
   const [insightsOpen, setInsightsOpen] = useState(false);
   const [archivedDrawerOpen, setArchivedDrawerOpen] = useState(false);
+  const [closedDrawerOpen, setClosedDrawerOpen] = useState(false);
   const [unarchivingId, setUnarchivingId] = useState<string | null>(null);
+  const [reopeningId, setReopeningId] = useState<string | null>(null);
 
   const { toast } = useToast();
 
@@ -125,8 +126,9 @@ function DashboardShellInner({
     ? localScripts.filter((s) => s.client_id === activeClientId)
     : localScripts;
 
-  const displayScripts = filteredScripts.filter((s) => !s.archived);
+  const displayScripts = filteredScripts.filter((s) => !s.archived && s.status !== "closed");
   const archivedScripts = filteredScripts.filter((s) => s.archived);
+  const closedScripts = filteredScripts.filter((s) => !s.archived && s.status === "closed");
 
   const handleScriptUploaded = useCallback(() => {
     setRefreshKey((k) => k + 1);
@@ -159,6 +161,32 @@ function DashboardShellInner({
   const handleArchive = useCallback((id: string, archived: boolean) => {
     setLocalScripts((prev) => prev.map((s) => s.id === id ? { ...s, archived } : s));
   }, []);
+
+  const handleStatusChange = useCallback((id: string, status: ScriptStatus) => {
+    setLocalScripts((prev) => prev.map((s) => s.id === id ? { ...s, status } : s));
+  }, []);
+
+  async function handleReopen(id: string) {
+    setReopeningId(id);
+    try {
+      const res = await fetch(`/api/scripts/${id}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "draft" }),
+      });
+      if (res.ok) {
+        toast("success", "Script reopened as draft");
+        handleStatusChange(id, "draft");
+        setRefreshKey((k) => k + 1);
+      } else {
+        toast("error", "Failed to reopen script");
+      }
+    } catch {
+      toast("error", "Failed to reopen script");
+    } finally {
+      setReopeningId(null);
+    }
+  }
 
   async function handleUnarchive(id: string) {
     setUnarchivingId(id);
@@ -219,21 +247,40 @@ function DashboardShellInner({
               <span className="text-[11px] text-[var(--muted)]">{connected ? "Live" : "Disconnected"}</span>
             </div>
             <button
-              onClick={() => setArchivedDrawerOpen(true)}
-              className={`ml-3 text-[11px] px-2 py-0.5 rounded border transition-colors flex items-center gap-1.5 border-[var(--border)] text-[var(--muted)] opacity-50 hover:opacity-100`}
-            >
-              <Archive size={10} />
-              Archived ({archivedScripts.length})
-            </button>
-            <button
-              onClick={() => setShowClosed(!showClosed)}
-              className={`text-[11px] px-2 py-0.5 rounded border transition-colors ${
-                showClosed
+              onClick={() => {
+                if (archivedDrawerOpen) {
+                  setArchivedDrawerOpen(false);
+                } else {
+                  setClosedDrawerOpen(false);
+                  setArchivedDrawerOpen(true);
+                }
+              }}
+              className={`ml-3 text-[11px] px-2 py-0.5 rounded border transition-colors flex items-center gap-1.5 ${
+                archivedDrawerOpen
                   ? "border-[var(--muted)]/30 text-[var(--text)] bg-[var(--surface-elevated)]"
                   : "border-[var(--border)] text-[var(--muted)] opacity-50 hover:opacity-100"
               }`}
             >
-              {showClosed ? "Hide closed" : "Show closed"}
+              <Archive size={10} />
+              {archivedDrawerOpen ? "Hide archived" : `Archived (${archivedScripts.length})`}
+            </button>
+            <button
+              onClick={() => {
+                if (closedDrawerOpen) {
+                  setClosedDrawerOpen(false);
+                } else {
+                  setArchivedDrawerOpen(false);
+                  setClosedDrawerOpen(true);
+                }
+              }}
+              className={`text-[11px] px-2 py-0.5 rounded border transition-colors flex items-center gap-1.5 ${
+                closedDrawerOpen
+                  ? "border-[var(--muted)]/30 text-[var(--text)] bg-[var(--surface-elevated)]"
+                  : "border-[var(--border)] text-[var(--muted)] opacity-50 hover:opacity-100"
+              }`}
+            >
+              <XCircle size={10} />
+              {closedDrawerOpen ? "Hide closed" : `Closed (${closedScripts.length})`}
             </button>
             {themes.length > 0 && (
               <button
@@ -276,7 +323,6 @@ function DashboardShellInner({
             initialScripts={displayScripts}
             onConnectionChange={setConnected}
             refreshKey={refreshKey}
-            showClosed={showClosed}
             onArchive={handleArchive}
           />
         </div>
@@ -353,6 +399,88 @@ function DashboardShellInner({
                             <ArchiveRestore size={11} />
                           )}
                           Unarchive
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* Closed drawer */}
+      <AnimatePresence>
+        {closedDrawerOpen && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm"
+              onClick={() => setClosedDrawerOpen(false)}
+            />
+            <motion.div
+              initial={{ x: "100%" }}
+              animate={{ x: 0 }}
+              exit={{ x: "100%" }}
+              transition={{ type: "spring", damping: 30, stiffness: 300 }}
+              className="fixed right-0 top-0 h-screen w-full max-w-md z-50 bg-[var(--card)] border-l border-[var(--border)] flex flex-col"
+            >
+              <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border)]">
+                <div className="flex items-center gap-2">
+                  <XCircle size={14} className="text-[var(--muted)]" />
+                  <h2 className="text-sm font-semibold text-[var(--text)]">Closed Scripts</h2>
+                  <span className="text-[10px] text-[var(--muted)] opacity-60 bg-[var(--surface-elevated)] border border-[var(--border)] px-1.5 py-0.5 rounded">
+                    {closedScripts.length}
+                  </span>
+                </div>
+                <button onClick={() => setClosedDrawerOpen(false)} className="text-[var(--muted)] hover:text-[var(--text)] shrink-0">
+                  <X size={16} />
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto px-6 py-4">
+                {closedScripts.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-16">
+                    <XCircle size={20} className="text-[var(--muted)] opacity-30 mb-3" />
+                    <p className="text-sm text-[var(--muted)] opacity-60">No closed scripts</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {closedScripts.map((script) => (
+                      <div
+                        key={script.id}
+                        className="p-4 rounded-lg bg-[var(--bg)] border border-[var(--border)]"
+                      >
+                        <div className="flex items-start justify-between gap-2 mb-2">
+                          <h3 className="text-sm font-medium text-[var(--text)] truncate">{script.title}</h3>
+                          <StatusBadge status={script.status} />
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-[var(--muted)] mb-3">
+                          <span>{script.client.name}</span>
+                          {script.client.company && (
+                            <span className="opacity-60">/ {script.client.company}</span>
+                          )}
+                          {script.sent_at && (
+                            <>
+                              <span className="opacity-30">&middot;</span>
+                              <span className="opacity-60">Sent {formatTimeAgo(script.sent_at)}</span>
+                            </>
+                          )}
+                        </div>
+                        <button
+                          onClick={() => handleReopen(script.id)}
+                          disabled={reopeningId === script.id}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded text-[11px] font-medium border border-[var(--border)] text-[var(--muted)] hover:text-[var(--text)] hover:bg-[var(--surface-elevated)] disabled:opacity-40"
+                        >
+                          {reopeningId === script.id ? (
+                            <Loader2 size={11} className="animate-spin" />
+                          ) : (
+                            <RotateCcw size={11} />
+                          )}
+                          Reopen
                         </button>
                       </div>
                     ))}
