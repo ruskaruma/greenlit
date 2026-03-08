@@ -38,9 +38,10 @@ interface KanbanBoardProps {
   onConnectionChange?: (connected: boolean) => void;
   refreshKey?: number;
   showClosed?: boolean;
+  onArchive?: (id: string, archived: boolean) => void;
 }
 
-export default function KanbanBoard({ initialScripts, onConnectionChange, refreshKey, showClosed }: KanbanBoardProps) {
+export default function KanbanBoard({ initialScripts, onConnectionChange, refreshKey, showClosed, onArchive }: KanbanBoardProps) {
   const [scripts, setScripts] = useState<ScriptWithClient[]>(initialScripts);
   const [selectedScript, setSelectedScript] = useState<ScriptWithClient | null>(null);
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -150,7 +151,8 @@ export default function KanbanBoard({ initialScripts, onConnectionChange, refres
 
   const handleArchive = useCallback((id: string, archived: boolean) => {
     setScripts((prev) => prev.map((s) => s.id === id ? { ...s, archived } : s));
-  }, []);
+    onArchive?.(id, archived);
+  }, [onArchive]);
 
   let visibleScripts = scripts.filter((s) => !s.archived);
   if (!showClosed) {

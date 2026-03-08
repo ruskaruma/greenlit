@@ -29,8 +29,11 @@ export async function PATCH(
     .eq("id", id);
 
   if (error) {
+    console.error("[archive] DB write failed:", error.message);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
+
+  console.log(`[archive] script=${id} archived=${archived} — DB write success`);
 
   await supabase.from("audit_log").insert({
     entity_type: "script",

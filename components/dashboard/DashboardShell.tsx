@@ -64,6 +64,7 @@ function DashboardShellInner({
 }: DashboardShellProps) {
   const [activeClientId, setActiveClientId] = useState<string | null>(null);
   const [clients, setClients] = useState(initialClients);
+  const [localScripts, setLocalScripts] = useState<ScriptWithClient[]>(scripts);
   const [connected, setConnected] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);
   const [showClosed, setShowClosed] = useState(false);
@@ -74,6 +75,10 @@ function DashboardShellInner({
   const [unarchivingId, setUnarchivingId] = useState<string | null>(null);
 
   const { toast } = useToast();
+
+  useEffect(() => {
+    setLocalScripts(scripts);
+  }, [scripts]);
 
   const fetchClients = useCallback(async () => {
     try {
@@ -117,8 +122,8 @@ function DashboardShellInner({
   }, []);
 
   const filteredScripts = activeClientId
-    ? scripts.filter((s) => s.client_id === activeClientId)
-    : scripts;
+    ? localScripts.filter((s) => s.client_id === activeClientId)
+    : localScripts;
 
   const displayScripts = filteredScripts.filter((s) => !s.archived);
   const archivedScripts = filteredScripts.filter((s) => s.archived);
@@ -151,6 +156,10 @@ function DashboardShellInner({
     }
   }, [toast]);
 
+  const handleArchive = useCallback((id: string, archived: boolean) => {
+    setLocalScripts((prev) => prev.map((s) => s.id === id ? { ...s, archived } : s));
+  }, []);
+
   async function handleUnarchive(id: string) {
     setUnarchivingId(id);
     try {
@@ -161,6 +170,7 @@ function DashboardShellInner({
       });
       if (res.ok) {
         toast("success", "Script unarchived");
+        handleArchive(id, false);
         setRefreshKey((k) => k + 1);
       } else {
         toast("error", "Failed to unarchive");
@@ -267,6 +277,7 @@ function DashboardShellInner({
             onConnectionChange={setConnected}
             refreshKey={refreshKey}
             showClosed={showClosed}
+            onArchive={handleArchive}
           />
         </div>
       </main>
