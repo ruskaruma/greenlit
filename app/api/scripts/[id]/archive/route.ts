@@ -6,7 +6,7 @@ import { requireSession } from "@/lib/auth/requireSession";
 type SupabaseAny = any;
 
 export async function PATCH(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { session, error: authError } = await requireSession();
@@ -15,9 +15,17 @@ export async function PATCH(
   const { id } = await params;
   const supabase: SupabaseAny = createServiceClientDirect();
 
+  let archived = true;
+  try {
+    const body = await request.json();
+    if (body.archived === false) archived = false;
+  } catch {
+    // No body means archive (backwards compatible)
+  }
+
   const { error } = await supabase
     .from("scripts")
-    .update({ archived: true, updated_at: new Date().toISOString() })
+    .update({ archived, updated_at: new Date().toISOString() })
     .eq("id", id);
 
   if (error) {
@@ -27,9 +35,9 @@ export async function PATCH(
   await supabase.from("audit_log").insert({
     entity_type: "script",
     entity_id: id,
-    action: "archived",
+    action: archived ? "archived" : "unarchived",
     actor: session?.user?.email ?? "team_lead",
   });
 
-  return NextResponse.json({ success: true });
+  return NextResponse.json({ success: true, archived });
 }

@@ -1,14 +1,16 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef } from "react";
-import { Loader2, AlertTriangle, Search, X, Lightbulb, Bot, CheckCircle, Circle } from "lucide-react";
+import { useState, useCallback, useEffect } from "react";
+import { Loader2, AlertTriangle, Search, X, Lightbulb, Archive, ArchiveRestore } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import Sidebar from "./Sidebar";
 import KanbanBoard from "./KanbanBoard";
 import UploadModal from "./UploadModal";
 import RunAgentButton from "./RunAgentButton";
+import StatusBadge from "@/components/ui/StatusBadge";
 import ToastProvider from "@/components/ui/ToastProvider";
 import { useToast } from "@/components/ui/ToastProvider";
+import { formatTimeAgo } from "@/lib/utils";
 import type { ScriptWithClient } from "@/lib/supabase/types";
 
 export interface ClientItem {
@@ -24,21 +26,6 @@ interface Theme {
   count: number;
   example: string;
 }
-
-interface StreamEvent {
-  node: string;
-  status: "started" | "completed" | "error";
-  timestamp: string;
-  data?: Record<string, unknown>;
-}
-
-const NODE_LABELS: Record<string, string> = {
-  ragRetrieval: "Retrieving client memory...",
-  sentimentAnalysis: "Analysing sentiment...",
-  generation: "Generating draft...",
-  selfCritique: "Running self-critique...",
-  revision: "Revising draft...",
-};
 
 interface DashboardShellProps {
   scripts: ScriptWithClient[];
@@ -79,20 +66,12 @@ function DashboardShellInner({
   const [clients, setClients] = useState(initialClients);
   const [connected, setConnected] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);
-  const [showArchived, setShowArchived] = useState(false);
   const [showClosed, setShowClosed] = useState(false);
   const [checkingOverdue, setCheckingOverdue] = useState(false);
   const [themes, setThemes] = useState<Theme[]>([]);
   const [insightsOpen, setInsightsOpen] = useState(false);
-
-  // Per-card agent modal state
-  const [agentModalOpen, setAgentModalOpen] = useState(false);
-  const [agentScript, setAgentScript] = useState<{ id: string; title: string; client_name: string; due_date: string | null } | null>(null);
-  const [agentRunning, setAgentRunning] = useState(false);
-  const [agentDone, setAgentDone] = useState(false);
-  const [agentCurrentNode, setAgentCurrentNode] = useState<string | null>(null);
-  const [agentCompletedNodes, setAgentCompletedNodes] = useState<string[]>([]);
-  const agentEsRef = useRef<EventSource | null>(null);
+  const [archivedDrawerOpen, setArchivedDrawerOpen] = useState(false);
+  const [unarchivingId, setUnarchivingId] = useState<string | null>(null);
 
   const { toast } = useToast();
 
@@ -141,9 +120,8 @@ function DashboardShellInner({
     ? scripts.filter((s) => s.client_id === activeClientId)
     : scripts;
 
-  const displayScripts = showArchived
-    ? filteredScripts
-    : filteredScripts.filter((s) => !s.archived);
+  const displayScripts = filteredScripts.filter((s) => !s.archived);
+  const archivedScripts = filteredScripts.filter((s) => s.archived);
 
   const handleScriptUploaded = useCallback(() => {
     setRefreshKey((k) => k + 1);
@@ -173,80 +151,25 @@ function DashboardShellInner({
     }
   }, [toast]);
 
-  const handleRunAgentPerCard = useCallback((script: { id: string; title: string; client_name: string; due_date: string | null }) => {
-    setAgentScript(script);
-    setAgentModalOpen(true);
-    setAgentRunning(false);
-    setAgentDone(false);
-    setAgentCurrentNode(null);
-    setAgentCompletedNodes([]);
-  }, []);
-
-  const runAgentForCard = useCallback(async () => {
-    if (!agentScript) return;
-    setAgentRunning(true);
-    setAgentCurrentNode(null);
-    setAgentCompletedNodes([]);
-    setAgentDone(false);
-
-    const es = new EventSource(`/api/agent/stream/${agentScript.id}`);
-    agentEsRef.current = es;
-
-    es.onmessage = (e) => {
-      try {
-        const event: StreamEvent = JSON.parse(e.data);
-        if (event.node === "done" || event.node === "result") {
-          setAgentRunning(false);
-          setAgentDone(true);
-          es.close();
-          if (event.node === "result" && event.status === "error") {
-            toast("error", `Agent error: ${event.data?.error ?? "unknown"}`);
-          } else {
-            toast("success", "Draft ready — check HITL panel");
-          }
-          return;
-        }
-        if (event.node !== "pipeline" && NODE_LABELS[event.node]) {
-          if (event.status === "started") setAgentCurrentNode(event.node);
-          if (event.status === "completed") {
-            setAgentCompletedNodes((prev) => [...prev, event.node]);
-            setAgentCurrentNode(null);
-          }
-        }
-      } catch { /* ignore */ }
-    };
-
-    es.onerror = () => {
-      setAgentRunning(false);
-      setAgentDone(true);
-      es.close();
-    };
-
+  async function handleUnarchive(id: string) {
+    setUnarchivingId(id);
     try {
-      const res = await fetch(`/api/agent/process-queue?scriptId=${agentScript.id}`);
-      if (!res.ok) {
-        const data = await res.json();
-        if (data.skipped && data.reason === "chaser_exists") {
-          toast("info", "Draft already exists in HITL panel");
-        } else if (data.error) {
-          toast("error", data.error);
-        }
-        setAgentRunning(false);
-        setAgentDone(true);
-        es.close();
+      const res = await fetch(`/api/scripts/${id}/archive`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ archived: false }),
+      });
+      if (res.ok) {
+        toast("success", "Script unarchived");
+        setRefreshKey((k) => k + 1);
+      } else {
+        toast("error", "Failed to unarchive");
       }
     } catch {
-      toast("error", "Failed to trigger agent");
-      setAgentRunning(false);
-      setAgentDone(true);
-      es.close();
+      toast("error", "Failed to unarchive");
+    } finally {
+      setUnarchivingId(null);
     }
-  }, [agentScript, toast]);
-
-  function closeAgentModal() {
-    agentEsRef.current?.close();
-    setAgentModalOpen(false);
-    setAgentRunning(false);
   }
 
   return (
@@ -286,14 +209,11 @@ function DashboardShellInner({
               <span className="text-[11px] text-[var(--muted)]">{connected ? "Live" : "Disconnected"}</span>
             </div>
             <button
-              onClick={() => setShowArchived(!showArchived)}
-              className={`ml-3 text-[11px] px-2 py-0.5 rounded border transition-colors ${
-                showArchived
-                  ? "border-[var(--muted)]/30 text-[var(--text)] bg-[var(--surface-elevated)]"
-                  : "border-[var(--border)] text-[var(--muted)] opacity-50 hover:opacity-100"
-              }`}
+              onClick={() => setArchivedDrawerOpen(true)}
+              className={`ml-3 text-[11px] px-2 py-0.5 rounded border transition-colors flex items-center gap-1.5 border-[var(--border)] text-[var(--muted)] opacity-50 hover:opacity-100`}
             >
-              {showArchived ? "Hide archived" : "Show archived"}
+              <Archive size={10} />
+              Archived ({archivedScripts.length})
             </button>
             <button
               onClick={() => setShowClosed(!showClosed)}
@@ -325,15 +245,18 @@ function DashboardShellInner({
               {checkingOverdue ? <Loader2 size={12} className="animate-spin" /> : <Search size={12} />}
               Check Overdue
             </button>
-            <RunAgentButton scripts={displayScripts.map((s) => ({
-              id: s.id,
-              title: s.title,
-              status: s.status,
-              sent_at: s.sent_at,
-              client_name: s.client.name,
-              due_date: s.due_date,
-              response_deadline_minutes: s.response_deadline_minutes,
-            }))} />
+            <RunAgentButton
+              scripts={displayScripts.map((s) => ({
+                id: s.id,
+                title: s.title,
+                status: s.status,
+                sent_at: s.sent_at,
+                client_name: s.client.name,
+                due_date: s.due_date,
+                response_deadline_minutes: s.response_deadline_minutes,
+              }))}
+              mode="batch"
+            />
             <UploadModal clients={clients} onScriptUploaded={handleScriptUploaded} />
           </div>
         </header>
@@ -343,115 +266,90 @@ function DashboardShellInner({
             initialScripts={displayScripts}
             onConnectionChange={setConnected}
             refreshKey={refreshKey}
-            showArchived={showArchived}
             showClosed={showClosed}
-            onRunAgent={handleRunAgentPerCard}
           />
         </div>
       </main>
 
-      {/* Per-card agent modal */}
+      {/* Archived drawer */}
       <AnimatePresence>
-        {agentModalOpen && agentScript && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          >
-            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={closeAgentModal} />
+        {archivedDrawerOpen && (
+          <>
             <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="relative w-full max-w-md bg-[var(--card)] border border-[var(--border)] rounded-xl overflow-hidden"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm"
+              onClick={() => setArchivedDrawerOpen(false)}
+            />
+            <motion.div
+              initial={{ x: "100%" }}
+              animate={{ x: 0 }}
+              exit={{ x: "100%" }}
+              transition={{ type: "spring", damping: 30, stiffness: 300 }}
+              className="fixed right-0 top-0 h-screen w-full max-w-md z-50 bg-[var(--card)] border-l border-[var(--border)] flex flex-col"
             >
-              <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)]">
-                <h3 className="text-sm font-semibold text-[var(--text)]">Run Chase Agent</h3>
-                <button onClick={closeAgentModal} className="text-[var(--muted)] hover:text-[var(--text)]">
-                  <X size={14} />
+              <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border)]">
+                <div className="flex items-center gap-2">
+                  <Archive size={14} className="text-[var(--muted)]" />
+                  <h2 className="text-sm font-semibold text-[var(--text)]">Archived Scripts</h2>
+                  <span className="text-[10px] text-[var(--muted)] opacity-60 bg-[var(--surface-elevated)] border border-[var(--border)] px-1.5 py-0.5 rounded">
+                    {archivedScripts.length}
+                  </span>
+                </div>
+                <button onClick={() => setArchivedDrawerOpen(false)} className="text-[var(--muted)] hover:text-[var(--text)] shrink-0">
+                  <X size={16} />
                 </button>
               </div>
 
-              <div className="px-5 py-4 space-y-4">
-                {!agentRunning && !agentDone && (
-                  <>
-                    <div className="bg-[var(--input-bg)] border border-[var(--border)] rounded-lg p-4">
-                      <p className="text-sm font-medium text-[var(--text)] mb-1">{agentScript.title}</p>
-                      <p className="text-xs text-[var(--muted)] mb-1">Client: {agentScript.client_name}</p>
-                      {agentScript.due_date && (
-                        <p className="text-xs text-[var(--muted)] opacity-60">
-                          Due: {new Date(agentScript.due_date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
-                        </p>
-                      )}
-                    </div>
-                    <p className="text-xs text-[var(--muted)] leading-relaxed">
-                      Claude will analyse {agentScript.client_name}&apos;s approval history and generate a personalised follow-up message for your review before anything is sent.
-                    </p>
-                  </>
-                )}
-
-                {(agentRunning || agentDone) && (
+              <div className="flex-1 overflow-y-auto px-6 py-4">
+                {archivedScripts.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-16">
+                    <Archive size={20} className="text-[var(--muted)] opacity-30 mb-3" />
+                    <p className="text-sm text-[var(--muted)] opacity-60">No archived scripts</p>
+                  </div>
+                ) : (
                   <div className="space-y-2">
-                    {Object.entries(NODE_LABELS).map(([key, label]) => {
-                      const isCompleted = agentCompletedNodes.includes(key);
-                      const isCurrent = agentCurrentNode === key;
-                      return (
-                        <div key={key} className="flex items-center gap-2.5">
-                          {isCompleted ? (
-                            <CheckCircle size={14} className="text-emerald-400 shrink-0" />
-                          ) : isCurrent ? (
-                            <Loader2 size={14} className="text-amber-400 animate-spin shrink-0" />
-                          ) : (
-                            <Circle size={14} className="text-[var(--muted)] opacity-30 shrink-0" />
-                          )}
-                          <span className={`text-xs ${
-                            isCompleted ? "text-[var(--text)] opacity-60" :
-                            isCurrent ? "text-amber-400 font-medium" :
-                            "text-[var(--muted)] opacity-30"
-                          }`}>
-                            {label}
-                          </span>
+                    {archivedScripts.map((script) => (
+                      <div
+                        key={script.id}
+                        className="p-4 rounded-lg bg-[var(--bg)] border border-[var(--border)]"
+                      >
+                        <div className="flex items-start justify-between gap-2 mb-2">
+                          <h3 className="text-sm font-medium text-[var(--text)] truncate">{script.title}</h3>
+                          <StatusBadge status={script.status} />
                         </div>
-                      );
-                    })}
-                    {agentDone && (
-                      <p className="text-xs text-emerald-400 font-medium pt-2">Draft ready in HITL panel</p>
-                    )}
+                        <div className="flex items-center gap-2 text-xs text-[var(--muted)] mb-3">
+                          <span>{script.client.name}</span>
+                          {script.client.company && (
+                            <span className="opacity-60">/ {script.client.company}</span>
+                          )}
+                          {script.sent_at && (
+                            <>
+                              <span className="opacity-30">&middot;</span>
+                              <span className="opacity-60">Sent {formatTimeAgo(script.sent_at)}</span>
+                            </>
+                          )}
+                        </div>
+                        <button
+                          onClick={() => handleUnarchive(script.id)}
+                          disabled={unarchivingId === script.id}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded text-[11px] font-medium border border-[var(--border)] text-[var(--muted)] hover:text-[var(--text)] hover:bg-[var(--surface-elevated)] disabled:opacity-40"
+                        >
+                          {unarchivingId === script.id ? (
+                            <Loader2 size={11} className="animate-spin" />
+                          ) : (
+                            <ArchiveRestore size={11} />
+                          )}
+                          Unarchive
+                        </button>
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>
-
-              {!agentRunning && !agentDone && (
-                <div className="flex gap-3 px-5 py-4 border-t border-[var(--border)]">
-                  <button
-                    onClick={closeAgentModal}
-                    className="flex-1 px-4 py-2 rounded text-xs font-medium border border-[var(--border)] text-[var(--muted)] hover:bg-[var(--surface-elevated)]"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={runAgentForCard}
-                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded text-xs font-medium bg-[var(--text)] text-[var(--bg)] hover:opacity-80"
-                  >
-                    <Bot size={12} />
-                    Run Agent
-                  </button>
-                </div>
-              )}
-
-              {agentDone && (
-                <div className="px-5 py-4 border-t border-[var(--border)]">
-                  <button
-                    onClick={closeAgentModal}
-                    className="w-full px-4 py-2 rounded text-xs font-medium border border-[var(--border)] text-[var(--muted)] hover:bg-[var(--surface-elevated)]"
-                  >
-                    Close
-                  </button>
-                </div>
-              )}
             </motion.div>
-          </motion.div>
+          </>
         )}
       </AnimatePresence>
 

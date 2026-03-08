@@ -9,6 +9,7 @@ import { useToast } from "@/components/ui/ToastProvider";
 import type { ScriptWithClient, ScriptStatus } from "@/lib/supabase/types";
 
 const statusOptions: { key: ScriptStatus; label: string }[] = [
+  { key: "draft", label: "Draft" },
   { key: "pending_review", label: "Pending Review" },
   { key: "changes_requested", label: "Changes Requested" },
   { key: "approved", label: "Approved" },

@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Clock, Calendar, AlertTriangle, MoreHorizontal, Bot, Archive, XCircle, CheckCircle, Ban, Loader2 } from "lucide-react";
+import { Clock, Calendar, AlertTriangle, MoreHorizontal, Bot, Archive, ArchiveRestore, XCircle, CheckCircle, Ban, RotateCcw, Loader2 } from "lucide-react";
 import StatusBadge from "@/components/ui/StatusBadge";
 import { cn, formatTimeAgo, isOverdue, getScriptAge, getChaseCountdown } from "@/lib/utils";
 import type { ScriptWithClient, ScriptStatus } from "@/lib/supabase/types";
@@ -10,7 +10,7 @@ import type { ScriptWithClient, ScriptStatus } from "@/lib/supabase/types";
 interface ScriptCardProps {
   script: ScriptWithClient;
   onClick?: () => void;
-  onArchive?: (id: string) => void;
+  onArchive?: (id: string, archived: boolean) => void;
   onStatusChange?: (id: string, status: ScriptStatus) => void;
   onRunAgent?: (script: { id: string; title: string; client_name: string; due_date: string | null }) => void;
 }
@@ -48,11 +48,16 @@ export default function ScriptCard({ script, onClick, onArchive, onStatusChange,
       return;
     }
 
-    if (action === "archive") {
-      setLoading("archive");
+    if (action === "archive" || action === "unarchive") {
+      const newArchived = action === "archive";
+      setLoading(action);
       try {
-        const res = await fetch(`/api/scripts/${script.id}/archive`, { method: "PATCH" });
-        if (res.ok) onArchive?.(script.id);
+        const res = await fetch(`/api/scripts/${script.id}/archive`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ archived: newArchived }),
+        });
+        if (res.ok) onArchive?.(script.id, newArchived);
       } catch { /* silent */ } finally { setLoading(null); }
       return;
     }
@@ -61,6 +66,7 @@ export default function ScriptCard({ script, onClick, onArchive, onStatusChange,
       close: "closed",
       approve: "approved",
       reject: "rejected",
+      reopen: "draft",
     };
 
     const newStatus = statusMap[action];
@@ -80,9 +86,11 @@ export default function ScriptCard({ script, onClick, onArchive, onStatusChange,
   const menuItems: { key: string; label: string; icon: React.ReactNode; show: boolean }[] = [
     { key: "run_agent", label: "Run Agent", icon: <Bot size={12} />, show: script.status !== "closed" },
     { key: "archive", label: "Archive", icon: <Archive size={12} />, show: !script.archived },
+    { key: "unarchive", label: "Unarchive", icon: <ArchiveRestore size={12} />, show: script.archived },
+    { key: "reopen", label: "Reopen", icon: <RotateCcw size={12} />, show: script.status === "closed" },
     { key: "close", label: "Close", icon: <XCircle size={12} />, show: script.status !== "closed" },
-    { key: "approve", label: "Mark Approved", icon: <CheckCircle size={12} />, show: script.status !== "approved" },
-    { key: "reject", label: "Mark Rejected", icon: <Ban size={12} />, show: script.status !== "rejected" },
+    { key: "approve", label: "Mark Approved", icon: <CheckCircle size={12} />, show: script.status !== "approved" && script.status !== "closed" },
+    { key: "reject", label: "Mark Rejected", icon: <Ban size={12} />, show: script.status !== "rejected" && script.status !== "closed" },
   ].filter(item => item.show);
 
   return (

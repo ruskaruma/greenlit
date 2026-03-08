@@ -6,6 +6,7 @@ import { Plus, Upload, FileEdit } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import ScriptCard from "./ScriptCard";
 import ScriptDetailSheet from "./ScriptDetailSheet";
+import RunAgentButton from "./RunAgentButton";
 import { isOverdue } from "@/lib/utils";
 import type { ScriptWithClient, Script, ScriptStatus } from "@/lib/supabase/types";
 
@@ -36,12 +37,10 @@ interface KanbanBoardProps {
   initialScripts: ScriptWithClient[];
   onConnectionChange?: (connected: boolean) => void;
   refreshKey?: number;
-  showArchived?: boolean;
   showClosed?: boolean;
-  onRunAgent?: (script: { id: string; title: string; client_name: string; due_date: string | null }) => void;
 }
 
-export default function KanbanBoard({ initialScripts, onConnectionChange, refreshKey, showArchived, showClosed, onRunAgent }: KanbanBoardProps) {
+export default function KanbanBoard({ initialScripts, onConnectionChange, refreshKey, showClosed }: KanbanBoardProps) {
   const [scripts, setScripts] = useState<ScriptWithClient[]>(initialScripts);
   const [selectedScript, setSelectedScript] = useState<ScriptWithClient | null>(null);
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -147,11 +146,13 @@ export default function KanbanBoard({ initialScripts, onConnectionChange, refres
     return () => clearInterval(interval);
   }, []);
 
-  const handleArchive = useCallback((id: string) => {
-    setScripts((prev) => prev.map((s) => s.id === id ? { ...s, archived: true } : s));
+  const [agentScript, setAgentScript] = useState<{ id: string; title: string; client_name: string; due_date: string | null } | null>(null);
+
+  const handleArchive = useCallback((id: string, archived: boolean) => {
+    setScripts((prev) => prev.map((s) => s.id === id ? { ...s, archived } : s));
   }, []);
 
-  let visibleScripts = showArchived ? scripts : scripts.filter((s) => !s.archived);
+  let visibleScripts = scripts.filter((s) => !s.archived);
   if (!showClosed) {
     visibleScripts = visibleScripts.filter((s) => s.status !== "closed");
   }
@@ -219,7 +220,7 @@ export default function KanbanBoard({ initialScripts, onConnectionChange, refres
                     onClick={() => setSelectedScript(script)}
                     onArchive={handleArchive}
                     onStatusChange={handleStatusChange}
-                    onRunAgent={onRunAgent}
+                    onRunAgent={(s) => setAgentScript(s)}
                   />
                 ))
               )}
@@ -248,7 +249,7 @@ export default function KanbanBoard({ initialScripts, onConnectionChange, refres
                   onClick={() => setSelectedScript(script)}
                   onArchive={handleArchive}
                   onStatusChange={handleStatusChange}
-                  onRunAgent={onRunAgent}
+                  onRunAgent={(s) => setAgentScript(s)}
                 />
               ))}
             </AnimatePresence>
@@ -266,6 +267,16 @@ export default function KanbanBoard({ initialScripts, onConnectionChange, refres
         />
       )}
     </AnimatePresence>
+
+    {agentScript && (
+      <RunAgentButton
+        scripts={[]}
+        mode="single"
+        singleScript={agentScript}
+        onOpenChange={(open) => { if (!open) setAgentScript(null); }}
+        key={agentScript.id}
+      />
+    )}
     </>
   );
 }

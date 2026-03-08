@@ -2,12 +2,12 @@
 
 import { useState, useRef, useCallback } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Bot, X, Loader2, CheckCircle, Circle } from "lucide-react";
+import { Bot, X, Loader2, CheckCircle, Circle, AlertCircle } from "lucide-react";
 import { useToast } from "@/components/ui/ToastProvider";
 import { isOverdue, getScriptAge } from "@/lib/utils";
 import type { ScriptStatus } from "@/lib/supabase/types";
 
-interface OverdueScript {
+interface ScriptInfo {
   id: string;
   title: string;
   status: ScriptStatus;
@@ -15,10 +15,6 @@ interface OverdueScript {
   client_name?: string;
   due_date?: string | null;
   response_deadline_minutes?: number;
-}
-
-interface RunAgentButtonProps {
-  scripts: { id: string; title: string; status: ScriptStatus; sent_at: string | null; client_name?: string; due_date?: string | null; response_deadline_minutes?: number }[];
 }
 
 interface StreamEvent {
@@ -36,17 +32,43 @@ const NODE_LABELS: Record<string, string> = {
   revision: "Revising draft...",
 };
 
-export default function RunAgentButton({ scripts }: RunAgentButtonProps) {
-  const [confirmOpen, setConfirmOpen] = useState(false);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+// --- Batch mode (header button): runs agent on ALL overdue scripts ---
+// --- Single mode (per-card): runs agent on ONE specific script ---
+
+interface RunAgentButtonProps {
+  scripts: ScriptInfo[];
+  mode: "batch" | "single";
+  singleScript?: { id: string; title: string; client_name: string; due_date: string | null };
+  onOpenChange?: (open: boolean) => void;
+}
+
+interface BatchScriptProgress {
+  id: string;
+  title: string;
+  client_name: string;
+  status: "queued" | "running" | "done" | "error";
+  currentNode: string | null;
+  completedNodes: string[];
+  error?: string;
+}
+
+export default function RunAgentButton({ scripts, mode, singleScript, onOpenChange }: RunAgentButtonProps) {
+  const [confirmOpen, setConfirmOpen] = useState(mode === "single");
   const [running, setRunning] = useState(false);
+  const [done, setDone] = useState(false);
+
+  // Single mode state
   const [currentNode, setCurrentNode] = useState<string | null>(null);
   const [completedNodes, setCompletedNodes] = useState<string[]>([]);
-  const [done, setDone] = useState(false);
   const eventSourceRef = useRef<EventSource | null>(null);
+
+  // Batch mode state
+  const [batchProgress, setBatchProgress] = useState<BatchScriptProgress[]>([]);
+  const batchEsRefs = useRef<Map<string, EventSource>>(new Map());
+
   const { toast } = useToast();
 
-  const overdueScripts: OverdueScript[] = scripts
+  const overdueScripts = scripts
     .filter((s) => isOverdue(s.sent_at, s.status, s.response_deadline_minutes) || s.status === "overdue")
     .sort((a, b) => {
       const ageA = a.sent_at ? getScriptAge(a.sent_at) : 0;
@@ -55,45 +77,45 @@ export default function RunAgentButton({ scripts }: RunAgentButtonProps) {
     });
 
   const hasOverdue = overdueScripts.length > 0;
-  const selected = overdueScripts.find((s) => s.id === selectedId) ?? overdueScripts[0] ?? null;
 
   function openConfirm() {
-    if (!hasOverdue) return;
-    setSelectedId(overdueScripts[0]?.id ?? null);
+    if (mode === "batch" && !hasOverdue) return;
     setConfirmOpen(true);
+    onOpenChange?.(true);
     setRunning(false);
     setDone(false);
     setCurrentNode(null);
     setCompletedNodes([]);
+    setBatchProgress([]);
   }
 
-  const runAgent = useCallback(async () => {
-    if (!selected) return;
+  function close() {
+    eventSourceRef.current?.close();
+    batchEsRefs.current.forEach((es) => es.close());
+    batchEsRefs.current.clear();
+    setConfirmOpen(false);
+    setRunning(false);
+    onOpenChange?.(false);
+  }
 
+  // --- Single script agent run ---
+  const runSingle = useCallback(async (scriptId: string) => {
     setRunning(true);
     setCurrentNode(null);
     setCompletedNodes([]);
     setDone(false);
 
-    // Connect SSE first so we catch events as the agent runs
-    const es = new EventSource(`/api/agent/stream/${selected.id}`);
+    const es = new EventSource(`/api/agent/stream/${scriptId}`);
     eventSourceRef.current = es;
 
     es.onmessage = (e) => {
       try {
         const event: StreamEvent = JSON.parse(e.data);
-        if (event.node === "done") {
+        if (event.node === "done" || event.node === "result") {
           setRunning(false);
           setDone(true);
           es.close();
-          toast("success", "Draft ready — check HITL panel");
-          return;
-        }
-        if (event.node === "result") {
-          setRunning(false);
-          setDone(true);
-          es.close();
-          if (event.status === "error") {
+          if (event.node === "result" && event.status === "error") {
             toast("error", `Agent error: ${event.data?.error ?? "unknown"}`);
           } else {
             toast("success", "Draft ready — check HITL panel");
@@ -101,17 +123,13 @@ export default function RunAgentButton({ scripts }: RunAgentButtonProps) {
           return;
         }
         if (event.node !== "pipeline" && NODE_LABELS[event.node]) {
-          if (event.status === "started") {
-            setCurrentNode(event.node);
-          }
+          if (event.status === "started") setCurrentNode(event.node);
           if (event.status === "completed") {
             setCompletedNodes((prev) => [...prev, event.node]);
             setCurrentNode(null);
           }
         }
-      } catch {
-        // ignore
-      }
+      } catch { /* ignore */ }
     };
 
     es.onerror = () => {
@@ -120,9 +138,8 @@ export default function RunAgentButton({ scripts }: RunAgentButtonProps) {
       es.close();
     };
 
-    // Queue and immediately process via process-queue
     try {
-      const res = await fetch(`/api/agent/process-queue?scriptId=${selected.id}`);
+      const res = await fetch(`/api/agent/process-queue?scriptId=${scriptId}`);
       if (!res.ok) {
         const data = await res.json();
         if (data.skipped && data.reason === "chaser_exists") {
@@ -140,34 +157,114 @@ export default function RunAgentButton({ scripts }: RunAgentButtonProps) {
       setDone(true);
       es.close();
     }
-  }, [selected, toast]);
+  }, [toast]);
 
-  function close() {
-    eventSourceRef.current?.close();
-    setConfirmOpen(false);
-    setRunning(false);
-  }
+  // --- Batch agent run on all overdue ---
+  const runBatch = useCallback(async () => {
+    setRunning(true);
+    setDone(false);
 
-  const daysOverdue = selected?.sent_at ? Math.round(getScriptAge(selected.sent_at) / 24) : 0;
+    const initial: BatchScriptProgress[] = overdueScripts.map((s) => ({
+      id: s.id,
+      title: s.title,
+      client_name: s.client_name ?? "Unknown",
+      status: "queued",
+      currentNode: null,
+      completedNodes: [],
+    }));
+    setBatchProgress(initial);
 
-  return (
-    <>
-      <div className="relative group">
-        <button
-          onClick={openConfirm}
-          disabled={!hasOverdue}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-xs border border-[var(--border)] ${
-            hasOverdue
-              ? "text-[var(--muted)] hover:bg-[var(--surface-elevated)] hover:text-[var(--text)]"
-              : "text-[var(--muted)] opacity-40 cursor-not-allowed"
-          }`}
-          title={hasOverdue ? undefined : "No overdue scripts right now"}
-        >
-          <Bot size={13} />
-          Run Agent
-        </button>
-      </div>
+    let completedCount = 0;
+    const total = overdueScripts.length;
 
+    function checkAllDone() {
+      completedCount++;
+      if (completedCount >= total) {
+        setRunning(false);
+        setDone(true);
+      }
+    }
+
+    for (const script of overdueScripts) {
+      // Connect SSE
+      const es = new EventSource(`/api/agent/stream/${script.id}`);
+      batchEsRefs.current.set(script.id, es);
+
+      es.onmessage = (e) => {
+        try {
+          const event: StreamEvent = JSON.parse(e.data);
+          if (event.node === "done" || event.node === "result") {
+            es.close();
+            batchEsRefs.current.delete(script.id);
+            const isError = event.node === "result" && event.status === "error";
+            setBatchProgress((prev) =>
+              prev.map((p) => p.id === script.id ? {
+                ...p,
+                status: isError ? "error" : "done",
+                currentNode: null,
+                error: isError ? String(event.data?.error ?? "unknown") : undefined,
+              } : p)
+            );
+            checkAllDone();
+            return;
+          }
+          if (event.node !== "pipeline" && NODE_LABELS[event.node]) {
+            setBatchProgress((prev) =>
+              prev.map((p) => {
+                if (p.id !== script.id) return p;
+                if (event.status === "started") {
+                  return { ...p, status: "running", currentNode: event.node };
+                }
+                if (event.status === "completed") {
+                  return { ...p, currentNode: null, completedNodes: [...p.completedNodes, event.node] };
+                }
+                return p;
+              })
+            );
+          }
+        } catch { /* ignore */ }
+      };
+
+      es.onerror = () => {
+        es.close();
+        batchEsRefs.current.delete(script.id);
+        setBatchProgress((prev) =>
+          prev.map((p) => p.id === script.id ? { ...p, status: "error", currentNode: null, error: "Connection lost" } : p)
+        );
+        checkAllDone();
+      };
+
+      // Queue each script
+      try {
+        const res = await fetch(`/api/agent/process-queue?scriptId=${script.id}`);
+        if (!res.ok) {
+          const data = await res.json();
+          es.close();
+          batchEsRefs.current.delete(script.id);
+          setBatchProgress((prev) =>
+            prev.map((p) => p.id === script.id ? {
+              ...p,
+              status: data.skipped ? "done" : "error",
+              currentNode: null,
+              error: data.skipped ? undefined : (data.error ?? "Failed"),
+            } : p)
+          );
+          checkAllDone();
+        }
+      } catch {
+        es.close();
+        batchEsRefs.current.delete(script.id);
+        setBatchProgress((prev) =>
+          prev.map((p) => p.id === script.id ? { ...p, status: "error", currentNode: null, error: "Network error" } : p)
+        );
+        checkAllDone();
+      }
+    }
+  }, [overdueScripts]);
+
+  // Render: single mode renders just a modal (triggered externally), batch mode renders button + modal
+  if (mode === "single" && singleScript) {
+    return (
       <AnimatePresence>
         {confirmOpen && (
           <motion.div
@@ -191,88 +288,35 @@ export default function RunAgentButton({ scripts }: RunAgentButtonProps) {
               </div>
 
               <div className="px-5 py-4 space-y-4">
-                {!running && !done && selected && (
+                {!running && !done && (
                   <>
-                    {overdueScripts.length > 1 && (
-                      <div>
-                        <label className="block text-[10px] uppercase tracking-widest text-[var(--muted)] opacity-50 mb-1.5">Select script</label>
-                        <select
-                          value={selectedId ?? selected.id}
-                          onChange={(e) => setSelectedId(e.target.value)}
-                          className="w-full px-3 py-2 bg-[var(--input-bg)] border border-[var(--border)] rounded-lg text-sm text-[var(--text)] focus:outline-none"
-                        >
-                          {overdueScripts.map((s) => {
-                            const days = s.sent_at ? Math.round(getScriptAge(s.sent_at) / 24) : 0;
-                            return (
-                              <option key={s.id} value={s.id}>
-                                {s.title} ({days}d overdue)
-                              </option>
-                            );
-                          })}
-                        </select>
-                      </div>
-                    )}
-
                     <div className="bg-[var(--input-bg)] border border-[var(--border)] rounded-lg p-4">
-                      <p className="text-sm font-medium text-[var(--text)] mb-1">{selected.title}</p>
-                      {selected.client_name && (
-                        <p className="text-xs text-[var(--muted)] mb-1">Client: {selected.client_name}</p>
-                      )}
-                      <p className="text-xs text-red-400 mb-1">{daysOverdue} days past deadline</p>
-                      {selected.due_date && (
+                      <p className="text-sm font-medium text-[var(--text)] mb-1">{singleScript.title}</p>
+                      <p className="text-xs text-[var(--muted)] mb-1">Client: {singleScript.client_name}</p>
+                      {singleScript.due_date && (
                         <p className="text-xs text-[var(--muted)] opacity-60">
-                          Due: {new Date(selected.due_date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                          Due: {new Date(singleScript.due_date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
                         </p>
                       )}
                     </div>
-
                     <p className="text-xs text-[var(--muted)] leading-relaxed">
-                      Claude will analyse {selected.client_name ? `${selected.client_name}'s` : "the client's"} approval history and generate a personalised follow-up message for your review before anything is sent.
+                      Claude will analyse {singleScript.client_name}&apos;s approval history and generate a personalised follow-up message for your review before anything is sent.
                     </p>
                   </>
                 )}
 
                 {(running || done) && (
-                  <div className="space-y-2">
-                    {Object.entries(NODE_LABELS).map(([key, label]) => {
-                      const isCompleted = completedNodes.includes(key);
-                      const isCurrent = currentNode === key;
-                      return (
-                        <div key={key} className="flex items-center gap-2.5">
-                          {isCompleted ? (
-                            <CheckCircle size={14} className="text-emerald-400 shrink-0" />
-                          ) : isCurrent ? (
-                            <Loader2 size={14} className="text-amber-400 animate-spin shrink-0" />
-                          ) : (
-                            <Circle size={14} className="text-[var(--muted)] opacity-30 shrink-0" />
-                          )}
-                          <span className={`text-xs ${
-                            isCompleted ? "text-[var(--text)] opacity-60" :
-                            isCurrent ? "text-amber-400 font-medium" :
-                            "text-[var(--muted)] opacity-30"
-                          }`}>
-                            {label}
-                          </span>
-                        </div>
-                      );
-                    })}
-                    {done && (
-                      <p className="text-xs text-emerald-400 font-medium pt-2">Draft ready in HITL panel</p>
-                    )}
-                  </div>
+                  <NodeProgressList currentNode={currentNode} completedNodes={completedNodes} done={done} />
                 )}
               </div>
 
               {!running && !done && (
                 <div className="flex gap-3 px-5 py-4 border-t border-[var(--border)]">
-                  <button
-                    onClick={close}
-                    className="flex-1 px-4 py-2 rounded text-xs font-medium border border-[var(--border)] text-[var(--muted)] hover:bg-[var(--surface-elevated)]"
-                  >
+                  <button onClick={close} className="flex-1 px-4 py-2 rounded text-xs font-medium border border-[var(--border)] text-[var(--muted)] hover:bg-[var(--surface-elevated)]">
                     Cancel
                   </button>
                   <button
-                    onClick={runAgent}
+                    onClick={() => runSingle(singleScript.id)}
                     className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded text-xs font-medium bg-[var(--text)] text-[var(--bg)] hover:opacity-80"
                   >
                     <Bot size={12} />
@@ -283,10 +327,127 @@ export default function RunAgentButton({ scripts }: RunAgentButtonProps) {
 
               {done && (
                 <div className="px-5 py-4 border-t border-[var(--border)]">
+                  <button onClick={close} className="w-full px-4 py-2 rounded text-xs font-medium border border-[var(--border)] text-[var(--muted)] hover:bg-[var(--surface-elevated)]">
+                    Close
+                  </button>
+                </div>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    );
+  }
+
+  // Batch mode: button + modal
+  return (
+    <>
+      <div className="relative group">
+        <button
+          onClick={openConfirm}
+          disabled={!hasOverdue}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-xs border border-[var(--border)] ${
+            hasOverdue
+              ? "text-[var(--muted)] hover:bg-[var(--surface-elevated)] hover:text-[var(--text)]"
+              : "text-[var(--muted)] opacity-40 cursor-not-allowed"
+          }`}
+          title={hasOverdue ? `Run agent on ${overdueScripts.length} overdue script${overdueScripts.length > 1 ? "s" : ""}` : "No overdue scripts right now"}
+        >
+          <Bot size={13} />
+          Run Agent{hasOverdue ? ` (${overdueScripts.length})` : ""}
+        </button>
+      </div>
+
+      <AnimatePresence>
+        {confirmOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          >
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={close} />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="relative w-full max-w-lg bg-[var(--card)] border border-[var(--border)] rounded-xl overflow-hidden"
+            >
+              <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)]">
+                <h3 className="text-sm font-semibold text-[var(--text)]">Run Chase Agent</h3>
+                <button onClick={close} className="text-[var(--muted)] hover:text-[var(--text)]">
+                  <X size={14} />
+                </button>
+              </div>
+
+              <div className="px-5 py-4 space-y-4 max-h-[60vh] overflow-y-auto">
+                {!running && !done && (
+                  <>
+                    <p className="text-xs text-[var(--muted)] leading-relaxed">
+                      Generate chase drafts for all {overdueScripts.length} overdue script{overdueScripts.length > 1 ? "s" : ""}. Drafts will appear in the HITL panel for your review before anything is sent.
+                    </p>
+                    <div className="space-y-2">
+                      {overdueScripts.map((s) => {
+                        const days = s.sent_at ? Math.round(getScriptAge(s.sent_at) / 24) : 0;
+                        return (
+                          <div key={s.id} className="flex items-center justify-between bg-[var(--input-bg)] border border-[var(--border)] rounded-lg px-4 py-2.5">
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium text-[var(--text)] truncate">{s.title}</p>
+                              {s.client_name && <p className="text-xs text-[var(--muted)] truncate">{s.client_name}</p>}
+                            </div>
+                            <span className="text-xs text-red-400 shrink-0 ml-2">{days}d overdue</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </>
+                )}
+
+                {(running || done) && (
+                  <div className="space-y-3">
+                    {batchProgress.map((p) => (
+                      <div key={p.id} className="bg-[var(--input-bg)] border border-[var(--border)] rounded-lg px-4 py-3">
+                        <div className="flex items-center justify-between mb-1.5">
+                          <p className="text-xs font-medium text-[var(--text)] truncate">{p.title}</p>
+                          {p.status === "done" && <CheckCircle size={13} className="text-emerald-400 shrink-0" />}
+                          {p.status === "error" && <AlertCircle size={13} className="text-red-400 shrink-0" />}
+                          {p.status === "running" && <Loader2 size={13} className="text-amber-400 animate-spin shrink-0" />}
+                          {p.status === "queued" && <Circle size={13} className="text-[var(--muted)] opacity-30 shrink-0" />}
+                        </div>
+                        <p className="text-[11px] text-[var(--muted)] truncate">{p.client_name}</p>
+                        {p.status === "running" && p.currentNode && (
+                          <p className="text-[11px] text-amber-400 mt-1">{NODE_LABELS[p.currentNode] ?? p.currentNode}</p>
+                        )}
+                        {p.status === "error" && p.error && (
+                          <p className="text-[11px] text-red-400 mt-1">{p.error}</p>
+                        )}
+                        {p.status === "done" && (
+                          <p className="text-[11px] text-emerald-400 mt-1">Draft ready</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {!running && !done && (
+                <div className="flex gap-3 px-5 py-4 border-t border-[var(--border)]">
+                  <button onClick={close} className="flex-1 px-4 py-2 rounded text-xs font-medium border border-[var(--border)] text-[var(--muted)] hover:bg-[var(--surface-elevated)]">
+                    Cancel
+                  </button>
                   <button
-                    onClick={close}
-                    className="w-full px-4 py-2 rounded text-xs font-medium border border-[var(--border)] text-[var(--muted)] hover:bg-[var(--surface-elevated)]"
+                    onClick={runBatch}
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded text-xs font-medium bg-[var(--text)] text-[var(--bg)] hover:opacity-80"
                   >
+                    <Bot size={12} />
+                    Run on All ({overdueScripts.length})
+                  </button>
+                </div>
+              )}
+
+              {done && (
+                <div className="px-5 py-4 border-t border-[var(--border)]">
+                  <button onClick={close} className="w-full px-4 py-2 rounded text-xs font-medium border border-[var(--border)] text-[var(--muted)] hover:bg-[var(--surface-elevated)]">
                     Close
                   </button>
                 </div>
@@ -296,5 +457,38 @@ export default function RunAgentButton({ scripts }: RunAgentButtonProps) {
         )}
       </AnimatePresence>
     </>
+  );
+}
+
+// Shared node progress list for single mode
+function NodeProgressList({ currentNode, completedNodes, done }: { currentNode: string | null; completedNodes: string[]; done: boolean }) {
+  return (
+    <div className="space-y-2">
+      {Object.entries(NODE_LABELS).map(([key, label]) => {
+        const isCompleted = completedNodes.includes(key);
+        const isCurrent = currentNode === key;
+        return (
+          <div key={key} className="flex items-center gap-2.5">
+            {isCompleted ? (
+              <CheckCircle size={14} className="text-emerald-400 shrink-0" />
+            ) : isCurrent ? (
+              <Loader2 size={14} className="text-amber-400 animate-spin shrink-0" />
+            ) : (
+              <Circle size={14} className="text-[var(--muted)] opacity-30 shrink-0" />
+            )}
+            <span className={`text-xs ${
+              isCompleted ? "text-[var(--text)] opacity-60" :
+              isCurrent ? "text-amber-400 font-medium" :
+              "text-[var(--muted)] opacity-30"
+            }`}>
+              {label}
+            </span>
+          </div>
+        );
+      })}
+      {done && (
+        <p className="text-xs text-emerald-400 font-medium pt-2">Draft ready in HITL panel</p>
+      )}
+    </div>
   );
 }
