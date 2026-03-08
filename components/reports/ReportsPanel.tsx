@@ -12,7 +12,6 @@ import { cn, formatTimeAgo } from "@/lib/utils";
 import { useToast } from "@/components/ui/ToastProvider";
 import type { ReportPlatform, ReportContentType, ReportEntry, AggregateMetrics } from "@/lib/supabase/types";
 
-/* ---------- Types ---------- */
 
 interface ClientOption {
   id: string;
@@ -53,7 +52,6 @@ interface EntryForm {
   collapsed: boolean;
 }
 
-/* ---------- Constants ---------- */
 
 const PLATFORMS: ReportPlatform[] = ["Instagram", "YouTube", "LinkedIn", "TikTok", "X/Twitter"];
 const CONTENT_TYPES: ReportContentType[] = ["Video", "Photo", "Carousel", "Story", "Reel", "Post"];
@@ -122,7 +120,6 @@ const PLATFORM_COLORS: Record<string, string> = {
   "X/Twitter": "text-gray-300",
 };
 
-/* ---------- Helpers ---------- */
 
 let entryIdCounter = 0;
 function newEntryId(): string {
@@ -168,7 +165,6 @@ function fmtDateRange(start: string, end: string): string {
   return `${s} — ${e}`;
 }
 
-/* ---------- Component ---------- */
 
 export default function ReportsPanel({ clients, initialReports }: ReportsPanelProps) {
   const { toast } = useToast();
@@ -217,7 +213,7 @@ export default function ReportsPanel({ clients, initialReports }: ReportsPanelPr
     return { totalReports: clientReports.length, totalEntries, sentCount, draftCount };
   }, [isAllClients, clientReports]);
 
-  /* ---------- Handlers ---------- */
+
 
   function handleClientChange(clientId: string) {
     setSelectedClientId(clientId);
@@ -449,7 +445,7 @@ export default function ReportsPanel({ clients, initialReports }: ReportsPanelPr
     } catch { toast("error", "Bulk send failed"); } finally { setBulkSending(false); }
   }
 
-  /* ---------- Render ---------- */
+
 
   const isViewingGenerated = viewingReport?.generated_summary && generatedOutput;
 
@@ -609,7 +605,7 @@ export default function ReportsPanel({ clients, initialReports }: ReportsPanelPr
       <div className="flex flex-col overflow-y-auto">
         <AnimatePresence mode="wait">
           {isViewingGenerated && generatedOutput && viewingReport ? (
-            /* ---------- GENERATED REPORT VIEW ---------- */
+
             <motion.div
               key={`view-${generatedOutput.id}`}
               initial={{ opacity: 0, y: 8 }}
@@ -745,7 +741,7 @@ export default function ReportsPanel({ clients, initialReports }: ReportsPanelPr
               </div>
             </motion.div>
           ) : (
-            /* ---------- FORM ---------- */
+
             <motion.div
               key="form"
               initial={{ opacity: 0, y: 8 }}

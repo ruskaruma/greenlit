@@ -41,32 +41,34 @@ export async function POST(request: Request) {
 
   const supabase: SupabaseAny = createServiceClientDirect();
 
-  // 1. Create client
+
+  const insertData: Record<string, unknown> = {
+    name,
+    email,
+    preferred_channel: preferred_channel || "email",
+  };
+  if (company) insertData.company = company;
+  if (whatsapp_number) insertData.whatsapp_number = whatsapp_number;
+  if (instagram_handle) insertData.instagram_handle = instagram_handle;
+  if (youtube_channel_id) insertData.youtube_channel_id = youtube_channel_id;
+  if (twitter_handle) insertData.twitter_handle = twitter_handle;
+  if (linkedin_url) insertData.linkedin_url = linkedin_url;
+  if (brand_voice) insertData.brand_voice = brand_voice;
+  if (account_manager) insertData.account_manager = account_manager;
+  if (contract_start) insertData.contract_start = contract_start;
+  if (monthly_volume) insertData.monthly_volume = parseInt(monthly_volume);
+  if (platform_focus?.length > 0) insertData.platform_focus = platform_focus;
+  insertData.onboarding_checklist = {
+    welcome_email: false,
+    google_drive: false,
+    notion_page: false,
+    airtable_entry: false,
+    first_brief: false,
+  };
+
   const { data: client, error: insertErr } = await supabase
     .from("clients")
-    .insert({
-      name,
-      email,
-      company: company || null,
-      whatsapp_number: whatsapp_number || null,
-      preferred_channel: preferred_channel || "email",
-      instagram_handle: instagram_handle || null,
-      youtube_channel_id: youtube_channel_id || null,
-      twitter_handle: twitter_handle || null,
-      linkedin_url: linkedin_url || null,
-      brand_voice: brand_voice || null,
-      account_manager: account_manager || null,
-      contract_start: contract_start || null,
-      monthly_volume: monthly_volume ? parseInt(monthly_volume) : null,
-      platform_focus: platform_focus?.length > 0 ? platform_focus : null,
-      onboarding_checklist: {
-        welcome_email: false,
-        google_drive: false,
-        notion_page: false,
-        airtable_entry: false,
-        first_brief: false,
-      },
-    })
+    .insert(insertData)
     .select("*")
     .single();
 
@@ -77,7 +79,7 @@ export async function POST(request: Request) {
   const clientId = client.id as string;
   const results: Record<string, { success: boolean; error?: string }> = {};
 
-  // 2. Seed 3 memories with embeddings
+
   try {
     const platformStr = platform_focus?.length > 0 ? platform_focus.join(", ") : "not specified";
     const voiceStr = brand_voice || "no specific brand voice noted";
@@ -107,7 +109,7 @@ export async function POST(request: Request) {
     results.memories = { success: false, error: msg };
   }
 
-  // 3. Send welcome email
+
   try {
     const emailResult = await sendWelcomeEmail({
       to: email,
@@ -128,7 +130,7 @@ export async function POST(request: Request) {
     results.welcome_email = { success: false, error: msg };
   }
 
-  // 4. Send WhatsApp notification to founder
+
   const demoWhatsApp = process.env.DEMO_WHATSAPP_NUMBER;
   const twilioFrom = process.env.TWILIO_WHATSAPP_FROM;
   if (twilioClient && demoWhatsApp && twilioFrom) {
@@ -148,7 +150,7 @@ export async function POST(request: Request) {
     results.whatsapp = { success: false, error: "Twilio not configured" };
   }
 
-  // 5. Audit log
+
   await supabase.from("audit_log").insert({
     entity_type: "client",
     entity_id: clientId,

@@ -6,14 +6,13 @@ import {
   User, Mail, Building2, Phone, Globe, Instagram, Youtube,
   Twitter, Linkedin,
   Mic, UserCheck, Calendar, Hash, ChevronRight, ChevronLeft,
-  Loader2, Check, ExternalLink, ArrowRight, Plus, RotateCcw,
+  Loader2, Check, ArrowRight, Plus,
   CheckCircle2, Clock, FileText,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/components/ui/ToastProvider";
 import Link from "next/link";
 
-/* ---------- Types ---------- */
 
 interface FormData {
   name: string;
@@ -41,7 +40,6 @@ const PLATFORMS = ["Instagram", "YouTube", "LinkedIn", "TikTok", "X/Twitter"] as
 const CHANNELS = ["email", "whatsapp", "both"] as const;
 const STEPS = ["Client Basics", "Contract Details", "Brand Intelligence", "Review & Submit"] as const;
 
-/* ---------- Component ---------- */
 
 export default function OnboardingForm() {
   const { toast } = useToast();
@@ -134,8 +132,7 @@ export default function OnboardingForm() {
     setChecklist({ google_drive: false, notion_page: false, airtable_entry: false });
   }
 
-  /* ---------- Post-Submit View ---------- */
-  if (result) {
+if (result) {
     const r = result.results;
     return (
       <div className="max-w-2xl mx-auto py-12 px-6">
@@ -228,8 +225,7 @@ export default function OnboardingForm() {
     );
   }
 
-  /* ---------- Form Steps ---------- */
-  return (
+return (
     <div className="max-w-2xl mx-auto py-8 px-6">
       {/* Step Indicator */}
       <div className="flex items-center gap-2 mb-8">
@@ -442,7 +438,6 @@ export default function OnboardingForm() {
   );
 }
 
-/* ---------- Helpers ---------- */
 
 const inputCls = "w-full px-3 py-2.5 bg-[var(--bg)] border border-[var(--border)] rounded-lg text-sm text-[var(--text)] placeholder:text-[var(--muted)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)] focus:border-transparent";
 

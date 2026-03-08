@@ -48,7 +48,7 @@ export async function PATCH(
 
   const updates: Record<string, unknown> = {};
   for (const key of allowed) {
-    if (key in body) updates[key] = body[key];
+    if (key in body && body[key] !== null && body[key] !== "") updates[key] = body[key];
   }
 
   if (Object.keys(updates).length === 0) {

@@ -98,20 +98,22 @@ export default function ClientEditDrawer({ clientId, onClose, onSaved }: ClientE
 
     setSaving(true);
     try {
-      const payload = {
-        ...form,
-        company: form.company || null,
-        whatsapp_number: form.whatsapp_number || null,
-        instagram_handle: form.instagram_handle || null,
-        youtube_channel_id: form.youtube_channel_id || null,
-        twitter_handle: form.twitter_handle || null,
-        linkedin_url: form.linkedin_url || null,
-        brand_voice: form.brand_voice || null,
-        account_manager: form.account_manager || null,
-        contract_start: form.contract_start || null,
-        monthly_volume: form.monthly_volume ? parseInt(form.monthly_volume) : null,
-        platform_focus: form.platform_focus.length > 0 ? form.platform_focus : null,
+      const payload: Record<string, unknown> = {
+        name: form.name,
+        email: form.email,
+        preferred_channel: form.preferred_channel,
       };
+      if (form.company) payload.company = form.company;
+      if (form.whatsapp_number) payload.whatsapp_number = form.whatsapp_number;
+      if (form.instagram_handle) payload.instagram_handle = form.instagram_handle;
+      if (form.youtube_channel_id) payload.youtube_channel_id = form.youtube_channel_id;
+      if (form.twitter_handle) payload.twitter_handle = form.twitter_handle;
+      if (form.linkedin_url) payload.linkedin_url = form.linkedin_url;
+      if (form.brand_voice) payload.brand_voice = form.brand_voice;
+      if (form.account_manager) payload.account_manager = form.account_manager;
+      if (form.contract_start) payload.contract_start = form.contract_start;
+      if (form.monthly_volume) payload.monthly_volume = parseInt(form.monthly_volume);
+      if (form.platform_focus.length > 0) payload.platform_focus = form.platform_focus;
 
       const res = await fetch(`/api/clients/${clientId}`, {
         method: "PATCH",

@@ -48,8 +48,7 @@ export async function GET(request: Request) {
   const supabase: SupabaseAny = createServiceClientDirect();
 
   try {
-    // 1. Overdue scripts (pending_review past deadline OR status=overdue)
-    const { data: allScripts } = await supabase
+const { data: allScripts } = await supabase
       .from("scripts")
       .select("id, title, status, sent_at, due_date, response_deadline_minutes, client_feedback, reviewed_at, updated_at, clients(name)")
       .not("status", "in", '("closed","draft")')
@@ -77,11 +76,9 @@ export async function GET(request: Request) {
       }
     }
 
-    // Sort overdue by days descending
-    overdueList.sort((a, b) => b.daysOverdue - a.daysOverdue);
+overdueList.sort((a, b) => b.daysOverdue - a.daysOverdue);
 
-    // 2. HITL pending chasers (needs action)
-    const { data: pendingChasers } = await supabase
+const { data: pendingChasers } = await supabase
       .from("chasers")
       .select("script_id, status, scripts(title), clients(name)")
       .in("status", ["pending_hitl", "draft_saved"]);
@@ -96,8 +93,7 @@ export async function GET(request: Request) {
       }
     }
 
-    // 3. Wins yesterday (approved in last 24h)
-    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
     const wins: { title: string; clientName: string }[] = [];
     for (const s of scripts) {
       if (s.status === "approved" && s.reviewed_at && s.reviewed_at >= yesterday) {
@@ -105,8 +101,7 @@ export async function GET(request: Request) {
       }
     }
 
-    // 4. Upcoming deadlines (due in next 7 days)
-    const nowMs = Date.now();
+const nowMs = Date.now();
     const weekMs = 7 * 24 * 60 * 60 * 1000;
     const deadlines: { title: string; clientName: string; daysUntil: number }[] = [];
     for (const s of scripts) {
