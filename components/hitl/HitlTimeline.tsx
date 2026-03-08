@@ -36,8 +36,8 @@ export default function HitlTimeline({ currentStage }: HitlTimelineProps) {
               <div
                 className={cn(
                   "w-6 h-6 rounded-full flex items-center justify-center border transition-colors",
-                  isComplete && "bg-[#00ff88]/15 border-[#00ff88] text-[#00ff88]",
-                  isCurrent && "bg-orange-400/15 border-orange-400 text-orange-400",
+                  isComplete && "bg-[var(--accent-success)]/15 border-[var(--accent-success)] text-[var(--accent-success)]",
+                  isCurrent && "bg-[var(--accent-primary)]/15 border-[var(--accent-primary)] text-[var(--accent-primary)]",
                   !isComplete && !isCurrent && "border-[var(--border)] text-[var(--muted)] opacity-40"
                 )}
               >
@@ -46,8 +46,8 @@ export default function HitlTimeline({ currentStage }: HitlTimelineProps) {
               <span
                 className={cn(
                   "text-[9px] whitespace-nowrap",
-                  isComplete && "text-[#00ff88]",
-                  isCurrent && "text-orange-400 font-medium",
+                  isComplete && "text-[var(--accent-success)]",
+                  isCurrent && "text-[var(--accent-primary)] font-medium",
                   !isComplete && !isCurrent && "text-[var(--muted)] opacity-40"
                 )}
               >
@@ -58,7 +58,7 @@ export default function HitlTimeline({ currentStage }: HitlTimelineProps) {
               <div
                 className={cn(
                   "h-px flex-1 mx-1 mb-4",
-                  i < currentIndex ? "bg-[#00ff88]/40" : "bg-[var(--border)]"
+                  i < currentIndex ? "bg-[var(--accent-success)]/40" : "bg-[var(--border)]"
                 )}
               />
             )}

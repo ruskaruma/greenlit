@@ -30,7 +30,7 @@ export async function POST(
 
   const { data: chaser, error: fetchError } = await supabase
     .from("chasers")
-    .select("id, script_id, client_id, draft_content, status, hitl_state, clients(name, email, company), scripts(title, platform, sent_at)")
+    .select("id, script_id, client_id, draft_content, status, hitl_state, clients(name, email, company), scripts(title, platform, sent_at, review_token)")
     .eq("id", id)
     .single();
 
@@ -98,9 +98,12 @@ export async function POST(
   let waError = "";
 
   if (sendEmail && clientEmail) {
+    const reviewToken = chaser.scripts?.review_token as string | undefined;
+    const appUrl = process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || "https://greenlit.ruskaruma.me";
+    const reviewUrl = reviewToken ? `${appUrl}/review/${reviewToken}` : undefined;
     console.log("[hitl/approve] Sending email to:", clientEmail, "subject:", emailSubject);
     try {
-      const emailResult = await sendChaserEmail(clientEmail, finalContent, emailSubject, clientName);
+      const emailResult = await sendChaserEmail(clientEmail, finalContent, emailSubject, clientName, reviewUrl);
       if (!emailResult.success) {
         emailFailed = true;
         emailError = emailResult.error ?? "Unknown email error";

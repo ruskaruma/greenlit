@@ -39,7 +39,7 @@ export async function sendReviewEmail({
         <table width="560" cellpadding="0" cellspacing="0" style="background-color:#111111;border-radius:12px;border:1px solid #222222;overflow:hidden;">
           <tr>
             <td style="padding:40px 40px 32px 40px;">
-              <p style="margin:0 0 4px 0;font-size:13px;color:#00ff88;font-weight:600;letter-spacing:0.5px;">GREENLIT</p>
+              <p style="margin:0 0 4px 0;font-size:13px;color:#F97316;font-weight:600;letter-spacing:0.5px;">GREENLIT</p>
               <h1 style="margin:0 0 24px 0;font-size:20px;color:#ffffff;font-weight:600;line-height:1.3;">
                 New script ready for review
               </h1>
@@ -52,8 +52,8 @@ export async function sendReviewEmail({
               </p>
               <table cellpadding="0" cellspacing="0" style="margin:0 0 24px 0;">
                 <tr>
-                  <td style="background-color:#22C55E;border-radius:8px;">
-                    <a href="${reviewUrl}" target="_blank" style="display:inline-block;padding:12px 32px;color:#000000;font-size:14px;font-weight:600;text-decoration:none;">
+                  <td style="background-color:#F97316;border-radius:8px;">
+                    <a href="${reviewUrl}" target="_blank" style="display:inline-block;padding:12px 32px;color:#ffffff;font-size:14px;font-weight:600;text-decoration:none;">
                       Review Script
                     </a>
                   </td>

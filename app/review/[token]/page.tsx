@@ -39,12 +39,12 @@ async function getScript(token: string): Promise<ScriptData | null> {
 
 function AlreadyReviewed({ status, clientName }: { status: ScriptStatus; clientName: string }) {
   const icon =
-    status === "approved" ? <Check size={28} className="text-[#00ff88]" /> :
+    status === "approved" ? <Check size={28} className="text-[var(--accent-success)]" /> :
     status === "changes_requested" ? <RotateCcw size={28} className="text-orange-400" /> :
     <X size={28} className="text-red-400" />;
 
   const bgColor =
-    status === "approved" ? "bg-[#00ff88]/10" :
+    status === "approved" ? "bg-[var(--accent-success)]/10" :
     status === "changes_requested" ? "bg-orange-500/10" :
     "bg-red-500/10";
 

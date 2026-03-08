@@ -477,7 +477,7 @@ function NodeProgressList({ currentNode, completedNodes, done }: { currentNode: 
             {isCompleted ? (
               <CheckCircle size={14} className="text-[var(--accent-success)] shrink-0" />
             ) : isCurrent ? (
-              <Loader2 size={14} className="text-[var(--accent-success)] animate-spin animate-neon-pulse shrink-0" />
+              <Loader2 size={14} className="text-[var(--accent-success)] animate-spin shrink-0" />
             ) : (
               <Circle size={14} className="text-[var(--muted)] shrink-0" />
             )}

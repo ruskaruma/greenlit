@@ -18,8 +18,8 @@ const actions: {
     key: "approved",
     label: "Approve",
     icon: Check,
-    style: "border-[var(--border)] text-[var(--text)] opacity-60 hover:opacity-100 hover:border-[#00ff88]/50 hover:text-[#00ff88]",
-    activeStyle: "bg-[#00ff88] border-[#00ff88] text-[#0a0a0a] opacity-100",
+    style: "border-[var(--border)] text-[var(--text)] opacity-60 hover:opacity-100 hover:border-[var(--accent-success)]/50 hover:text-[var(--accent-success)]",
+    activeStyle: "bg-[var(--accent-success)] border-[var(--accent-success)] text-white opacity-100",
   },
   {
     key: "changes_requested",
@@ -68,16 +68,12 @@ export default function ReviewActions({ token }: ReviewActionsProps) {
 
   function handleSubmitClick() {
     if (!selected) return;
-    if (!confirming) {
-      setConfirming(true);
-      return;
-    }
+    if (!confirming) { setConfirming(true); return; }
     handleSubmit();
   }
 
   async function handleSubmit() {
     if (!selected) return;
-
     setIsSubmitting(true);
     setConfirming(false);
     setError(null);
@@ -86,28 +82,14 @@ export default function ReviewActions({ token }: ReviewActionsProps) {
       const res = await fetch(`/api/review/${token}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: selected,
-          feedback: feedback.trim() || undefined,
-        }),
+        body: JSON.stringify({ action: selected, feedback: feedback.trim() || undefined }),
       });
-
       const data = await res.json();
-
-      if (res.status === 409) {
-        // Already reviewed — show the previous decision gracefully
-        setSubmitted(data.status || selected);
-        return;
-      }
-
-      if (!res.ok) {
-        throw new Error(data.error || "Failed to submit review");
-      }
-
+      if (res.status === 409) { setSubmitted(data.status || selected); return; }
+      if (!res.ok) throw new Error(data.error || "Failed to submit review");
       setSubmitted(selected);
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Something went wrong";
-      setError(message);
+      setError(err instanceof Error ? err.message : "Something went wrong");
     } finally {
       setIsSubmitting(false);
     }
@@ -123,11 +105,11 @@ export default function ReviewActions({ token }: ReviewActionsProps) {
       >
         <div className={cn(
           "w-16 h-16 rounded-full flex items-center justify-center mb-6",
-          submitted === "approved" && "bg-[#00ff88]/10",
+          submitted === "approved" && "bg-[var(--accent-success)]/10",
           submitted === "changes_requested" && "bg-orange-500/10",
           submitted === "rejected" && "bg-red-500/10",
         )}>
-          {submitted === "approved" && <Check size={28} className="text-[#00ff88]" />}
+          {submitted === "approved" && <Check size={28} className="text-[var(--accent-success)]" />}
           {submitted === "changes_requested" && <RotateCcw size={28} className="text-orange-400" />}
           {submitted === "rejected" && <X size={28} className="text-red-400" />}
         </div>
@@ -146,11 +128,7 @@ export default function ReviewActions({ token }: ReviewActionsProps) {
           return (
             <button
               key={action.key}
-              onClick={() => {
-                setSelected(isActive ? null : action.key);
-                setError(null);
-                setConfirming(false);
-              }}
+              onClick={() => { setSelected(isActive ? null : action.key); setError(null); setConfirming(false); }}
               className={cn(
                 "flex flex-col items-center gap-2 px-4 py-4 rounded-lg border transition-all duration-150",
                 isActive ? action.activeStyle : action.style
@@ -182,9 +160,7 @@ export default function ReviewActions({ token }: ReviewActionsProps) {
         )}
       </AnimatePresence>
 
-      {error && (
-        <p className="text-sm text-red-400">{error}</p>
-      )}
+      {error && <p className="text-sm text-red-400">{error}</p>}
 
       <AnimatePresence>
         {selected && (
@@ -200,25 +176,16 @@ export default function ReviewActions({ token }: ReviewActionsProps) {
               className={cn(
                 "w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg text-sm font-semibold disabled:opacity-40 disabled:cursor-not-allowed transition-colors",
                 confirming
-                  ? "bg-amber-500 text-[#0a0a0a] hover:bg-amber-400"
-                  : "bg-[#00ff88] text-[#0a0a0a] hover:bg-[#00dd77]"
+                  ? "bg-amber-500 text-white hover:bg-amber-400"
+                  : "bg-[var(--accent-primary)] text-white hover:opacity-90"
               )}
             >
               {isSubmitting ? (
-                <>
-                  <Loader2 size={16} className="animate-spin" />
-                  Submitting...
-                </>
+                <><Loader2 size={16} className="animate-spin" /> Submitting...</>
               ) : confirming ? (
-                <>
-                  Confirm Submit
-                  <ArrowRight size={16} />
-                </>
+                <><span>Confirm Submit</span> <ArrowRight size={16} /></>
               ) : (
-                <>
-                  Submit Review
-                  <ArrowRight size={16} />
-                </>
+                <><span>Submit Review</span> <ArrowRight size={16} /></>
               )}
             </button>
           </motion.div>
