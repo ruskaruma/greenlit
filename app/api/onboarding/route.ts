@@ -14,6 +14,7 @@ const twilioClient =
     : null;
 
 export async function POST(request: Request) {
+  try {
   const { error: authError } = await requireSession();
   if (authError) return authError;
 
@@ -79,7 +80,6 @@ export async function POST(request: Request) {
   const clientId = client.id as string;
   const results: Record<string, { success: boolean; error?: string }> = {};
 
-
   try {
     const platformStr = platform_focus?.length > 0 ? platform_focus.join(", ") : "not specified";
     const voiceStr = brand_voice || "no specific brand voice noted";
@@ -109,7 +109,6 @@ export async function POST(request: Request) {
     results.memories = { success: false, error: msg };
   }
 
-
   try {
     const emailResult = await sendWelcomeEmail({
       to: email,
@@ -130,7 +129,6 @@ export async function POST(request: Request) {
     results.welcome_email = { success: false, error: msg };
   }
 
-
   const demoWhatsApp = process.env.DEMO_WHATSAPP_NUMBER;
   const twilioFrom = process.env.TWILIO_WHATSAPP_FROM;
   if (twilioClient && demoWhatsApp && twilioFrom) {
@@ -150,14 +148,22 @@ export async function POST(request: Request) {
     results.whatsapp = { success: false, error: "Twilio not configured" };
   }
 
-
-  await supabase.from("audit_log").insert({
-    entity_type: "client",
-    entity_id: clientId,
-    action: "client_onboarded",
-    actor: "team_lead",
-    metadata: { name, email, company, platform_focus, results },
-  });
+  try {
+    await supabase.from("audit_log").insert({
+      entity_type: "client",
+      entity_id: clientId,
+      action: "client_onboarded",
+      actor: "team_lead",
+      metadata: { name, email, company, platform_focus, results },
+    });
+  } catch {
+    console.error("[onboarding] Audit log failed");
+  }
 
   return NextResponse.json({ client, results }, { status: 201 });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown error";
+    console.error("[onboarding] Unhandled error:", message);
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
 }
