@@ -3,29 +3,35 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 :root {
-  --bg: #F7F7F7;
-  --card: #FFFFFF;
-  --text: #0A0A0A;
-  --muted: #888888;
-  --border: #E5E5E5;
-  --accent: #E8E8E8;
-  --input-bg: #F0F0F0;
-  --surface-elevated: #EFEFEF;
-  --accent-primary: #D4FF00;
-  --accent-success: #00FFA3;
+  --bg: #FDFBF7;
+  --card: #F8F4EE;
+  --text: #4A3B33;
+  --muted: #78716C;
+  --border: #E4D9BC;
+  --accent: #f2daba;
+  --input-bg: #F1E9DA;
+  --surface-elevated: #F1E9DA;
+  --accent-primary: #B45309;
+  --accent-success: #16a34a;
+  --primary: #B45309;
+  --primary-foreground: #FFFFFF;
+  --ring: #B45309;
 }
 
 .dark {
-  --bg: #09090b;
-  --card: #18181b;
-  --text: #f4f4f5;
-  --muted: #a1a1aa;
-  --border: #27272a;
-  --accent: #E8E8E8;
-  --input-bg: #09090b;
-  --surface-elevated: #18181b;
-  --accent-primary: #D4FF00;
-  --accent-success: #00FFA3;
+  --bg: #1C1917;
+  --card: #292524;
+  --text: #F5F5F4;
+  --muted: #A8A29E;
+  --border: #44403C;
+  --accent: #1e4252;
+  --input-bg: #292524;
+  --surface-elevated: #292524;
+  --accent-primary: #F97316;
+  --accent-success: #22c55e;
+  --primary: #F97316;
+  --primary-foreground: #FFFFFF;
+  --ring: #F97316;
 }
 
 @theme inline {
@@ -34,9 +40,14 @@
   --color-accent: var(--accent);
   --color-card: var(--card);
   --color-border: var(--border);
-  --color-lime: #D4FF00;
-  --color-lime-hover: #bce600;
-  --color-neon: #00FFA3;
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted);
+  --color-ring: var(--ring);
+  --color-input: var(--input-bg);
+  --color-secondary: var(--surface-elevated);
+  --color-secondary-foreground: var(--text);
 }
 
 body {
@@ -48,96 +59,51 @@ html {
   transition: color 150ms ease, background-color 150ms ease;
 }
 
-
-/* Custom scrollbar */
 .dark ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 
 .dark ::-webkit-scrollbar-track {
-  background: #09090b;
+  background: #1C1917;
 }
 
 .dark ::-webkit-scrollbar-thumb {
-  background: #27272a;
+  background: #44403C;
   border-radius: 3px;
 }
 
 .dark ::-webkit-scrollbar-thumb:hover {
-  background: #3f3f46;
+  background: #57534E;
 }
 
-/* Neon green glow for live indicator */
-.glow-green {
-  box-shadow: 0 0 8px rgba(0, 255, 163, 0.5);
+.glow-primary {
+  box-shadow: 0 0 15px rgba(249, 115, 22, 0.15);
 }
 
-/* Lime CTA glow */
-.glow-lime {
-  box-shadow: 0 0 15px rgba(212, 255, 0, 0.15);
-}
-
-/* Neon success glow */
-.glow-neon {
-  box-shadow: 0 0 12px rgba(0, 255, 163, 0.2);
-}
-
-/* Overdue card pulse */
 @keyframes pulse-red {
-  0%, 100% {
-    box-shadow: 0 0 4px rgba(239, 68, 68, 0.15);
-  }
-  50% {
-    box-shadow: 0 0 12px rgba(239, 68, 68, 0.3);
-  }
+  0%, 100% { box-shadow: 0 0 4px rgba(239, 68, 68, 0.15); }
+  50% { box-shadow: 0 0 12px rgba(239, 68, 68, 0.3); }
 }
 
 .animate-pulse-red {
   animation: pulse-red 2s ease-in-out infinite;
 }
 
-/* Overdue subtle opacity pulse */
 @keyframes pulse-subtle {
-  0%, 100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.6;
-  }
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
 }
 
 .animate-pulse-subtle {
   animation: pulse-subtle 2.5s ease-in-out infinite;
 }
 
-/* Status badge pulse for overdue */
 @keyframes badge-pulse {
-  0%, 100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.6;
-  }
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
 }
 
 .animate-badge-pulse {
   animation: badge-pulse 1.5s ease-in-out infinite;
 }
-
-/* Neon spinner pulse */
-@keyframes neon-pulse {
-  0%, 100% {
-    opacity: 1;
-    filter: drop-shadow(0 0 4px rgba(0, 255, 163, 0.4));
-  }
-  50% {
-    opacity: 0.7;
-    filter: drop-shadow(0 0 8px rgba(0, 255, 163, 0.6));
-  }
-}
-
-.animate-neon-pulse {
-  animation: neon-pulse 1.5s ease-in-out infinite;
-}
-

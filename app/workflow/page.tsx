@@ -13,7 +13,7 @@ export default function WorkflowPage() {
         <p className="text-[var(--muted)] mb-8">Coming soon.</p>
         <Link
           href="/"
-          className="text-sm text-[#D4FF00] hover:underline"
+          className="text-sm text-[var(--accent-primary)] hover:underline"
         >
           &larr; Back to home
         </Link>

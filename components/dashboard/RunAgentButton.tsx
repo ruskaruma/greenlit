@@ -317,7 +317,7 @@ export default function RunAgentButton({ scripts, mode, singleScript, onOpenChan
                   </button>
                   <button
                     onClick={() => runSingle(singleScript.id)}
-                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded text-xs font-bold bg-[#D4FF00] text-zinc-950 hover:bg-[#bce600] glow-lime"
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded text-xs font-bold bg-[var(--accent-primary)] text-white hover:bg-[var(--accent-primary)]/90 glow-primary"
                   >
                     <Bot size={12} />
                     Run Agent
@@ -409,20 +409,20 @@ export default function RunAgentButton({ scripts, mode, singleScript, onOpenChan
                       <div key={p.id} className="bg-[var(--input-bg)] border border-[var(--border)] rounded-lg px-4 py-3">
                         <div className="flex items-center justify-between mb-1.5">
                           <p className="text-xs font-medium text-[var(--text)] truncate">{p.title}</p>
-                          {p.status === "done" && <CheckCircle size={13} className="text-[#00FFA3] shrink-0" />}
+                          {p.status === "done" && <CheckCircle size={13} className="text-[var(--accent-success)] shrink-0" />}
                           {p.status === "error" && <AlertCircle size={13} className="text-red-400 shrink-0" />}
-                          {p.status === "running" && <Loader2 size={13} className="text-[#00FFA3] animate-spin shrink-0" />}
+                          {p.status === "running" && <Loader2 size={13} className="text-[var(--accent-success)] animate-spin shrink-0" />}
                           {p.status === "queued" && <Circle size={13} className="text-[var(--muted)] shrink-0" />}
                         </div>
                         <p className="text-[11px] text-[var(--muted)] truncate">{p.client_name}</p>
                         {p.status === "running" && p.currentNode && (
-                          <motion.p initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="text-[11px] text-[#00FFA3] mt-1">{NODE_LABELS[p.currentNode] ?? p.currentNode}</motion.p>
+                          <motion.p initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="text-[11px] text-[var(--accent-success)] mt-1">{NODE_LABELS[p.currentNode] ?? p.currentNode}</motion.p>
                         )}
                         {p.status === "error" && p.error && (
                           <p className="text-[11px] text-red-400 mt-1">{p.error}</p>
                         )}
                         {p.status === "done" && (
-                          <motion.p initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="text-[11px] text-[#00FFA3] mt-1">Draft ready</motion.p>
+                          <motion.p initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="text-[11px] text-[var(--accent-success)] mt-1">Draft ready</motion.p>
                         )}
                       </div>
                     ))}
@@ -437,7 +437,7 @@ export default function RunAgentButton({ scripts, mode, singleScript, onOpenChan
                   </button>
                   <button
                     onClick={runBatch}
-                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded text-xs font-bold bg-[#D4FF00] text-zinc-950 hover:bg-[#bce600] glow-lime"
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded text-xs font-bold bg-[var(--accent-primary)] text-white hover:bg-[var(--accent-primary)]/90 glow-primary"
                   >
                     <Bot size={12} />
                     Run on All ({overdueScripts.length})
@@ -475,15 +475,15 @@ function NodeProgressList({ currentNode, completedNodes, done }: { currentNode: 
             animate={{ opacity: 1, y: 0 }}
           >
             {isCompleted ? (
-              <CheckCircle size={14} className="text-[#00FFA3] shrink-0" />
+              <CheckCircle size={14} className="text-[var(--accent-success)] shrink-0" />
             ) : isCurrent ? (
-              <Loader2 size={14} className="text-[#00FFA3] animate-spin animate-neon-pulse shrink-0" />
+              <Loader2 size={14} className="text-[var(--accent-success)] animate-spin animate-neon-pulse shrink-0" />
             ) : (
               <Circle size={14} className="text-[var(--muted)] shrink-0" />
             )}
             <span className={`text-xs ${
               isCompleted ? "text-[var(--text)]" :
-              isCurrent ? "text-[#00FFA3] font-medium" :
+              isCurrent ? "text-[var(--accent-success)] font-medium" :
               "text-[var(--muted)]"
             }`}>
               {label}
@@ -495,7 +495,7 @@ function NodeProgressList({ currentNode, completedNodes, done }: { currentNode: 
         <motion.p
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="text-xs text-[#00FFA3] font-medium pt-2"
+          className="text-xs text-[var(--accent-success)] font-medium pt-2"
         >
           Draft ready in HITL panel
         </motion.p>

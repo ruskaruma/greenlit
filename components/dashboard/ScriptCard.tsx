@@ -100,7 +100,7 @@ export default function ScriptCard({ script, onClick, onArchive, onStatusChange,
       animate={{ opacity: script.archived ? 0.5 : 1, y: 0 }}
       exit={{ opacity: 0, y: -8 }}
       transition={{ duration: 0.15 }}
-      whileHover={{ scale: 1.01, borderColor: "#00FFA3" }}
+      whileHover={{ scale: 1.01, borderColor: "var(--accent-primary)" }}
       onClick={onClick}
       className={cn(
         "p-4 rounded-lg bg-[var(--card)] border border-[var(--border)] cursor-pointer",
@@ -128,7 +128,7 @@ export default function ScriptCard({ script, onClick, onArchive, onStatusChange,
             <span className={cn(
               "text-[9px] font-bold px-1.5 py-0.5 rounded border",
               script.quality_score.average >= 8
-                ? "bg-[#00FFA3]/10 text-[#00FFA3] border-[#00FFA3]/25"
+                ? "bg-[var(--accent-success)]/10 text-[var(--accent-success)] border-[var(--accent-success)]/25"
                 : script.quality_score.average >= 6
                   ? "bg-amber-500/15 text-amber-400 border-amber-500/30"
                   : "bg-red-500/15 text-red-400 border-red-500/30"

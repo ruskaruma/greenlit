@@ -1,77 +1,44 @@
 import Link from "next/link";
 
-const sections = [
-  {
-    title: "Frontend",
-    items: [
-      { name: "Next.js 16", note: "App Router, React Server Components, middleware auth" },
-      { name: "React 19", note: "Concurrent features, server actions" },
-      { name: "Tailwind CSS v4", note: "CSS-variable theming, @theme inline, dark mode" },
-      { name: "Framer Motion", note: "Layout animations, spring physics, staggered entrances" },
-      { name: "shadcn/ui", note: "Badge, Button components with CVA variants" },
-    ],
-  },
-  {
-    title: "Backend & Data",
-    items: [
-      { name: "Supabase", note: "Postgres database, Realtime subscriptions for live Kanban updates" },
-      { name: "NextAuth.js", note: "GitHub OAuth, JWT sessions, middleware-protected routes" },
-      { name: "Server-Sent Events", note: "Real-time agent progress streaming to the browser" },
-    ],
-  },
-  {
-    title: "AI & Agent Tools",
-    items: [
-      { name: "Claude AI (Anthropic)", note: "Haiku for quality scoring, Sonnet for draft generation and tone adaptation" },
-      { name: "Autonomous Agent", note: "Multi-step chase pipeline with configurable escalation schedules" },
-      { name: "Human-in-the-Loop", note: "Every AI draft requires human approval before client delivery" },
-      { name: "Quality Scorer", note: "3-dimension analysis: hook strength, CTA clarity, tone consistency" },
-    ],
-  },
-  {
-    title: "Communication",
-    items: [
-      { name: "Resend", note: "Transactional email delivery for script approvals and chases" },
-      { name: "Twilio", note: "WhatsApp Business API for client messaging" },
-    ],
-  },
-];
-
 export default function AboutPage() {
   return (
     <div className="min-h-screen bg-[var(--bg)] px-6 py-16">
       <div className="max-w-3xl mx-auto">
-        <Link href="/" className="text-sm text-[var(--muted)] hover:text-[var(--text)] transition-colors mb-8 inline-block">
-          &larr; Back
-        </Link>
+        <Link href="/" className="text-sm text-[var(--muted)] hover:text-[var(--text)] transition-colors mb-8 inline-block">&larr; Back</Link>
 
-        <h1
-          className="text-4xl font-bold text-[var(--text)] mb-3 tracking-tight"
-          style={{ fontFamily: "var(--font-playfair), serif" }}
-        >
+        <h1 className="text-4xl font-bold text-[var(--text)] mb-6 tracking-tight" style={{ fontFamily: "var(--font-playfair), serif" }}>
           About Greenlit
         </h1>
-        <p className="text-[var(--muted)] mb-12 max-w-lg leading-relaxed">
-          Greenlit is an AI-orchestrated script approval engine built for Scrollhouse.
-          It automates the back-and-forth of getting video scripts approved by clients
-          through intelligent chasing, quality analysis, and human oversight.
-        </p>
 
-        {sections.map((s) => (
-          <div key={s.title} className="mb-10">
-            <h2 className="text-lg font-semibold text-[var(--text)] mb-4 border-b border-[var(--border)] pb-2">
-              {s.title}
-            </h2>
-            <div className="space-y-3">
-              {s.items.map((item) => (
-                <div key={item.name} className="flex gap-3">
-                  <span className="text-sm font-medium text-[var(--text)] shrink-0 w-40">{item.name}</span>
-                  <span className="text-sm text-[var(--muted)]">{item.note}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        ))}
+        <div className="space-y-6 text-[var(--text)] leading-relaxed">
+          <p>
+            Greenlit is an AI-orchestrated script approval engine built for Scrollhouse, a video production agency.
+          </p>
+          <p>
+            The problem: getting clients to approve video scripts is slow. It involves endless email threads, WhatsApp follow-ups, and manual tracking. Scripts sit in limbo for days.
+          </p>
+          <p>
+            Greenlit fixes this by automating the entire chase cycle. When a script is uploaded, the AI agent drafts personalized follow-up messages, scores the script quality, and queues everything for human review before anything is sent.
+          </p>
+
+          <h2 className="text-xl font-semibold pt-4">How it works</h2>
+          <ul className="space-y-2 text-[var(--muted)]">
+            <li>Upload a script and assign it to a client</li>
+            <li>AI scores the script on hook strength, CTA clarity, and tone</li>
+            <li>Agent drafts chase messages (email + WhatsApp) with escalating urgency</li>
+            <li>Human reviews and approves every message before delivery</li>
+            <li>Client receives the message, responds, and the loop continues</li>
+            <li>Real-time Kanban board tracks everything across all scripts</li>
+          </ul>
+
+          <h2 className="text-xl font-semibold pt-4">Key decisions</h2>
+          <ul className="space-y-2 text-[var(--muted)]">
+            <li>Human-in-the-loop by default. No AI message goes out without approval.</li>
+            <li>SSE for real-time agent progress instead of polling.</li>
+            <li>Supabase Realtime for instant Kanban updates across tabs.</li>
+            <li>Quality scoring runs synchronously on upload so you see issues immediately.</li>
+          </ul>
+        </div>
 
         <p className="text-xs text-[var(--muted)] opacity-50 mt-16">by ruskaruma &middot; for Scrollhouse</p>
       </div>

@@ -6,7 +6,7 @@ import { Badge, BadgeDot } from "@/components/ui/badge";
 import type { ScriptStatus } from "@/lib/supabase/types";
 
 const statusConfig: Record<ScriptStatus, { variant: "success" | "warning" | "destructive" | "info" | "mono"; dotColor?: string }> = {
-  approved: { variant: "success", dotColor: "bg-[#00FFA3]" },
+  approved: { variant: "success", dotColor: "bg-[var(--accent-success)]" },
   pending_review: { variant: "warning", dotColor: "bg-amber-400" },
   changes_requested: { variant: "warning", dotColor: "bg-amber-400" },
   overdue: { variant: "destructive", dotColor: "bg-red-400" },

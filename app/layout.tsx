@@ -1,17 +1,28 @@
 import type { Metadata } from "next";
-import { Inter, Playfair_Display } from "next/font/google";
+import { Oxanium, Playfair_Display, Fira_Code, Merriweather } from "next/font/google";
 import ThemeProvider from "@/components/ThemeProvider";
 import "./globals.css";
 
-const inter = Inter({
+const oxanium = Oxanium({
   subsets: ["latin"],
-  variable: "--font-inter",
+  variable: "--font-sans",
 });
 
 const playfair = Playfair_Display({
   subsets: ["latin"],
   weight: ["700"],
   variable: "--font-playfair",
+});
+
+const firaCode = Fira_Code({
+  subsets: ["latin"],
+  variable: "--font-mono",
+});
+
+const merriweather = Merriweather({
+  subsets: ["latin"],
+  weight: ["400", "700"],
+  variable: "--font-serif",
 });
 
 export const metadata: Metadata = {
@@ -39,7 +50,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${inter.variable} ${playfair.variable} font-sans antialiased bg-[var(--bg)] text-[var(--text)]`} suppressHydrationWarning>
+      <body className={`${oxanium.variable} ${playfair.variable} ${firaCode.variable} ${merriweather.variable} font-sans antialiased bg-[var(--bg)] text-[var(--text)]`} suppressHydrationWarning>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
         <ThemeProvider>{children}</ThemeProvider>
       </body>

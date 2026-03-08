@@ -24,7 +24,7 @@ export function getStatusColor(status: ScriptStatus): string {
     case "pending_review":
       return "bg-amber-500/15 text-amber-400 border-amber-500/20";
     case "approved":
-      return "bg-[#00FFA3]/10 text-[#00FFA3] border-[#00FFA3]/20";
+      return "bg-[var(--accent-success)]/10 text-[var(--accent-success)] border-[var(--accent-success)]/20";
     case "rejected":
       return "bg-red-500/10 text-red-400 border-red-500/20";
     case "overdue":
