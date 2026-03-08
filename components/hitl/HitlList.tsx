@@ -56,7 +56,7 @@ export default function HitlList({ initialChasers, memories }: HitlListProps) {
     <ToastProvider>
       <div className="flex gap-6 min-h-[600px]">
         {/* Left: Chaser list */}
-        <div className="w-[280px] shrink-0 border-r border-[var(--border)] pr-4 space-y-1">
+        <div className="w-[240px] shrink-0 border-r border-[var(--border)] pr-4 space-y-1">
           <p className="text-[10px] uppercase tracking-widest text-[var(--muted)] opacity-50 mb-3 px-2">
             Pending Drafts ({chasers.length})
           </p>

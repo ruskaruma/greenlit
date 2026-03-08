@@ -130,7 +130,7 @@ export default async function HitlPage() {
   const memories = await getClientMemories(clientIds);
 
   return (
-    <div className="min-h-screen bg-[var(--bg)] p-6 max-w-6xl mx-auto transition-colors duration-300">
+    <div className="min-h-screen bg-[var(--bg)] p-6 max-w-[1600px] mx-auto transition-colors duration-300">
       <header className="flex items-center justify-between mb-8">
         <div className="flex items-center gap-4">
           <Link

@@ -1,16 +1,17 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import { Loader2, AlertTriangle, Search, X, Lightbulb, Archive, ArchiveRestore, XCircle, RotateCcw } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import Sidebar from "./Sidebar";
 import KanbanBoard from "./KanbanBoard";
+import StatsBar from "./StatsBar";
 import UploadModal from "./UploadModal";
 import RunAgentButton from "./RunAgentButton";
 import StatusBadge from "@/components/ui/StatusBadge";
 import ToastProvider from "@/components/ui/ToastProvider";
 import { useToast } from "@/components/ui/ToastProvider";
-import { formatTimeAgo } from "@/lib/utils";
+import { formatTimeAgo, isOverdue } from "@/lib/utils";
 import type { ScriptWithClient, ScriptStatus } from "@/lib/supabase/types";
 
 export interface ClientItem {
@@ -35,22 +36,10 @@ interface DashboardShellProps {
   isSandbox?: boolean;
 }
 
-export default function DashboardShell({
-  scripts,
-  clients: initialClients,
-  inReview,
-  overdueCount,
-  isSandbox,
-}: DashboardShellProps) {
+export default function DashboardShell(props: DashboardShellProps) {
   return (
     <ToastProvider>
-      <DashboardShellInner
-        scripts={scripts}
-        clients={initialClients}
-        inReview={inReview}
-        overdueCount={overdueCount}
-        isSandbox={isSandbox}
-      />
+      <DashboardShellInner {...props} />
     </ToastProvider>
   );
 }
@@ -58,8 +47,6 @@ export default function DashboardShell({
 function DashboardShellInner({
   scripts,
   clients: initialClients,
-  inReview,
-  overdueCount,
   isSandbox,
 }: DashboardShellProps) {
   const [activeClientId, setActiveClientId] = useState<string | null>(null);
@@ -74,6 +61,8 @@ function DashboardShellInner({
   const [closedDrawerOpen, setClosedDrawerOpen] = useState(false);
   const [unarchivingId, setUnarchivingId] = useState<string | null>(null);
   const [reopeningId, setReopeningId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
 
   const { toast } = useToast();
 
@@ -81,44 +70,32 @@ function DashboardShellInner({
     setLocalScripts(scripts);
   }, [scripts]);
 
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedQuery(searchQuery), 300);
+    return () => clearTimeout(t);
+  }, [searchQuery]);
+
   const fetchClients = useCallback(async () => {
     try {
       const res = await fetch("/api/clients");
       if (res.ok) {
         const data = await res.json();
         const newClients: ClientItem[] = data.map((c: ClientItem) => ({
-          id: c.id,
-          name: c.name,
-          email: c.email,
-          whatsapp_number: c.whatsapp_number,
-          preferred_channel: c.preferred_channel,
+          id: c.id, name: c.name, email: c.email,
+          whatsapp_number: c.whatsapp_number, preferred_channel: c.preferred_channel,
         }));
         setClients(newClients);
-
-        setActiveClientId((prev) => {
-          if (prev && !newClients.some((c) => c.id === prev)) {
-            return null;
-          }
-          return prev;
-        });
+        setActiveClientId((prev) => prev && !newClients.some((c) => c.id === prev) ? null : prev);
       }
-    } catch {
-      // silent
-    }
+    } catch { /* silent */ }
   }, []);
 
-  useEffect(() => {
-    setClients(initialClients);
-  }, [initialClients]);
+  useEffect(() => { setClients(initialClients); }, [initialClients]);
 
   useEffect(() => {
     fetch("/api/scripts/insights")
       .then((r) => r.ok ? r.json() : null)
-      .then((data) => {
-        if (data?.themes?.length > 0) {
-          setThemes(data.themes);
-        }
-      })
+      .then((data) => { if (data?.themes?.length > 0) setThemes(data.themes); })
       .catch(() => {});
   }, []);
 
@@ -130,9 +107,36 @@ function DashboardShellInner({
   const archivedScripts = filteredScripts.filter((s) => s.archived);
   const closedScripts = filteredScripts.filter((s) => !s.archived && s.status === "closed");
 
-  const handleScriptUploaded = useCallback(() => {
-    setRefreshKey((k) => k + 1);
-  }, []);
+  const searchedScripts = useMemo(() => {
+    if (!debouncedQuery) return displayScripts;
+    const q = debouncedQuery.toLowerCase();
+    return displayScripts.filter((s) =>
+      s.title.toLowerCase().includes(q) ||
+      s.client.name.toLowerCase().includes(q) ||
+      (s.client.company && s.client.company.toLowerCase().includes(q))
+    );
+  }, [displayScripts, debouncedQuery]);
+
+  const stats = useMemo(() => {
+    const active = displayScripts.length;
+    const inReview = displayScripts.filter((s) => s.status === "pending_review" || s.status === "changes_requested").length;
+    const overdue = displayScripts.filter((s) => s.status === "overdue" || isOverdue(s.sent_at, s.status, s.response_deadline_minutes)).length;
+    const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    const approvedThisWeek = localScripts.filter((s) => s.status === "approved" && s.updated_at >= weekAgo).length;
+    const reviewed = localScripts.filter((s) => s.reviewed_at);
+    let avgResponseHours: number | null = null;
+    if (reviewed.length > 0) {
+      const total = reviewed.reduce((sum, s) => {
+        const sent = new Date(s.sent_at || s.created_at).getTime();
+        const rev = new Date(s.reviewed_at!).getTime();
+        return sum + (rev - sent) / 3600000;
+      }, 0);
+      avgResponseHours = total / reviewed.length;
+    }
+    return { active, inReview, overdue, approvedThisWeek, avgResponseHours };
+  }, [displayScripts, localScripts]);
+
+  const handleScriptUploaded = useCallback(() => { setRefreshKey((k) => k + 1); }, []);
 
   const handleCheckOverdue = useCallback(async () => {
     setCheckingOverdue(true);
@@ -145,11 +149,9 @@ function DashboardShellInner({
       }
       const data = await res.json();
       const count = data.updated ?? 0;
-      if (count === 0) {
-        toast("success", "All scripts are on track.");
-      } else {
-        toast("info", `Found ${count} overdue script${count > 1 ? "s" : ""}. Use Run Agent on individual cards to generate follow-ups.`);
-      }
+      toast(count === 0 ? "success" : "info",
+        count === 0 ? "All scripts are on track." : `Found ${count} overdue script${count > 1 ? "s" : ""}. Use Run Agent on individual cards to generate follow-ups.`
+      );
       setRefreshKey((k) => k + 1);
     } catch {
       toast("error", "Failed to check overdue scripts");
@@ -170,44 +172,32 @@ function DashboardShellInner({
     setReopeningId(id);
     try {
       const res = await fetch(`/api/scripts/${id}/status`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        method: "PATCH", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: "draft" }),
       });
       if (res.ok) {
         toast("success", "Script reopened as draft");
         handleStatusChange(id, "draft");
         setRefreshKey((k) => k + 1);
-      } else {
-        toast("error", "Failed to reopen script");
-      }
-    } catch {
-      toast("error", "Failed to reopen script");
-    } finally {
-      setReopeningId(null);
-    }
+      } else toast("error", "Failed to reopen script");
+    } catch { toast("error", "Failed to reopen script"); }
+    finally { setReopeningId(null); }
   }
 
   async function handleUnarchive(id: string) {
     setUnarchivingId(id);
     try {
       const res = await fetch(`/api/scripts/${id}/archive`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        method: "PATCH", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ archived: false }),
       });
       if (res.ok) {
         toast("success", "Script unarchived");
         handleArchive(id, false);
         setRefreshKey((k) => k + 1);
-      } else {
-        toast("error", "Failed to unarchive");
-      }
-    } catch {
-      toast("error", "Failed to unarchive");
-    } finally {
-      setUnarchivingId(null);
-    }
+      } else toast("error", "Failed to unarchive");
+    } catch { toast("error", "Failed to unarchive"); }
+    finally { setUnarchivingId(null); }
   }
 
   return (
@@ -223,38 +213,19 @@ function DashboardShellInner({
         {isSandbox && (
           <div className="flex items-center gap-2 px-6 py-2 bg-amber-500/10 border-b border-amber-500/20 text-xs text-amber-400">
             <AlertTriangle size={12} />
-            <span>
-              WhatsApp is in sandbox mode. Clients must text &quot;join&quot; followed by the sandbox word to +14155238886 before receiving messages. Email delivery has no such restriction.
-            </span>
+            <span>WhatsApp is in sandbox mode. Clients must text &quot;join&quot; followed by the sandbox word to +14155238886 before receiving messages.</span>
           </div>
         )}
 
         <header className="flex items-center justify-between h-14 px-6 border-b border-[var(--border)]">
           <div className="flex items-center gap-3">
             <h2 className="text-sm font-medium text-[var(--text)]">Dashboard</h2>
-            <div className="flex items-center gap-3 text-xs text-[var(--muted)] ml-2">
-              <span>
-                <span className="text-[var(--text)] font-medium">{inReview}</span> in review
-              </span>
-              {overdueCount > 0 && (
-                <span>
-                  <span className="text-[var(--text)] font-medium">{overdueCount}</span> overdue
-                </span>
-              )}
-            </div>
             <div className="flex items-center gap-1.5 ml-2">
               <div className={`w-1.5 h-1.5 rounded-full ${connected ? "bg-[var(--accent-success)] animate-pulse glow-primary" : "bg-red-400"}`} />
               <span className="text-[11px] text-[var(--muted)]">{connected ? "Live" : "Disconnected"}</span>
             </div>
             <button
-              onClick={() => {
-                if (archivedDrawerOpen) {
-                  setArchivedDrawerOpen(false);
-                } else {
-                  setClosedDrawerOpen(false);
-                  setArchivedDrawerOpen(true);
-                }
-              }}
+              onClick={() => { setClosedDrawerOpen(false); setArchivedDrawerOpen((v) => !v); }}
               className={`ml-3 text-[11px] px-2 py-0.5 rounded border transition-colors flex items-center gap-1.5 ${
                 archivedDrawerOpen
                   ? "border-[var(--muted)]/30 text-[var(--text)] bg-[var(--surface-elevated)]"
@@ -265,14 +236,7 @@ function DashboardShellInner({
               {archivedDrawerOpen ? "Hide archived" : `Archived (${archivedScripts.length})`}
             </button>
             <button
-              onClick={() => {
-                if (closedDrawerOpen) {
-                  setClosedDrawerOpen(false);
-                } else {
-                  setArchivedDrawerOpen(false);
-                  setClosedDrawerOpen(true);
-                }
-              }}
+              onClick={() => { setArchivedDrawerOpen(false); setClosedDrawerOpen((v) => !v); }}
               className={`text-[11px] px-2 py-0.5 rounded border transition-colors flex items-center gap-1.5 ${
                 closedDrawerOpen
                   ? "border-[var(--muted)]/30 text-[var(--text)] bg-[var(--surface-elevated)]"
@@ -304,13 +268,8 @@ function DashboardShellInner({
             </button>
             <RunAgentButton
               scripts={displayScripts.map((s) => ({
-                id: s.id,
-                title: s.title,
-                status: s.status,
-                sent_at: s.sent_at,
-                client_name: s.client.name,
-                due_date: s.due_date,
-                response_deadline_minutes: s.response_deadline_minutes,
+                id: s.id, title: s.title, status: s.status, sent_at: s.sent_at,
+                client_name: s.client.name, due_date: s.due_date, response_deadline_minutes: s.response_deadline_minutes,
               }))}
               mode="batch"
             />
@@ -318,9 +277,33 @@ function DashboardShellInner({
           </div>
         </header>
 
+        <StatsBar
+          active={stats.active}
+          inReview={stats.inReview}
+          overdue={stats.overdue}
+          approvedThisWeek={stats.approvedThisWeek}
+          avgResponseHours={stats.avgResponseHours}
+        />
+
+        <div className="flex items-center gap-2 px-6 py-3 border-b border-[var(--border)]">
+          <Search size={14} className="text-[var(--muted)]" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search scripts by title or client..."
+            className="flex-1 bg-transparent text-sm text-[var(--text)] placeholder:text-[var(--muted)] placeholder:opacity-50 outline-none"
+          />
+          {searchQuery && (
+            <button onClick={() => setSearchQuery("")} className="text-[var(--muted)] hover:text-[var(--text)]">
+              <X size={14} />
+            </button>
+          )}
+        </div>
+
         <div className="p-6 overflow-x-auto">
           <KanbanBoard
-            initialScripts={displayScripts}
+            initialScripts={searchedScripts}
             onConnectionChange={setConnected}
             refreshKey={refreshKey}
             onArchive={handleArchive}
@@ -328,21 +311,16 @@ function DashboardShellInner({
         </div>
       </main>
 
-      {/* Archived drawer */}
       <AnimatePresence>
         {archivedDrawerOpen && (
           <>
             <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm"
               onClick={() => setArchivedDrawerOpen(false)}
             />
             <motion.div
-              initial={{ x: "100%" }}
-              animate={{ x: 0 }}
-              exit={{ x: "100%" }}
+              initial={{ x: "100%" }} animate={{ x: 0 }} exit={{ x: "100%" }}
               transition={{ type: "spring", damping: 30, stiffness: 300 }}
               className="fixed right-0 top-0 h-screen w-full max-w-md z-50 bg-[var(--card)] border-l border-[var(--border)] flex flex-col"
             >
@@ -358,7 +336,6 @@ function DashboardShellInner({
                   <X size={16} />
                 </button>
               </div>
-
               <div className="flex-1 overflow-y-auto px-6 py-4">
                 {archivedScripts.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-16">
@@ -368,19 +345,14 @@ function DashboardShellInner({
                 ) : (
                   <div className="space-y-2">
                     {archivedScripts.map((script) => (
-                      <div
-                        key={script.id}
-                        className="p-4 rounded-lg bg-[var(--bg)] border border-[var(--border)]"
-                      >
+                      <div key={script.id} className="p-4 rounded-lg bg-[var(--bg)] border border-[var(--border)]">
                         <div className="flex items-start justify-between gap-2 mb-2">
                           <h3 className="text-sm font-medium text-[var(--text)] truncate">{script.title}</h3>
                           <StatusBadge status={script.status} />
                         </div>
                         <div className="flex items-center gap-2 text-xs text-[var(--muted)] mb-3">
                           <span>{script.client.name}</span>
-                          {script.client.company && (
-                            <span className="opacity-60">/ {script.client.company}</span>
-                          )}
+                          {script.client.company && <span className="opacity-60">/ {script.client.company}</span>}
                           {script.sent_at && (
                             <>
                               <span className="opacity-30">&middot;</span>
@@ -393,11 +365,7 @@ function DashboardShellInner({
                           disabled={unarchivingId === script.id}
                           className="flex items-center gap-1.5 px-3 py-1.5 rounded text-[11px] font-medium border border-[var(--border)] text-[var(--muted)] hover:text-[var(--text)] hover:bg-[var(--surface-elevated)] disabled:opacity-40"
                         >
-                          {unarchivingId === script.id ? (
-                            <Loader2 size={11} className="animate-spin" />
-                          ) : (
-                            <ArchiveRestore size={11} />
-                          )}
+                          {unarchivingId === script.id ? <Loader2 size={11} className="animate-spin" /> : <ArchiveRestore size={11} />}
                           Unarchive
                         </button>
                       </div>
@@ -410,21 +378,16 @@ function DashboardShellInner({
         )}
       </AnimatePresence>
 
-      {/* Closed drawer */}
       <AnimatePresence>
         {closedDrawerOpen && (
           <>
             <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm"
               onClick={() => setClosedDrawerOpen(false)}
             />
             <motion.div
-              initial={{ x: "100%" }}
-              animate={{ x: 0 }}
-              exit={{ x: "100%" }}
+              initial={{ x: "100%" }} animate={{ x: 0 }} exit={{ x: "100%" }}
               transition={{ type: "spring", damping: 30, stiffness: 300 }}
               className="fixed right-0 top-0 h-screen w-full max-w-md z-50 bg-[var(--card)] border-l border-[var(--border)] flex flex-col"
             >
@@ -440,7 +403,6 @@ function DashboardShellInner({
                   <X size={16} />
                 </button>
               </div>
-
               <div className="flex-1 overflow-y-auto px-6 py-4">
                 {closedScripts.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-16">
@@ -450,19 +412,14 @@ function DashboardShellInner({
                 ) : (
                   <div className="space-y-2">
                     {closedScripts.map((script) => (
-                      <div
-                        key={script.id}
-                        className="p-4 rounded-lg bg-[var(--bg)] border border-[var(--border)]"
-                      >
+                      <div key={script.id} className="p-4 rounded-lg bg-[var(--bg)] border border-[var(--border)]">
                         <div className="flex items-start justify-between gap-2 mb-2">
                           <h3 className="text-sm font-medium text-[var(--text)] truncate">{script.title}</h3>
                           <StatusBadge status={script.status} />
                         </div>
                         <div className="flex items-center gap-2 text-xs text-[var(--muted)] mb-3">
                           <span>{script.client.name}</span>
-                          {script.client.company && (
-                            <span className="opacity-60">/ {script.client.company}</span>
-                          )}
+                          {script.client.company && <span className="opacity-60">/ {script.client.company}</span>}
                           {script.sent_at && (
                             <>
                               <span className="opacity-30">&middot;</span>
@@ -475,11 +432,7 @@ function DashboardShellInner({
                           disabled={reopeningId === script.id}
                           className="flex items-center gap-1.5 px-3 py-1.5 rounded text-[11px] font-medium border border-[var(--border)] text-[var(--muted)] hover:text-[var(--text)] hover:bg-[var(--surface-elevated)] disabled:opacity-40"
                         >
-                          {reopeningId === script.id ? (
-                            <Loader2 size={11} className="animate-spin" />
-                          ) : (
-                            <RotateCcw size={11} />
-                          )}
+                          {reopeningId === script.id ? <Loader2 size={11} className="animate-spin" /> : <RotateCcw size={11} />}
                           Reopen
                         </button>
                       </div>
@@ -495,16 +448,12 @@ function DashboardShellInner({
       <AnimatePresence>
         {insightsOpen && themes.length > 0 && (
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             className="fixed inset-0 z-50 flex items-center justify-center p-4"
           >
             <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setInsightsOpen(false)} />
             <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
+              initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}
               className="relative w-full max-w-md bg-[var(--card)] border border-[var(--border)] rounded-xl overflow-hidden"
             >
               <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)]">

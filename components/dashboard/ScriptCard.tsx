@@ -2,7 +2,8 @@
 
 import { useState, useRef, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Clock, Calendar, AlertTriangle, MoreHorizontal, Bot, Archive, ArchiveRestore, XCircle, CheckCircle, Ban, RotateCcw, Loader2, MessageSquare } from "lucide-react";
+import { Clock, Calendar, AlertTriangle, MoreHorizontal, Bot, Archive, ArchiveRestore, XCircle, CheckCircle, Ban, RotateCcw, Loader2, MessageSquare, GripVertical } from "lucide-react";
+import type { DraggableProvidedDragHandleProps } from "@hello-pangea/dnd";
 import StatusBadge from "@/components/ui/StatusBadge";
 import { cn, formatTimeAgo, isOverdue, getScriptAge, getChaseCountdown } from "@/lib/utils";
 import type { ScriptWithClient, ScriptStatus } from "@/lib/supabase/types";
@@ -13,9 +14,11 @@ interface ScriptCardProps {
   onArchive?: (id: string, archived: boolean) => void;
   onStatusChange?: (id: string, status: ScriptStatus) => void;
   onRunAgent?: (script: { id: string; title: string; client_name: string; due_date: string | null }) => void;
+  dragHandleProps?: DraggableProvidedDragHandleProps | null;
+  disableLayoutAnimation?: boolean;
 }
 
-export default function ScriptCard({ script, onClick, onArchive, onStatusChange, onRunAgent }: ScriptCardProps) {
+export default function ScriptCard({ script, onClick, onArchive, onStatusChange, onRunAgent, dragHandleProps, disableLayoutAnimation }: ScriptCardProps) {
   const overdue = isOverdue(script.sent_at, script.status, script.response_deadline_minutes) || script.status === "overdue";
   const displayStatus = overdue ? "overdue" as const : script.status;
   const clientInitial = script.client.name.charAt(0).toUpperCase();
@@ -95,12 +98,12 @@ export default function ScriptCard({ script, onClick, onArchive, onStatusChange,
 
   return (
     <motion.div
-      layout
+      layout={!disableLayoutAnimation}
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: script.archived ? 0.5 : 1, y: 0 }}
       exit={{ opacity: 0, y: -8 }}
       transition={{ duration: 0.15 }}
-      whileHover={{ scale: 1.01, borderColor: "var(--accent-primary)" }}
+      whileHover={disableLayoutAnimation ? undefined : { scale: 1.01, borderColor: "var(--accent-primary)" }}
       onClick={onClick}
       className={cn(
         "p-4 rounded-lg bg-[var(--card)] border border-[var(--border)] cursor-pointer",
@@ -110,6 +113,11 @@ export default function ScriptCard({ script, onClick, onArchive, onStatusChange,
       )}
     >
       <div className="flex items-start justify-between gap-2 mb-3">
+        {dragHandleProps && (
+          <div {...dragHandleProps} className="mt-0.5 cursor-grab active:cursor-grabbing text-[var(--muted)] opacity-30 hover:opacity-70 shrink-0">
+            <GripVertical size={14} />
+          </div>
+        )}
         <div className="flex items-center gap-1.5 min-w-0">
           {overdue && isSevere && (
             <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse shrink-0" />

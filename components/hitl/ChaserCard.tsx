@@ -447,7 +447,7 @@ export default function ChaserCard({ chaser, memories, onActionComplete }: Chase
             <div className="grid grid-cols-2 gap-3 mb-3">
               <div className="flex flex-col">
                 <p className="text-[10px] uppercase text-[var(--muted)] opacity-50 mb-1">Previous</p>
-                <div className="flex-1 px-3 py-2.5 bg-[var(--input-bg)] border border-[var(--border)] rounded-lg text-xs text-[var(--text)] opacity-70 leading-relaxed whitespace-pre-wrap overflow-y-auto max-h-[300px]">
+                <div className="flex-1 px-3 py-2.5 bg-[var(--input-bg)] border border-[var(--border)] rounded-lg text-xs text-[var(--text)] opacity-70 leading-relaxed whitespace-pre-wrap overflow-y-auto max-h-[400px]">
                   {previousDraft}
                 </div>
                 <button
@@ -460,7 +460,7 @@ export default function ChaserCard({ chaser, memories, onActionComplete }: Chase
               </div>
               <div className="flex flex-col">
                 <p className="text-[10px] uppercase text-emerald-400 opacity-80 mb-1">New version</p>
-                <div className="flex-1 px-3 py-2.5 bg-[var(--input-bg)] border border-emerald-500/30 rounded-lg text-xs text-[var(--text)] opacity-80 leading-relaxed whitespace-pre-wrap overflow-y-auto max-h-[300px]">
+                <div className="flex-1 px-3 py-2.5 bg-[var(--input-bg)] border border-emerald-500/30 rounded-lg text-xs text-[var(--text)] opacity-80 leading-relaxed whitespace-pre-wrap overflow-y-auto max-h-[400px]">
                   {newDraft}
                 </div>
                 <button
@@ -476,8 +476,8 @@ export default function ChaserCard({ chaser, memories, onActionComplete }: Chase
             <textarea
               value={editedContent}
               onChange={(e) => handleEditChange(e.target.value)}
-              rows={8}
-              className="flex-1 w-full px-4 py-3 bg-[var(--input-bg)] border border-[var(--border)] rounded-lg text-sm text-[var(--text)] opacity-90 leading-relaxed focus:outline-none focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)] resize-y min-h-[180px]"
+              rows={12}
+              className="flex-1 w-full px-4 py-3 bg-[var(--input-bg)] border border-[var(--border)] rounded-lg text-sm text-[var(--text)] opacity-90 leading-relaxed focus:outline-none focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)] resize-y min-h-[280px]"
             />
           )}
 
