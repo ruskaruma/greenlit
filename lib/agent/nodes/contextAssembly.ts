@@ -1,4 +1,5 @@
 import { ChatPromptTemplate } from "@langchain/core/prompts";
+import { getFewShotExamples } from "../fewShot";
 import type { AgentState } from "../types";
 
 function formatReadableDate(iso: string): string {
@@ -77,12 +78,29 @@ ${contentPreview}
 This was sent ${state.hoursOverdue} hours ago with no response. Write a personalized follow-up that references something specific from the script content above.`;
 }
 
+function buildFewShotBlock(examples: { original_draft: string; edited_draft: string }[]): string {
+  if (examples.length === 0) return "";
+
+  const formatted = examples.map((ex, i) =>
+    `Example ${i + 1}:
+ORIGINAL (AI draft): ${ex.original_draft.slice(0, 300)}${ex.original_draft.length > 300 ? "..." : ""}
+PREFERRED (team lead edit): ${ex.edited_draft.slice(0, 300)}${ex.edited_draft.length > 300 ? "..." : ""}`
+  ).join("\n\n");
+
+  return `\n\nFEW-SHOT EXAMPLES — the team lead has previously edited drafts for this client. Match their preferred style:\n${formatted}\n`;
+}
+
 export async function assembleContext(state: AgentState): Promise<{
   prompt: ChatPromptTemplate;
   variables: Record<string, string>;
 }> {
+  // Fetch few-shot examples for this client
+  const examples = await getFewShotExamples(state.clientId, 3);
+  const fewShotBlock = buildFewShotBlock(examples);
+  const systemPrompt = buildSystemPrompt(state) + fewShotBlock;
+
   const prompt = ChatPromptTemplate.fromMessages([
-    ["system", buildSystemPrompt(state)],
+    ["system", systemPrompt],
     ["human", "{humanMessage}"],
   ]);
 

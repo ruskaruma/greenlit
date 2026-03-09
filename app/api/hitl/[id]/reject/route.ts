@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServiceClientDirect } from "@/lib/supabase/server";
 import { requireSession } from "@/lib/auth/requireSession";
+import { resumeChaserGraph } from "@/lib/agent/graph";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type SupabaseAny = any;
@@ -41,12 +42,18 @@ export async function POST(
     return NextResponse.json({ error: updateError.message }, { status: 500 });
   }
 
+  // Resume the LangGraph thread — rejected loops back to generation
+  const threadId = `chaser-${chaser.script_id}`;
+  resumeChaserGraph(threadId, "rejected").catch((err: unknown) =>
+    console.error("[hitl/reject] Graph resume failed (non-blocking):", err)
+  );
+
   await supabase.from("audit_log").insert({
     entity_type: "chaser",
     entity_id: id,
     action: "chaser_rejected",
     actor: "team_lead",
-    metadata: { script_id: chaser.script_id },
+    metadata: { script_id: chaser.script_id, thread_id: threadId },
   });
 
   return NextResponse.json({ success: true });

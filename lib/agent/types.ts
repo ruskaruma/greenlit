@@ -21,6 +21,9 @@ export interface AgentState {
   revisionCount: number;
   // Execution log (items 2-4)
   nodeExecutionLog: NodeLogEntry[];
+  // HITL interrupt/resume (set during graph execution, not required at init)
+  hitlAction?: string | null;
+  hitlEditedContent?: string | null;
 }
 
 export interface CritiqueScores {

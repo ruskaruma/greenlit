@@ -1,5 +1,6 @@
-import { StateGraph, Annotation, END, START } from "@langchain/langgraph";
+import { StateGraph, Annotation, END, START, interrupt, Command } from "@langchain/langgraph";
 import { createServiceClientDirect } from "@/lib/supabase/server";
+import { SupabaseCheckpointSaver } from "./checkpointer";
 import { monitorOverdueScripts } from "./nodes/monitor";
 import { retrieveClientMemories } from "./nodes/ragRetrieval";
 import { analyzeSentiment } from "./nodes/sentimentAnalysis";
@@ -36,6 +37,9 @@ const GraphState = Annotation.Root({
   critiqueScores: Annotation<CritiqueScores | null>(),
   revisionCount: Annotation<number>(),
   nodeExecutionLog: Annotation<NodeLogEntry[]>(),
+  // HITL interrupt/resume fields
+  hitlAction: Annotation<string | null>(),
+  hitlEditedContent: Annotation<string | null>(),
 });
 
 async function ragNode(state: typeof GraphState.State): Promise<Partial<typeof GraphState.State>> {
@@ -146,6 +150,81 @@ async function finalizeNode(state: typeof GraphState.State): Promise<Partial<typ
   return {};
 }
 
+/**
+ * HITL node — pauses the graph via interrupt().
+ * The team lead's action (approved/edited/rejected) is returned as the resume value.
+ * Graph state is serialized to Supabase via SupabaseCheckpointSaver.
+ */
+function hitlNode(state: typeof GraphState.State): Partial<typeof GraphState.State> {
+  addStreamEvent(state.scriptId, { node: "hitl", status: "started", timestamp: new Date().toISOString() });
+
+  // interrupt() pauses here. Resume value = { action, editedContent? }
+  const resume = interrupt({
+    chaserId: state.chaserId,
+    scriptId: state.scriptId,
+    clientId: state.clientId,
+    draftContent: state.generatedEmail,
+    emailSubject: state.emailSubject,
+    critiqueScores: state.critiqueScores,
+  });
+
+  const action = (resume as { action: string }).action;
+  const editedContent = (resume as { editedContent?: string }).editedContent ?? null;
+
+  addStreamEvent(state.scriptId, { node: "hitl", status: "completed", timestamp: new Date().toISOString(), data: { action } });
+
+  return {
+    hitlAction: action,
+    hitlEditedContent: editedContent,
+    // If edited, update the email content
+    ...(editedContent ? { generatedEmail: editedContent } : {}),
+  };
+}
+
+function routeAfterHitl(state: typeof GraphState.State): "delivery" | "generation" | typeof END {
+  if (state.hitlAction === "approved" || state.hitlAction === "edited") {
+    return "delivery";
+  }
+  if (state.hitlAction === "rejected") {
+    // Loop back to generation for a new draft
+    return "generation";
+  }
+  return END;
+}
+
+/**
+ * Delivery node — the graph proceeds here after HITL approval.
+ * Marks the chaser as approved/edited in DB. Actual email/WhatsApp send
+ * is still handled by the approve route for now (keeps delivery logic
+ * in one place with error handling + channel selection).
+ */
+async function deliveryNode(state: typeof GraphState.State): Promise<Partial<typeof GraphState.State>> {
+  if (!state.chaserId) return {};
+
+  const supabase: SupabaseAny = createServiceClientDirect();
+  const newStatus = state.hitlAction === "edited" ? "edited" : "approved";
+
+  const updatePayload: Record<string, unknown> = {
+    status: newStatus,
+  };
+
+  if (state.hitlEditedContent) {
+    updatePayload.draft_content = state.hitlEditedContent;
+    updatePayload.team_lead_edits = state.hitlEditedContent;
+  }
+
+  const { error } = await supabase.from("chasers").update(updatePayload).eq("id", state.chaserId);
+  if (error) {
+    console.error("[delivery] Failed to update chaser:", error.message);
+  }
+
+  addStreamEvent(state.scriptId, { node: "delivery", status: "completed", timestamp: new Date().toISOString(), data: { status: newStatus } });
+
+  return {};
+}
+
+const checkpointer = new SupabaseCheckpointSaver();
+
 const workflow = new StateGraph(GraphState)
   .addNode("ragRetrieval", ragNode)
   .addNode("sentimentAnalysis", sentimentNode)
@@ -153,14 +232,18 @@ const workflow = new StateGraph(GraphState)
   .addNode("selfCritique", critiqueNode)
   .addNode("revision", revisionNode)
   .addNode("finalize", finalizeNode)
+  .addNode("hitl", hitlNode)
+  .addNode("delivery", deliveryNode)
   .addEdge(START, "ragRetrieval")
   .addEdge("ragRetrieval", "sentimentAnalysis")
   .addEdge("sentimentAnalysis", "generation")
   .addEdge("generation", "selfCritique")
   .addConditionalEdges("selfCritique", routeAfterCritique)
   .addEdge("revision", "selfCritique")
-  .addEdge("finalize", END)
-  .compile();
+  .addEdge("finalize", "hitl")
+  .addConditionalEdges("hitl", routeAfterHitl)
+  .addEdge("delivery", END)
+  .compile({ checkpointer });
 
 function defaultState(): Partial<AgentState> {
   return {
@@ -172,10 +255,52 @@ function defaultState(): Partial<AgentState> {
   };
 }
 
+/**
+ * Run the chaser graph for a single script.
+ * The graph will pause at the HITL node (interrupt) and return.
+ * Thread ID = script ID so we can resume later.
+ */
 export async function runChaserForScript(initialState: AgentState): Promise<AgentState> {
-  const fullState = { ...defaultState(), ...initialState };
-  const result = await workflow.invoke(fullState);
+  const fullState = { ...defaultState(), ...initialState, hitlAction: null, hitlEditedContent: null };
+  const threadId = `chaser-${initialState.scriptId}`;
+
+  const config = {
+    configurable: { thread_id: threadId },
+  };
+
+  const result = await workflow.invoke(fullState, config);
   return result as AgentState;
+}
+
+/**
+ * Resume a paused graph after HITL decision.
+ * Called by the resume API route.
+ */
+export async function resumeChaserGraph(
+  threadId: string,
+  action: "approved" | "edited" | "rejected",
+  editedContent?: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const resumeValue = { action, editedContent: editedContent ?? null };
+
+    await workflow.invoke(new Command({ resume: resumeValue }), {
+      configurable: { thread_id: threadId },
+    });
+
+    return { success: true };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Resume failed";
+    console.error("[graph] Resume failed:", message);
+    return { success: false, error: message };
+  }
+}
+
+/**
+ * Get the current state of a paused graph thread.
+ */
+export async function getThreadState(threadId: string) {
+  return workflow.getState({ configurable: { thread_id: threadId } });
 }
 
 export async function runChaserAgent(): Promise<{ processed: number; errors: string[] }> {

@@ -4,6 +4,8 @@ import { requireSession } from "@/lib/auth/requireSession";
 import { sendChaserEmail } from "@/lib/resend/sendChaserEmail";
 import { sendChaserWhatsApp } from "@/lib/twilio/sendChaserWhatsApp";
 import { storeClientMemory, buildChaserSentMemory } from "@/lib/agent/nodes/memoryUpdate";
+import { resumeChaserGraph } from "@/lib/agent/graph";
+import { storeFewShotExample } from "@/lib/agent/fewShot";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type SupabaseAny = any;
@@ -160,6 +162,28 @@ export async function POST(
   if (updateError) {
     console.error("[hitl/approve] Chaser update failed:", updateError.message);
     return NextResponse.json({ error: updateError.message }, { status: 500 });
+  }
+
+  // Resume the LangGraph thread (best-effort — doesn't block approval)
+  const threadId = `chaser-${chaser.script_id}`;
+  resumeChaserGraph(
+    threadId,
+    wasEdited ? "edited" : "approved",
+    editedContent
+  ).catch((err: unknown) =>
+    console.error("[hitl/approve] Graph resume failed (non-blocking):", err)
+  );
+
+  // Store few-shot example if team lead edited
+  if (wasEdited && editedContent) {
+    storeFewShotExample({
+      clientId: chaser.client_id,
+      originalDraft: chaser.draft_content,
+      editedDraft: editedContent,
+      scriptTitle: chaser.scripts?.title ?? null,
+    }).catch((err: unknown) =>
+      console.error("[hitl/approve] Few-shot storage failed:", err)
+    );
   }
 
   // Reset script status to pending_review so client can re-review via the chaser's review link
