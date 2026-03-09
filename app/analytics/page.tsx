@@ -1,4 +1,5 @@
 import { createServiceClientDirect } from "@/lib/supabase/server";
+import AnalyticsPanel from "@/components/analytics/AnalyticsPanel";
 import ReportsPanel from "@/components/reports/ReportsPanel";
 import AppSidebar from "@/components/shared/AppSidebar";
 
@@ -44,16 +45,16 @@ export default async function AnalyticsPage() {
       <AppSidebar />
 
       <main className="flex-1 ml-[220px] min-h-screen">
-        <header className="flex items-center gap-4 px-6 py-4 border-b border-[var(--border)]">
-          <h1 className="text-lg font-semibold text-[var(--text)]">Analytics</h1>
+        <header className="flex items-center gap-4 px-6 h-14 border-b border-[var(--border)]">
+          <h1 className="text-sm font-medium text-[var(--text)]">Analytics</h1>
         </header>
 
-        {clients.length === 0 ? (
-          <div className="flex items-center justify-center h-[60vh]">
-            <p className="text-sm text-[var(--muted)]">No clients found. Add clients from the dashboard first.</p>
+        <AnalyticsPanel />
+
+        {clients.length > 0 && (
+          <div className="border-t border-[var(--border)]">
+            <ReportsPanel clients={clients} initialReports={reports} />
           </div>
-        ) : (
-          <ReportsPanel clients={clients} initialReports={reports} />
         )}
       </main>
     </div>

@@ -57,6 +57,20 @@ export default function HitlList({ initialChasers, memories }: HitlListProps) {
     [chasers, filter]
   );
 
+  function handleSelectNext() {
+    const idx = filtered.findIndex((c) => c.id === selectedId);
+    if (idx >= 0 && idx < filtered.length - 1) {
+      setSelectedId(filtered[idx + 1].id);
+    }
+  }
+
+  function handleSelectPrev() {
+    const idx = filtered.findIndex((c) => c.id === selectedId);
+    if (idx > 0) {
+      setSelectedId(filtered[idx - 1].id);
+    }
+  }
+
   function handleActionComplete(id: string) {
     setChasers((prev) => {
       const next = prev.filter((c) => c.id !== id);
@@ -161,6 +175,8 @@ export default function HitlList({ initialChasers, memories }: HitlListProps) {
               chaser={selected}
               memories={memories[selected.client_id] ?? []}
               onActionComplete={() => handleActionComplete(selected.id)}
+              onSelectNext={handleSelectNext}
+              onSelectPrev={handleSelectPrev}
             />
           ) : (
             <div className="flex items-center justify-center h-full">

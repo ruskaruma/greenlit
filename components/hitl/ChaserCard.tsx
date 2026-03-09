@@ -15,6 +15,8 @@ interface ChaserCardProps {
   chaser: ChaserData;
   memories: { content: string; memory_type: string; created_at: string }[];
   onActionComplete: () => void;
+  onSelectNext?: () => void;
+  onSelectPrev?: () => void;
 }
 
 const CHASER_SCORE_LABELS: Record<string, string> = {
@@ -71,7 +73,7 @@ function ScoreBar({ label, value }: { label: string; value: number }) {
   );
 }
 
-export default function ChaserCard({ chaser, memories, onActionComplete }: ChaserCardProps) {
+export default function ChaserCard({ chaser, memories, onActionComplete, onSelectNext, onSelectPrev }: ChaserCardProps) {
   const { id, script_id: scriptId, client, script, hitl_state: hitlState } = chaser;
   const [editedContent, setEditedContent] = useState(chaser.draft_content);
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
@@ -102,6 +104,9 @@ export default function ChaserCard({ chaser, memories, onActionComplete }: Chase
       ? client.preferred_channel as "email" | "whatsapp" | "both"
       : "email"
   );
+
+  const editTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const [showHints, setShowHints] = useState(true);
 
   const isSaved = chaser.status === "draft_saved";
   const hasEdits = editedContent !== chaser.draft_content;
@@ -290,6 +295,50 @@ export default function ChaserCard({ chaser, memories, onActionComplete }: Chase
     }
   }
 
+  // Keyboard shortcuts
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      const tag = (e.target as HTMLElement).tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+
+      switch (e.key.toLowerCase()) {
+        case "a":
+          e.preventDefault();
+          if (!loadingAction && !comparing && !pendingApprove) {
+            handleApprove();
+          }
+          break;
+        case "e":
+          e.preventDefault();
+          editTextareaRef.current?.focus();
+          break;
+        case "r":
+          e.preventDefault();
+          if (!loadingAction && !comparing && !pendingApprove) {
+            handleReject();
+          }
+          break;
+        case "n":
+          e.preventDefault();
+          onSelectNext?.();
+          break;
+        case "p":
+          e.preventDefault();
+          onSelectPrev?.();
+          break;
+        default:
+          return;
+      }
+
+      setShowHints(false);
+    }
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loadingAction, comparing, pendingApprove, onSelectNext, onSelectPrev]);
+
   if (result?.success) {
     return (
       <motion.div initial={{ opacity: 1 }} animate={{ opacity: 0.6 }} className="flex items-center justify-center h-full">
@@ -342,6 +391,15 @@ export default function ChaserCard({ chaser, memories, onActionComplete }: Chase
 
   return (
     <div className="flex flex-col h-full">
+      {/* Keyboard shortcut hints */}
+      {showHints && (
+        <div className="px-6 py-1.5 border-b border-[var(--border)] bg-[var(--surface-elevated)]/50">
+          <p className="text-[10px] text-[var(--muted)] opacity-50 text-center tracking-wide">
+            <kbd className="text-[var(--text)] opacity-60">A</kbd> approve · <kbd className="text-[var(--text)] opacity-60">E</kbd> edit · <kbd className="text-[var(--text)] opacity-60">R</kbd> reject · <kbd className="text-[var(--text)] opacity-60">N</kbd> next · <kbd className="text-[var(--text)] opacity-60">P</kbd> prev
+          </p>
+        </div>
+      )}
+
       {/* Top context bar */}
       <div className="px-6 py-3 border-b border-[var(--border)] bg-[var(--card)]">
         <div className="flex items-center gap-3 flex-wrap">
@@ -615,6 +673,7 @@ export default function ChaserCard({ chaser, memories, onActionComplete }: Chase
                   </div>
                 </div>
                 <textarea
+                  ref={editTextareaRef}
                   value={editedContent}
                   onChange={(e) => handleEditChange(e.target.value)}
                   rows={12}
