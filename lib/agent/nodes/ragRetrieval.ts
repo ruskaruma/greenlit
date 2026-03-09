@@ -10,11 +10,28 @@ const embeddings = new OpenAIEmbeddings({
   dimensions: 1536,
 });
 
+function buildContextualQuery(state: AgentState): string {
+  const parts = [`client ${state.clientName}`];
+
+  // Add context-specific terms based on situation
+  if (state.hoursOverdue > 168) {
+    parts.push("unresponsive repeated follow-up escalation");
+  } else if (state.hoursOverdue > 72) {
+    parts.push("slow response delay patterns");
+  } else {
+    parts.push("response behavior preferences");
+  }
+
+  parts.push(`script review feedback ${state.scriptTitle}`);
+
+  return parts.join(" ");
+}
+
 export async function retrieveClientMemories(state: AgentState): Promise<AgentState> {
   const supabase: SupabaseAny = createServiceClientDirect();
 
   try {
-    const query = `client ${state.clientName} approval behavior feedback patterns`;
+    const query = buildContextualQuery(state);
     const queryEmbedding = await embeddings.embedQuery(query);
 
     // pgvector cosine distance search
@@ -46,7 +63,22 @@ export async function retrieveClientMemories(state: AgentState): Promise<AgentSt
     };
   } catch (err) {
     console.error("[rag] Embedding generation failed:", err);
-    return { ...state, clientMemories: [] };
+    // Last resort: try plain text memories
+    try {
+      const { data: fallback } = await supabase
+        .from("client_memories")
+        .select("content")
+        .eq("client_id", state.clientId)
+        .order("created_at", { ascending: false })
+        .limit(3);
+
+      return {
+        ...state,
+        clientMemories: (fallback ?? []).map((m: { content: string }) => m.content),
+      };
+    } catch {
+      return { ...state, clientMemories: [] };
+    }
   }
 }
 

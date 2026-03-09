@@ -243,6 +243,7 @@ export default function KanbanBoard({ initialScripts, onConnectionChange, refres
             script={selectedScript}
             onClose={() => setSelectedScript(null)}
             onStatusChange={handleStatusChange}
+            onScriptUpdated={fetchScripts}
           />
         )}
       </AnimatePresence>

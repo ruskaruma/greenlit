@@ -4,12 +4,8 @@ import type { AgentState, NodeLogEntry } from "../types";
 const model = new ChatAnthropic({
   model: "claude-haiku-4-5-20251001",
   maxTokens: 500,
-  temperature: 0.7,
+  temperature: 0.5,
 });
-
-const systemPrompt = `You are revising a follow-up email draft based on critique feedback.
-Keep the same SUBJECT: / BODY: format. Keep the email under 150 words.
-Improve the draft based on the feedback while preserving the core message.`;
 
 export async function reviseEmail(state: AgentState): Promise<AgentState> {
   const start = Date.now();
@@ -18,12 +14,33 @@ export async function reviseEmail(state: AgentState): Promise<AgentState> {
     return state;
   }
 
+  const failedFeedback = state.critiqueScores.feedback ?? "Improve the overall quality.";
+
+  const systemPrompt = `You are revising a follow-up email that failed quality checks.
+
+IMPORTANT: Fix ONLY the specific issues listed below. Do NOT rewrite the entire email. Keep everything that already works.
+
+FAILED QUALITY CHECKS:
+${failedFeedback}
+
+RULES:
+- Keep the same SUBJECT: / BODY: format
+- Keep the email under 150 words
+- Do NOT add pleasantries, cliches, or filler
+- The script title is "${state.scriptTitle}"
+- The client name is "${state.clientName}"
+- It has been ${state.hoursOverdue} hours (${Math.round(state.hoursOverdue / 24)} days) since the script was sent
+- Target tone: ${state.toneRecommendation ?? "neutral"}
+- Sign off as "Scrollhouse Team"
+
+Fix the listed issues and output in SUBJECT: / BODY: format.`;
+
   try {
     const response = await model.invoke([
       { role: "system", content: systemPrompt },
       {
         role: "user",
-        content: `Original draft:\nSUBJECT: ${state.emailSubject}\nBODY: ${state.generatedEmail}\n\nCritique feedback: ${state.critiqueScores.feedback}\nScores - Professionalism: ${state.critiqueScores.professionalism}, Personalization: ${state.critiqueScores.personalization}, Clarity: ${state.critiqueScores.clarity}, Persuasiveness: ${state.critiqueScores.persuasiveness}\nTarget tone: ${state.toneRecommendation ?? "neutral"}\n\nRevise the email to address the feedback. Output in SUBJECT: / BODY: format.`,
+        content: `Current draft that needs fixing:\nSUBJECT: ${state.emailSubject}\nBODY: ${state.generatedEmail}`,
       },
     ]);
 
@@ -40,11 +57,16 @@ export async function reviseEmail(state: AgentState): Promise<AgentState> {
     const newSubject = subjectMatch?.[1]?.trim() ?? state.emailSubject;
     const newBody = bodyMatch?.[1]?.trim() ?? state.generatedEmail;
 
+    // Validate non-empty
+    if (!newBody || newBody.length < 20) {
+      throw new Error("Revision produced empty or too-short email");
+    }
+
     const entry: NodeLogEntry = {
       node: "revision",
       timestamp: new Date().toISOString(),
       durationMs: Date.now() - start,
-      summary: `Revision ${state.revisionCount + 1} applied`,
+      summary: `Revision ${state.revisionCount + 1} applied — fixing: ${failedFeedback.slice(0, 100)}`,
     };
 
     return {
@@ -66,8 +88,10 @@ export async function reviseEmail(state: AgentState): Promise<AgentState> {
       summary: `Error: ${message}`,
     };
 
+    // On failure, increment revision count to prevent infinite loops
     return {
       ...state,
+      revisionCount: state.revisionCount + 1,
       nodeExecutionLog: [...state.nodeExecutionLog, entry],
     };
   }

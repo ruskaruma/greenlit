@@ -113,7 +113,7 @@ export default function LandingPage() {
             >
               <Link href="/login">
                 <motion.span
-                  className="inline-block px-8 py-3.5 rounded-xl font-semibold text-base bg-[var(--accent-primary)] text-white cursor-pointer glow-primary"
+                  className="inline-block px-8 py-3.5 rounded-lg font-semibold text-base bg-[var(--accent-primary)] text-white cursor-pointer"
                   whileHover={{ scale: 1.03, y: -1 }}
                   whileTap={{ scale: 0.98 }}
                 >
@@ -150,7 +150,7 @@ export default function LandingPage() {
                 initial={{ opacity: 0, y: 15 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 1.3 + i * 0.08, duration: 0.4 }}
-                className="p-5 rounded-xl bg-[var(--card)] border border-[var(--border)]"
+                className="p-5 rounded-lg bg-[var(--card)] border border-[var(--border)]"
               >
                 <div className="w-9 h-9 rounded-lg border border-[var(--accent-primary)]/30 bg-[var(--accent-primary)]/5 flex items-center justify-center mb-4">
                   <f.icon size={18} className="text-[var(--accent-primary)]" />

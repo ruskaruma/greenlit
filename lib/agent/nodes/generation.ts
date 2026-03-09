@@ -23,8 +23,10 @@ function replacePlaceholders(text: string, state: AgentState): string {
 
   return text
     .replace(/\[date\]/gi, sentDate)
-    .replace(/\[DATE\]/g, dueDate)
-    .replace(/\[Your Name\]/gi, "Scrollhouse Team");
+    .replace(/\[due.?date\]/gi, dueDate)
+    .replace(/\[your\s*name\]/gi, "Scrollhouse Team")
+    .replace(/\[team\s*name\]/gi, "Scrollhouse Team")
+    .replace(/\[company\]/gi, "Scrollhouse");
 }
 
 function parseEmailResponse(text: string, state: AgentState): { subject: string; body: string } {
@@ -57,6 +59,12 @@ export async function generateChaser(state: AgentState): Promise<AgentState> {
           .join("");
 
     const { subject, body } = parseEmailResponse(responseText, state);
+
+    // Validate non-empty output
+    if (!body || body.length < 20) {
+      console.error("[generation] Generated email is empty or too short:", body?.length ?? 0);
+      return { ...state, error: "Generated email was empty or too short" };
+    }
 
     // Store draft in chasers table
     const { data: chaser, error: chaserError } = await supabase

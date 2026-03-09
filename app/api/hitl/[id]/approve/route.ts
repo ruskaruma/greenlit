@@ -162,6 +162,22 @@ export async function POST(
     return NextResponse.json({ error: updateError.message }, { status: 500 });
   }
 
+  // Reset script status to pending_review so client can re-review via the chaser's review link
+  if (!allDeliveryFailed) {
+    const { error: scriptResetError } = await supabase
+      .from("scripts")
+      .update({
+        status: "pending_review",
+        client_feedback: null,
+        reviewed_at: null,
+      })
+      .eq("id", chaser.script_id);
+
+    if (scriptResetError) {
+      console.error("[hitl/approve] Script status reset failed:", scriptResetError.message);
+    }
+  }
+
   await supabase.from("audit_log").insert({
     entity_type: "chaser",
     entity_id: id,

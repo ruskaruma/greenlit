@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { X, Clock, FileText, User, Calendar, ChevronRight, Loader2 } from "lucide-react";
+import { X, ChevronRight, Loader2, Pencil, Send, Save } from "lucide-react";
 import StatusBadge from "@/components/ui/StatusBadge";
 import { cn, formatTimeAgo, formatStatus } from "@/lib/utils";
 import { useToast } from "@/components/ui/ToastProvider";
@@ -20,12 +20,20 @@ interface ScriptDetailSheetProps {
   script: ScriptWithClient;
   onClose: () => void;
   onStatusChange: (scriptId: string, newStatus: ScriptStatus) => void;
+  onScriptUpdated?: () => void;
 }
 
-export default function ScriptDetailSheet({ script, onClose, onStatusChange }: ScriptDetailSheetProps) {
+export default function ScriptDetailSheet({ script, onClose, onStatusChange, onScriptUpdated }: ScriptDetailSheetProps) {
   const [showStatusMenu, setShowStatusMenu] = useState(false);
   const [changingStatus, setChangingStatus] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [editContent, setEditContent] = useState(script.content);
+  const [saving, setSaving] = useState(false);
+  const [sending, setSending] = useState(false);
   const { toast } = useToast();
+
+  const canResend = script.status === "changes_requested" || script.status === "rejected";
+  const canEdit = script.status !== "approved" && script.status !== "closed";
 
   async function handleStatusChange(newStatus: ScriptStatus) {
     if (newStatus === script.status) {
@@ -50,6 +58,96 @@ export default function ScriptDetailSheet({ script, onClose, onStatusChange }: S
     } finally {
       setChangingStatus(false);
       setShowStatusMenu(false);
+    }
+  }
+
+  async function handleSaveEdit() {
+    if (editContent === script.content) {
+      setEditing(false);
+      return;
+    }
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/scripts/${script.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: editContent }),
+      });
+      if (res.ok) {
+        toast("success", "Script content updated");
+        setEditing(false);
+        onScriptUpdated?.();
+      } else {
+        toast("error", "Failed to save changes");
+      }
+    } catch {
+      toast("error", "Failed to save changes");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleSendDraft() {
+    setSending(true);
+    try {
+      const res = await fetch(`/api/scripts/${script.id}/send`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          review_channel: script.client.preferred_channel || "email",
+        }),
+      });
+      if (res.ok) {
+        toast("success", "Script sent for review");
+        onStatusChange(script.id, "pending_review");
+        onScriptUpdated?.();
+      } else {
+        const data = await res.json();
+        toast("error", data.error || "Failed to send");
+      }
+    } catch {
+      toast("error", "Failed to send script");
+    } finally {
+      setSending(false);
+    }
+  }
+
+  async function handleResend() {
+    // Save any pending edits first
+    if (editing && editContent !== script.content) {
+      const saveRes = await fetch(`/api/scripts/${script.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: editContent }),
+      });
+      if (!saveRes.ok) {
+        toast("error", "Failed to save changes before resending");
+        return;
+      }
+    }
+
+    setSending(true);
+    try {
+      const res = await fetch(`/api/scripts/${script.id}/send`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          review_channel: script.client.preferred_channel || "email",
+        }),
+      });
+      if (res.ok) {
+        toast("success", "Script resent for review with a new link");
+        onStatusChange(script.id, "pending_review");
+        onScriptUpdated?.();
+        setEditing(false);
+      } else {
+        const data = await res.json();
+        toast("error", data.error || "Failed to resend");
+      }
+    } catch {
+      toast("error", "Failed to resend script");
+    } finally {
+      setSending(false);
     }
   }
 
@@ -116,6 +214,64 @@ export default function ScriptDetailSheet({ script, onClose, onStatusChange }: S
             )}
           </div>
 
+          {/* Resend banner for changes_requested / rejected */}
+          {canResend && (
+            <div className={cn(
+              "p-3 rounded-lg border",
+              script.status === "changes_requested"
+                ? "bg-orange-500/5 border-orange-500/20"
+                : "bg-red-500/5 border-red-500/20"
+            )}>
+              <p className="text-xs text-[var(--text)] font-medium mb-1">
+                {script.status === "changes_requested"
+                  ? "Client requested changes"
+                  : "Client rejected this script"}
+              </p>
+              <p className="text-[11px] text-[var(--muted)] mb-3">
+                Edit the script below, then resend for review. A new review link will be generated.
+              </p>
+              <div className="flex gap-2">
+                {!editing && (
+                  <button
+                    onClick={() => setEditing(true)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded text-[11px] font-medium border border-[var(--border)] text-[var(--muted)] hover:text-[var(--text)] hover:bg-[var(--surface-elevated)]"
+                  >
+                    <Pencil size={11} />
+                    Edit Script
+                  </button>
+                )}
+                <button
+                  onClick={handleResend}
+                  disabled={sending}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded text-[11px] font-semibold bg-[var(--accent-primary)] text-white hover:bg-[var(--accent-primary)]/90 disabled:opacity-50"
+                >
+                  {sending ? <Loader2 size={11} className="animate-spin" /> : <Send size={11} />}
+                  {sending ? "Sending..." : "Resend for Review"}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Send button for draft scripts */}
+          {script.status === "draft" && (
+            <div className="p-3 rounded-lg border bg-[var(--surface-elevated)] border-[var(--border)]">
+              <p className="text-xs text-[var(--text)] font-medium mb-1">
+                Ready to send?
+              </p>
+              <p className="text-[11px] text-[var(--muted)] mb-3">
+                Send this script to the client for review via {script.client.preferred_channel || "email"}.
+              </p>
+              <button
+                onClick={handleSendDraft}
+                disabled={sending}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded text-[11px] font-semibold bg-[var(--accent-primary)] text-white hover:bg-[var(--accent-primary)]/90 disabled:opacity-50"
+              >
+                {sending ? <Loader2 size={11} className="animate-spin" /> : <Send size={11} />}
+                {sending ? "Sending..." : "Send for Review"}
+              </button>
+            </div>
+          )}
+
           {/* Client info */}
           <div>
             <p className="text-[10px] uppercase tracking-widest text-[var(--muted)] opacity-50 mb-2">Client</p>
@@ -172,14 +328,104 @@ export default function ScriptDetailSheet({ script, onClose, onStatusChange }: S
             </div>
           )}
 
-          {/* Script content */}
-          <div>
-            <p className="text-[10px] uppercase tracking-widest text-[var(--muted)] opacity-50 mb-2">Script Content</p>
-            <div className="bg-[var(--input-bg)] border border-[var(--border)] rounded-lg px-4 py-3 max-h-[400px] overflow-y-auto">
-              <pre className="font-mono text-sm text-[var(--text)] opacity-80 whitespace-pre-wrap leading-relaxed">
-                {script.content}
-              </pre>
+          {/* Script Quality */}
+          {script.quality_score && (
+            <div>
+              <p className="text-[10px] uppercase tracking-widest text-[var(--muted)] opacity-50 mb-2">Script Quality</p>
+              <div className="grid grid-cols-2 gap-2">
+                {([
+                  ["hook_strength", "Hook"],
+                  ["cta_clarity", "CTA"],
+                  ["brand_alignment", "Brand"],
+                  ["platform_fit", "Platform"],
+                  ["pacing_structure", "Pacing"],
+                  ["tone_consistency", "Tone"],
+                ] as const).map(([key, label]) => {
+                  const val = (script.quality_score as Record<string, unknown>)?.[key];
+                  if (val == null) return null;
+                  const num = typeof val === "number" ? val : 0;
+                  return (
+                    <div key={key} className="flex items-center justify-between bg-[var(--input-bg)] border border-[var(--border)] rounded px-3 py-1.5">
+                      <span className="text-[11px] text-[var(--muted)]">{label}</span>
+                      <span className={cn("text-xs font-medium", num >= 8 ? "text-emerald-400" : num >= 5 ? "text-amber-400" : "text-red-400")}>
+                        {num}/10
+                      </span>
+                    </div>
+                  );
+                })}
+                <div className="flex items-center justify-between bg-[var(--input-bg)] border border-[var(--border)] rounded px-3 py-1.5 col-span-2">
+                  <span className="text-[11px] text-[var(--muted)]">Average</span>
+                  <span className={cn("text-xs font-semibold", script.quality_score.average >= 8 ? "text-emerald-400" : script.quality_score.average >= 5 ? "text-amber-400" : "text-red-400")}>
+                    {script.quality_score.average}/10
+                  </span>
+                </div>
+              </div>
+              {script.quality_score.feedback && (
+                <p className="text-[11px] text-[var(--muted)] opacity-70 italic mt-2">{script.quality_score.feedback}</p>
+              )}
+              {script.quality_score.strengths && script.quality_score.strengths.length > 0 && (
+                <div className="mt-2">
+                  {script.quality_score.strengths.map((s, i) => (
+                    <p key={i} className="text-[11px] text-emerald-400/80">+ {s}</p>
+                  ))}
+                </div>
+              )}
+              {script.quality_score.improvements && script.quality_score.improvements.length > 0 && (
+                <div className="mt-1">
+                  {script.quality_score.improvements.map((s, i) => (
+                    <p key={i} className="text-[11px] text-amber-400/80">- {s}</p>
+                  ))}
+                </div>
+              )}
             </div>
+          )}
+
+          {/* Script content — editable or read-only */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-[10px] uppercase tracking-widest text-[var(--muted)] opacity-50">Script Content</p>
+              {canEdit && !editing && (
+                <button
+                  onClick={() => setEditing(true)}
+                  className="flex items-center gap-1 text-[10px] text-[var(--muted)] hover:text-[var(--text)]"
+                >
+                  <Pencil size={10} />
+                  Edit
+                </button>
+              )}
+            </div>
+
+            {editing ? (
+              <div className="space-y-2">
+                <textarea
+                  value={editContent}
+                  onChange={(e) => setEditContent(e.target.value)}
+                  className="w-full bg-[var(--input-bg)] border border-[var(--accent-primary)]/30 rounded-lg px-4 py-3 font-mono text-sm text-[var(--text)] opacity-80 whitespace-pre-wrap leading-relaxed resize-y min-h-[300px] focus:outline-none focus:border-[var(--accent-primary)]"
+                />
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleSaveEdit}
+                    disabled={saving}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded text-[11px] font-medium bg-[var(--accent-primary)] text-white hover:bg-[var(--accent-primary)]/90 disabled:opacity-50"
+                  >
+                    {saving ? <Loader2 size={11} className="animate-spin" /> : <Save size={11} />}
+                    {saving ? "Saving..." : "Save Changes"}
+                  </button>
+                  <button
+                    onClick={() => { setEditing(false); setEditContent(script.content); }}
+                    className="px-3 py-1.5 rounded text-[11px] text-[var(--muted)] hover:text-[var(--text)] border border-[var(--border)]"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-[var(--input-bg)] border border-[var(--border)] rounded-lg px-4 py-3 max-h-[400px] overflow-y-auto">
+                <pre className="font-mono text-sm text-[var(--text)] opacity-80 whitespace-pre-wrap leading-relaxed">
+                  {script.content}
+                </pre>
+              </div>
+            )}
           </div>
         </div>
       </motion.div>

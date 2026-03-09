@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  LayoutDashboard, Shield, BarChart3, UserPlus,
+  LayoutDashboard, Shield, BarChart3, UserPlus, FileText,
   ChevronLeft, ChevronRight, Plus, MoreHorizontal, Trash2, Pencil,
   Mail, Phone, Eye,
 } from "lucide-react";
@@ -24,6 +24,7 @@ interface SidebarProps {
 
 const navItems = [
   { href: "/onboarding", label: "Onboarding", icon: UserPlus },
+  { href: "/briefs", label: "Briefs", icon: FileText },
   { href: "/dashboard", label: "Content Approval", icon: LayoutDashboard },
   { href: "/hitl", label: "HITL", icon: Shield },
   { href: "/analytics", label: "Analytics", icon: BarChart3 },
@@ -171,6 +172,7 @@ function ClientRow({
   onDelete: () => void;
 }) {
   const menuRef = useRef<HTMLDivElement>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   useEffect(() => {
     if (!isMenuOpen) return;
@@ -223,13 +225,39 @@ function ClientRow({
             View details
           </Link>
           <button
-            onClick={onDelete}
+            onClick={() => { onMenuToggle(); setConfirmDelete(true); }}
             className="flex items-center gap-2 px-3 py-1.5 text-[11px] text-red-400 hover:bg-[var(--surface-elevated)] w-full text-left"
           >
             <Trash2 size={11} />
             Delete client
           </button>
         </div>
+      )}
+
+      {confirmDelete && (
+        <>
+          <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm" onClick={() => setConfirmDelete(false)} />
+          <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-full max-w-sm bg-[var(--card)] border border-[var(--border)] rounded-lg p-5 shadow-xl">
+            <h3 className="text-sm font-semibold text-[var(--text)] mb-2">Delete {client.name}?</h3>
+            <p className="text-xs text-[var(--muted)] mb-5 leading-relaxed">
+              This permanently removes all scripts, chasers and data for this client. This action cannot be undone.
+            </p>
+            <div className="flex items-center justify-end gap-2">
+              <button
+                onClick={() => setConfirmDelete(false)}
+                className="px-3 py-1.5 rounded text-xs font-medium border border-[var(--border)] text-[var(--muted)] hover:bg-[var(--surface-elevated)]"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => { setConfirmDelete(false); onDelete(); }}
+                className="px-3 py-1.5 rounded text-xs font-medium bg-red-500 text-white hover:bg-red-600"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </>
       )}
     </div>
   );

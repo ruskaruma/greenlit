@@ -94,7 +94,27 @@ export async function GET(request: Request) {
     }
 
     // Full mode: queue agent runs instead of running inline
-    const queueRows = scriptIds.map((id: string) => ({
+    // Filter out scripts that already have a queued entry to prevent duplicates
+    const { data: alreadyQueued } = await supabase
+      .from("agent_queue")
+      .select("script_id")
+      .in("script_id", scriptIds)
+      .eq("status", "queued");
+
+    const alreadyQueuedIds = new Set((alreadyQueued ?? []).map((r: { script_id: string }) => r.script_id));
+    const newScriptIds = scriptIds.filter((id: string) => !alreadyQueuedIds.has(id));
+
+    if (newScriptIds.length === 0) {
+      return NextResponse.json({
+        updated: scriptIds.length,
+        scriptIds,
+        mode: "full",
+        queued: 0,
+        skipped: scriptIds.length,
+      });
+    }
+
+    const queueRows = newScriptIds.map((id: string) => ({
       script_id: id,
       status: "queued",
     }));
@@ -108,13 +128,13 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: queueError.message }, { status: 500 });
     }
 
-    console.log(`[agent/run] Queued ${scriptIds.length} scripts for agent processing`);
+    console.log(`[agent/run] Queued ${newScriptIds.length} scripts for agent processing (${alreadyQueuedIds.size} already queued)`);
 
     return NextResponse.json({
       updated: scriptIds.length,
       scriptIds,
       mode: "full",
-      queued: scriptIds.length,
+      queued: newScriptIds.length,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Agent run failed";

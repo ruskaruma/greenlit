@@ -642,7 +642,7 @@ export default function ReportsPanel({ clients, initialReports }: ReportsPanelPr
                         const prev = viewingReport.previous_aggregate?.overall?.[key];
                         const change = prev !== undefined ? calcChange(value, prev) : null;
                         return (
-                          <div key={key} className="bg-[var(--card)] border border-[var(--border)] rounded-xl p-4">
+                          <div key={key} className="bg-[var(--card)] border border-[var(--border)] rounded-lg p-4">
                             <div className="flex items-center gap-2 mb-2">
                               <IconComp size={13} className="text-[var(--muted)]" />
                               <span className="text-[10px] uppercase tracking-wider text-[var(--muted)] opacity-60">{fmtLabel(key)}</span>
@@ -668,7 +668,7 @@ export default function ReportsPanel({ clients, initialReports }: ReportsPanelPr
                   {viewingReport.entries.map((entry, i) => {
                     const topMetrics = Object.entries(entry.metrics).slice(0, 4);
                     return (
-                      <div key={i} className="bg-[var(--card)] border border-[var(--border)] rounded-xl p-4">
+                      <div key={i} className="bg-[var(--card)] border border-[var(--border)] rounded-lg p-4">
                         <div className="flex items-center justify-between gap-3">
                           <div className="min-w-0">
                             <div className="flex items-center gap-2">
@@ -701,20 +701,20 @@ export default function ReportsPanel({ clients, initialReports }: ReportsPanelPr
               </div>
 
               {/* Generated Sections */}
-              <div className="bg-[var(--card)] border border-[var(--border)] rounded-xl p-5">
+              <div className="bg-[var(--card)] border border-[var(--border)] rounded-lg p-5">
                 <p className="text-[10px] uppercase tracking-widest text-[var(--accent-primary)] mb-3 font-semibold">Performance Overview</p>
                 <p className="text-sm text-[var(--text)] leading-relaxed whitespace-pre-wrap">{generatedOutput.overview}</p>
               </div>
 
               {generatedOutput.comparison && (
-                <div className="bg-[var(--card)] border border-[var(--border)] rounded-xl p-5">
+                <div className="bg-[var(--card)] border border-[var(--border)] rounded-lg p-5">
                   <p className="text-[10px] uppercase tracking-widest text-[var(--accent-primary)] mb-3 font-semibold">Period Comparison</p>
                   <p className="text-sm text-[var(--text)] leading-relaxed whitespace-pre-wrap">{generatedOutput.comparison}</p>
                 </div>
               )}
 
               {generatedOutput.recommendations && (
-                <div className="bg-[var(--card)] border border-[var(--border)] rounded-xl p-5">
+                <div className="bg-[var(--card)] border border-[var(--border)] rounded-lg p-5">
                   <p className="text-[10px] uppercase tracking-widest text-[var(--accent-primary)] mb-3 font-semibold">Recommendations</p>
                   <p className="text-sm text-[var(--text)] leading-relaxed whitespace-pre-wrap">{generatedOutput.recommendations}</p>
                 </div>
@@ -729,7 +729,7 @@ export default function ReportsPanel({ clients, initialReports }: ReportsPanelPr
                     "flex items-center gap-2 px-5 py-2.5 rounded-lg text-xs font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed",
                     viewingReport.sent_at
                       ? "bg-[var(--surface-elevated)] text-[var(--muted)] border border-[var(--border)]"
-                      : "bg-[var(--accent-primary)] text-white hover:bg-[var(--accent-primary)]/90 glow-primary"
+                      : "bg-[var(--accent-primary)] text-white hover:bg-[var(--accent-primary)]/90"
                   )}
                 >
                   {sending ? <Loader2 size={12} className="animate-spin" /> : viewingReport.sent_at ? <CheckCircle2 size={12} /> : <Send size={12} />}
@@ -809,7 +809,7 @@ export default function ReportsPanel({ clients, initialReports }: ReportsPanelPr
                     return (
                       <div
                         key={entry.id}
-                        className="bg-[var(--card)] border border-[var(--border)] rounded-xl overflow-hidden"
+                        className="bg-[var(--card)] border border-[var(--border)] rounded-lg overflow-hidden"
                       >
                         {/* Entry Header */}
                         <div className="flex items-center gap-3 px-4 py-3 border-b border-[var(--border)]">
@@ -936,7 +936,7 @@ export default function ReportsPanel({ clients, initialReports }: ReportsPanelPr
                 {/* Add another */}
                 <button
                   onClick={addEntry}
-                  className="w-full mt-3 flex items-center justify-center gap-2 py-3 rounded-xl border border-dashed border-[var(--border)] text-xs text-[var(--muted)] hover:text-[var(--text)] hover:border-[var(--accent-primary)]/30 transition-colors"
+                  className="w-full mt-3 flex items-center justify-center gap-2 py-3 rounded-lg border border-dashed border-[var(--border)] text-xs text-[var(--muted)] hover:text-[var(--text)] hover:border-[var(--accent-primary)]/30 transition-colors"
                 >
                   <Plus size={13} />
                   Add another content entry
@@ -948,7 +948,7 @@ export default function ReportsPanel({ clients, initialReports }: ReportsPanelPr
                 <button
                   onClick={handleGenerate}
                   disabled={saving || generating || !reportTitle.trim() || !periodStart || !periodEnd}
-                  className="flex items-center gap-2 px-6 py-3 rounded-lg text-sm font-bold bg-[var(--accent-primary)] text-white hover:bg-[var(--accent-primary)]/90 glow-primary transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="flex items-center gap-2 px-6 py-3 rounded-lg text-sm font-bold bg-[var(--accent-primary)] text-white hover:bg-[var(--accent-primary)]/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   {saving ? (
                     <><Loader2 size={14} className="animate-spin" /> Saving...</>
@@ -987,7 +987,7 @@ export default function ReportsPanel({ clients, initialReports }: ReportsPanelPr
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 10 }}
               onClick={(e) => e.stopPropagation()}
-              className="bg-[var(--card)] border border-[var(--border)] rounded-xl p-6 w-full max-w-md mx-4 shadow-2xl"
+              className="bg-[var(--card)] border border-[var(--border)] rounded-lg p-6 w-full max-w-md mx-4 shadow-2xl"
             >
               <p className="text-[10px] uppercase tracking-widest text-[var(--accent-primary)] font-semibold mb-4">Confirm Send</p>
               <p className="text-sm text-[var(--text)] leading-relaxed mb-4">
@@ -1013,7 +1013,7 @@ export default function ReportsPanel({ clients, initialReports }: ReportsPanelPr
                 </button>
                 <button
                   onClick={handleConfirmSend}
-                  className="flex items-center gap-2 px-5 py-2 rounded-lg text-xs font-bold bg-[var(--accent-primary)] text-white hover:bg-[var(--accent-primary)]/90 glow-primary transition-colors"
+                  className="flex items-center gap-2 px-5 py-2 rounded-lg text-xs font-bold bg-[var(--accent-primary)] text-white hover:bg-[var(--accent-primary)]/90 transition-colors"
                 >
                   <Send size={12} />
                   Confirm Send

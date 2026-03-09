@@ -7,14 +7,30 @@ const model = new ChatAnthropic({
   temperature: 0,
 });
 
+const VALID_TONES = ["gentle", "neutral", "firm", "urgent"] as const;
+
 const systemPrompt = `You analyze client follow-up situations and recommend an email tone.
 Given the context, output EXACTLY this JSON format (no markdown):
 {"urgencyScore": <1-10>, "toneRecommendation": "<one of: gentle, neutral, firm, urgent>"}
 
 Scoring guide:
-- 1-3: Low urgency (just overdue, new client, no history of ignoring)
-- 4-6: Medium urgency (significantly overdue, or has ignored before)
-- 7-10: High urgency (very overdue, repeated non-response, deadline-sensitive)`;
+- 1-3: Low urgency (just overdue, new client, no history of ignoring). Use "gentle".
+- 4-6: Medium urgency (significantly overdue, or has ignored before). Use "neutral" or "firm".
+- 7-10: High urgency (very overdue, repeated non-response, deadline-sensitive). Use "firm" or "urgent".
+
+IMPORTANT: Match the tone to the urgency. Do NOT recommend "gentle" for high urgency situations.`;
+
+function clamp(val: unknown, min: number, max: number): number {
+  const num = typeof val === "number" && !isNaN(val) ? val : min;
+  return Math.max(min, Math.min(max, num));
+}
+
+function validateTone(val: unknown): string {
+  if (typeof val === "string" && VALID_TONES.includes(val as typeof VALID_TONES[number])) {
+    return val;
+  }
+  return "neutral";
+}
 
 export async function analyzeSentiment(state: AgentState): Promise<AgentState> {
   const start = Date.now();
@@ -41,34 +57,41 @@ export async function analyzeSentiment(state: AgentState): Promise<AgentState> {
 
     const parsed = JSON.parse(text.replace(/```[\w]*\n?/g, '').replace(/\n?```/g, '').trim());
 
+    const urgencyScore = clamp(parsed.urgencyScore, 1, 10);
+    const toneRecommendation = validateTone(parsed.toneRecommendation);
+
     const entry: NodeLogEntry = {
       node: "sentimentAnalysis",
       timestamp: new Date().toISOString(),
       durationMs: Date.now() - start,
-      summary: `Urgency: ${parsed.urgencyScore}/10, Tone: ${parsed.toneRecommendation}`,
+      summary: `Urgency: ${urgencyScore}/10, Tone: ${toneRecommendation}`,
     };
 
     return {
       ...state,
-      urgencyScore: parsed.urgencyScore,
-      toneRecommendation: parsed.toneRecommendation,
+      urgencyScore,
+      toneRecommendation,
       nodeExecutionLog: [...state.nodeExecutionLog, entry],
     };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Sentiment analysis failed";
     console.error("[sentimentAnalysis]", message);
 
+    // Derive fallback from hours overdue instead of hardcoding neutral
+    const fallbackUrgency = state.hoursOverdue > 168 ? 8 : state.hoursOverdue > 72 ? 6 : state.hoursOverdue > 24 ? 4 : 2;
+    const fallbackTone = fallbackUrgency >= 7 ? "firm" : fallbackUrgency >= 4 ? "neutral" : "gentle";
+
     const entry: NodeLogEntry = {
       node: "sentimentAnalysis",
       timestamp: new Date().toISOString(),
       durationMs: Date.now() - start,
-      summary: `Error: ${message}`,
+      summary: `Error: ${message} — using fallback urgency ${fallbackUrgency}, tone ${fallbackTone}`,
     };
 
     return {
       ...state,
-      urgencyScore: 5,
-      toneRecommendation: "neutral",
+      urgencyScore: fallbackUrgency,
+      toneRecommendation: fallbackTone,
       nodeExecutionLog: [...state.nodeExecutionLog, entry],
     };
   }

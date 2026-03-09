@@ -1,10 +1,14 @@
 import { NextResponse } from "next/server";
 import { createServiceClientDirect } from "@/lib/supabase/server";
+import { requireSession } from "@/lib/auth/requireSession";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type SupabaseAny = any;
 
 export async function GET() {
+  const { error: authError } = await requireSession();
+  if (authError) return authError;
+
   const supabase: SupabaseAny = createServiceClientDirect();
 
   const { count, error } = await supabase

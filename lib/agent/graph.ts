@@ -13,7 +13,8 @@ import type { AgentState, CritiqueScores, NodeLogEntry } from "./types";
 type SupabaseAny = any;
 
 const MAX_REVISIONS = 2;
-const MIN_AVG_SCORE = 7;
+// With binary criteria (10 checks), 8/10 = 80% pass rate required
+const MIN_PASS_RATE = 8; // minimum average score out of 10
 
 const GraphState = Annotation.Root({
   scriptId: Annotation<string>(),
@@ -94,7 +95,7 @@ async function revisionNode(state: typeof GraphState.State): Promise<Partial<typ
 function routeAfterCritique(state: typeof GraphState.State): "revision" | "finalize" {
   if (
     state.critiqueScores &&
-    state.critiqueScores.average < MIN_AVG_SCORE &&
+    state.critiqueScores.average < MIN_PASS_RATE &&
     state.revisionCount < MAX_REVISIONS
   ) {
     return "revision";
@@ -109,12 +110,21 @@ async function finalizeNode(state: typeof GraphState.State): Promise<Partial<typ
 
   const updatePayload: Record<string, unknown> = {};
 
-  if (state.critiqueScores) {
-    updatePayload.hitl_state = {
-      email_subject: state.emailSubject,
-      client_email: state.clientEmail,
-      hours_overdue: state.hoursOverdue,
-      memories_used: state.clientMemories.length,
+  // Always save the latest draft content
+  if (state.generatedEmail) {
+    updatePayload.draft_content = state.generatedEmail;
+  }
+
+  // Build comprehensive hitl_state with all context
+  updatePayload.hitl_state = {
+    email_subject: state.emailSubject,
+    client_email: state.clientEmail,
+    hours_overdue: state.hoursOverdue,
+    memories_used: state.clientMemories.length,
+    tone_recommendation: state.toneRecommendation ?? "neutral",
+    urgency_score: state.urgencyScore,
+    revision_count: state.revisionCount,
+    ...(state.critiqueScores ? {
       critique_scores: {
         professionalism: state.critiqueScores.professionalism,
         personalization: state.critiqueScores.personalization,
@@ -122,15 +132,15 @@ async function finalizeNode(state: typeof GraphState.State): Promise<Partial<typ
         persuasiveness: state.critiqueScores.persuasiveness,
         average: state.critiqueScores.average,
       },
-    };
-  }
-
-  if (state.revisionCount > 0 && state.generatedEmail) {
-    updatePayload.draft_content = state.generatedEmail;
-  }
+      critique_feedback: state.critiqueScores.feedback,
+    } : {}),
+  };
 
   if (Object.keys(updatePayload).length > 0) {
-    await supabase.from("chasers").update(updatePayload).eq("id", state.chaserId);
+    const { error } = await supabase.from("chasers").update(updatePayload).eq("id", state.chaserId);
+    if (error) {
+      console.error("[finalize] Failed to update chaser:", error.message);
+    }
   }
 
   return {};

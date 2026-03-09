@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useCallback, useEffect, useMemo } from "react";
-import { Loader2, AlertTriangle, Search, X, Lightbulb, Archive, ArchiveRestore, XCircle, RotateCcw } from "lucide-react";
+import { Loader2, AlertTriangle, Search, X, Lightbulb, Archive, ArchiveRestore, XCircle, RotateCcw, UserPlus, FileText, Upload } from "lucide-react";
+import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import Sidebar from "./Sidebar";
 import KanbanBoard from "./KanbanBoard";
@@ -226,11 +227,57 @@ function DashboardShellInner({
           </div>
         )}
 
+        {clients.length === 0 && localScripts.length === 0 ? (
+          <div className="flex items-center justify-center min-h-[80vh]">
+            <div className="max-w-lg w-full px-6">
+              <h2 className="text-lg font-semibold text-[var(--text)] mb-1 text-center">Get started</h2>
+              <p className="text-xs text-[var(--muted)] mb-8 text-center">Set up your first client, create a brief, then upload scripts.</p>
+              <div className="grid gap-4">
+                <Link
+                  href="/onboarding"
+                  className="flex items-center gap-4 p-4 rounded-lg border border-[var(--border)] bg-[var(--card)] hover:bg-[var(--surface-elevated)] transition-colors group"
+                >
+                  <div className="w-10 h-10 rounded-lg bg-[var(--surface-elevated)] border border-[var(--border)] flex items-center justify-center shrink-0 group-hover:border-[var(--accent-primary)]/40">
+                    <UserPlus size={18} className="text-[var(--accent-primary)]" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-[var(--text)]">Onboard your first client</p>
+                    <p className="text-[11px] text-[var(--muted)] mt-0.5">Add client details, brand voice, and contact preferences</p>
+                  </div>
+                </Link>
+                <Link
+                  href="/briefs"
+                  className="flex items-center gap-4 p-4 rounded-lg border border-[var(--border)] bg-[var(--card)] hover:bg-[var(--surface-elevated)] transition-colors group"
+                >
+                  <div className="w-10 h-10 rounded-lg bg-[var(--surface-elevated)] border border-[var(--border)] flex items-center justify-center shrink-0 group-hover:border-[var(--accent-primary)]/40">
+                    <FileText size={18} className="text-[var(--accent-primary)]" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-[var(--text)]">Create a content brief</p>
+                    <p className="text-[11px] text-[var(--muted)] mt-0.5">Define deliverables, deadlines, and platform requirements</p>
+                  </div>
+                </Link>
+                <div
+                  className="flex items-center gap-4 p-4 rounded-lg border border-[var(--border)] bg-[var(--card)] opacity-40 cursor-not-allowed"
+                >
+                  <div className="w-10 h-10 rounded-lg bg-[var(--surface-elevated)] border border-[var(--border)] flex items-center justify-center shrink-0">
+                    <Upload size={18} className="text-[var(--muted)]" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-[var(--text)]">Upload a script</p>
+                    <p className="text-[11px] text-[var(--muted)] mt-0.5">Onboard a client first, then upload scripts for review</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : (
+        <>
         <header className="flex items-center justify-between h-14 px-6 border-b border-[var(--border)]">
           <div className="flex items-center gap-3">
             <h2 className="text-sm font-medium text-[var(--text)]">Dashboard</h2>
             <div className="flex items-center gap-1.5 ml-2">
-              <div className={`w-1.5 h-1.5 rounded-full ${connected ? "bg-[var(--accent-success)] animate-pulse glow-primary" : "bg-red-400"}`} />
+              <div className={`w-1.5 h-1.5 rounded-full ${connected ? "bg-[var(--accent-success)]" : "bg-red-400"}`} />
               <span className="text-[11px] text-[var(--muted)]">{connected ? "Live" : "Disconnected"}</span>
             </div>
             <button
@@ -318,6 +365,8 @@ function DashboardShellInner({
             onArchive={handleArchive}
           />
         </div>
+        </>
+        )}
       </main>
 
       <AnimatePresence>
@@ -463,7 +512,7 @@ function DashboardShellInner({
             <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setInsightsOpen(false)} />
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}
-              className="relative w-full max-w-md bg-[var(--card)] border border-[var(--border)] rounded-xl overflow-hidden"
+              className="relative w-full max-w-md bg-[var(--card)] border border-[var(--border)] rounded-lg overflow-hidden"
             >
               <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)]">
                 <div className="flex items-center gap-2">

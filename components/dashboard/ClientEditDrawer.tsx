@@ -272,7 +272,7 @@ export default function ClientEditDrawer({ clientId, onClose, onSaved }: ClientE
           <button
             onClick={handleSave}
             disabled={saving || loading}
-            className="w-full flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg text-xs font-bold bg-[var(--accent-primary)] text-white hover:bg-[var(--accent-primary)]/90 glow-primary transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            className="w-full flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg text-xs font-bold bg-[var(--accent-primary)] text-white hover:bg-[var(--accent-primary)]/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
             {saving ? "Saving..." : "Save Changes"}

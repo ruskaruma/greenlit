@@ -147,6 +147,11 @@ export default function ScriptCard({ script, onClick, onArchive, onStatusChange,
           <span className="text-[9px] font-medium px-1 py-0.5 rounded bg-[var(--surface-elevated)] border border-[var(--border)] text-[var(--muted)]">
             v{script.version}
           </span>
+          {script.brief_id && (
+            <span className="text-[9px] font-medium px-1 py-0.5 rounded bg-purple-500/10 border border-purple-500/20 text-purple-400">
+              From brief
+            </span>
+          )}
           <StatusBadge status={displayStatus} />
           <div className="relative" ref={menuRef}>
             {loading ? (
@@ -215,7 +220,7 @@ export default function ScriptCard({ script, onClick, onArchive, onStatusChange,
         </div>
       )}
 
-      {script.client_feedback && (script.status === "changes_requested" || script.status === "rejected") && (
+      {script.client_feedback && (script.status === "changes_requested" || script.status === "rejected" || script.status === "approved") && (
         <div className="flex items-start gap-1.5 text-[11px] mt-1.5">
           <MessageSquare size={10} className="text-amber-400 opacity-70 mt-0.5 shrink-0" />
           <span className="text-[var(--muted)] opacity-80 leading-relaxed line-clamp-2">

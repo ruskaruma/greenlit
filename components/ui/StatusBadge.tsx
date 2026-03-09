@@ -28,7 +28,7 @@ export default function StatusBadge({ status, className }: StatusBadgeProps) {
     <Badge
       variant={config.variant}
       size="xs"
-      className={cn(isOverdueStatus && "animate-pulse-subtle", className)}
+      className={cn(className)}
     >
       {config.dotColor && (
         <BadgeDot className={config.dotColor} />

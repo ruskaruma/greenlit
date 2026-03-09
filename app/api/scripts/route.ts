@@ -32,13 +32,14 @@ export async function POST(request: Request) {
   const supabase: SupabaseAny = createServiceClientDirect();
   const body = await request.json();
 
-  const { title, content, client_id, due_date, review_channel, response_deadline_minutes } = body as {
+  const { title, content, client_id, due_date, review_channel, response_deadline_minutes, platform } = body as {
     title: string;
     content: string;
     client_id: string;
     due_date?: string;
     review_channel?: string;
     response_deadline_minutes?: number;
+    platform?: string;
   };
 
   if (!title || !client_id) {
@@ -110,6 +111,7 @@ export async function POST(request: Request) {
     qualityScore = await scoreScript({
       content,
       clientId: client_id,
+      platform,
       supabase,
     });
 

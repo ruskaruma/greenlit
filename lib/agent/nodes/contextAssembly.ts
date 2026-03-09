@@ -6,47 +6,53 @@ function formatReadableDate(iso: string): string {
   return d.toLocaleDateString("en-US", { month: "long", day: "numeric" });
 }
 
+function buildToneInstructions(tone: string | null, urgencyScore: number | null): string {
+  const t = tone ?? "neutral";
+  const u = urgencyScore ?? 5;
+
+  switch (t) {
+    case "gentle":
+      return "TONE: Warm and patient. Acknowledge they may be busy. Soft deadline suggestion. No pressure.";
+    case "neutral":
+      return "TONE: Professional and direct. State what you need clearly. Give a specific deadline.";
+    case "firm":
+      return `TONE: Assertive and clear. This is ${Math.round(u >= 7 ? u : 6)}+ urgency. State the deadline firmly. Make it clear you need a response.`;
+    case "urgent":
+      return `TONE: High-priority. This is blocking work. Use words like "urgent", "blocking", "need your response today". Be direct but not rude.`;
+    default:
+      return "TONE: Professional and direct.";
+  }
+}
+
 function buildSystemPrompt(state: AgentState): string {
   const daysOverdue = Math.round(state.hoursOverdue / 24);
   const sentDate = formatReadableDate(state.sentAt);
   const dueDate = state.dueDate ? formatReadableDate(state.dueDate) : null;
   const dueLine = dueDate ? `\nThe review deadline was ${dueDate}.` : "";
 
-  const toneGuide = state.toneRecommendation
-    ? `\nSentiment analysis recommends: ${state.toneRecommendation} tone.`
-    : "";
+  const toneInstructions = buildToneInstructions(state.toneRecommendation, state.urgencyScore);
 
   const memoryContext = state.clientMemories.length > 0
     ? state.clientMemories.map(m => `- ${m}`).join("\n")
     : "- No previous interactions on record.";
 
-  return `You are a professional email writer for Scrollhouse, a video content agency. Write chaser emails that follow these rules without exception:
+  return `You write short follow-up emails for Scrollhouse, a video content agency. Your goal: get the client to respond with their script review.
 
-TONE & STYLE:
-- Professional but warm. Never overly formal, never casual.
-- Short sentences. Short paragraphs. Maximum 3 lines per paragraph.
-- Never use em dashes. Use commas or full stops instead.
-- No emojis. No exclamation marks unless absolutely necessary.
-- Never start with "Hope you're doing well" or any variation of it.
-- Never say "as per my last email", "just circling back", "just checking in", "touching base".
-- Get to the point in the first sentence.
+${toneInstructions}
 
-STRUCTURE:
-- Line 1: Reference the script by name and when it was sent.
-- Line 2-3: One specific thing you liked about the script (use the script content provided).
-- Line 4-5: Clear ask. What you need from them and by when.
+RULES:
+- First sentence: mention the script "${state.scriptTitle}" by name and when it was sent (${sentDate}).
+- Reference something specific from the script content to show you care about their project.
+- Include a clear ask with a specific deadline date.
 - Sign off: "Best, Scrollhouse Team"
-
-GRAMMAR:
-- Oxford comma always.
-- Never end a sentence with a preposition.
-- Spell out numbers under ten.
-- No passive voice.
+- Maximum 120 words. Short paragraphs.
+- No pleasantries ("hope you're well"), no cliches ("just checking in", "circling back").
+- No em dashes, no exclamation marks, no emojis.
 
 CONTEXT:
 Client: ${state.clientName}
-Script: "${state.scriptTitle}" — ${daysOverdue} days overdue
-Sent on: ${sentDate}${dueLine}${toneGuide}
+Script: "${state.scriptTitle}" — ${daysOverdue} day${daysOverdue !== 1 ? "s" : ""} overdue
+Sent on: ${sentDate}${dueLine}
 
 What you know about this client:
 ${memoryContext}
@@ -57,19 +63,18 @@ BODY: [email body]`;
 }
 
 function buildHumanPrompt(state: AgentState): string {
-  const contentPreview = state.scriptContent.length > 300
-    ? state.scriptContent.slice(0, 300) + "..."
+  const contentPreview = state.scriptContent.length > 500
+    ? state.scriptContent.slice(0, 500) + "..."
     : state.scriptContent;
 
   return `Write a follow-up email for this situation:
 
 Client: ${state.clientName}
 Script: "${state.scriptTitle}"
-Script preview: ${contentPreview}
-Sent ${state.hoursOverdue} hours ago with no response.
+Script content:
+${contentPreview}
 
-Write a short, personalized follow-up email. Reference the specific script.
-If you know their communication preferences from the memory context, adapt your tone accordingly.`;
+This was sent ${state.hoursOverdue} hours ago with no response. Write a personalized follow-up that references something specific from the script content above.`;
 }
 
 export async function assembleContext(state: AgentState): Promise<{

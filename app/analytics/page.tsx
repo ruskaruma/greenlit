@@ -1,7 +1,6 @@
 import { createServiceClientDirect } from "@/lib/supabase/server";
 import ReportsPanel from "@/components/reports/ReportsPanel";
-import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
+import AppSidebar from "@/components/shared/AppSidebar";
 
 export const dynamic = "force-dynamic";
 
@@ -41,26 +40,22 @@ export default async function AnalyticsPage() {
   const [clients, reports] = await Promise.all([getClients(), getReports()]);
 
   return (
-    <div className="min-h-screen bg-[var(--bg)] transition-colors duration-300">
-      <header className="flex items-center gap-4 px-6 py-4 border-b border-[var(--border)]">
-        <Link
-          href="/dashboard"
-          className="flex items-center gap-1.5 text-xs text-[var(--muted)] hover:text-[var(--text)] transition-colors"
-        >
-          <ArrowLeft size={14} />
-          Dashboard
-        </Link>
-        <div className="h-4 w-px bg-[var(--border)]" />
-        <h1 className="text-lg font-semibold text-[var(--text)]">Analytics</h1>
-      </header>
+    <div className="min-h-screen bg-[var(--bg)] flex transition-colors duration-300">
+      <AppSidebar />
 
-      {clients.length === 0 ? (
-        <div className="flex items-center justify-center h-[60vh]">
-          <p className="text-sm text-[var(--muted)]">No clients found. Add clients from the dashboard first.</p>
-        </div>
-      ) : (
-        <ReportsPanel clients={clients} initialReports={reports} />
-      )}
+      <main className="flex-1 ml-[220px] min-h-screen">
+        <header className="flex items-center gap-4 px-6 py-4 border-b border-[var(--border)]">
+          <h1 className="text-lg font-semibold text-[var(--text)]">Analytics</h1>
+        </header>
+
+        {clients.length === 0 ? (
+          <div className="flex items-center justify-center h-[60vh]">
+            <p className="text-sm text-[var(--muted)]">No clients found. Add clients from the dashboard first.</p>
+          </div>
+        ) : (
+          <ReportsPanel clients={clients} initialReports={reports} />
+        )}
+      </main>
     </div>
   );
 }

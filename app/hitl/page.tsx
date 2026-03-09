@@ -1,7 +1,6 @@
 import { createServiceClientDirect } from "@/lib/supabase/server";
 import HitlList from "@/components/hitl/HitlList";
-import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
+import AppSidebar from "@/components/shared/AppSidebar";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +19,9 @@ export interface ChaserData {
     hours_overdue?: number;
     client_email?: string;
     tone_recommendation?: string;
+    urgency_score?: number;
+    revision_count?: number;
+    critique_feedback?: string;
     critique_scores?: {
       professionalism?: number;
       personalization?: number;
@@ -46,6 +48,21 @@ export interface ChaserData {
     platform: string | null;
     assigned_writer: string | null;
     sent_at: string | null;
+    status: string | null;
+    client_feedback: string | null;
+    reviewed_at: string | null;
+    quality_score: {
+      hook_strength?: number;
+      cta_clarity?: number;
+      tone_consistency?: number | null;
+      brand_alignment?: number;
+      platform_fit?: number;
+      pacing_structure?: number;
+      average?: number;
+      feedback?: string;
+      strengths?: string[];
+      improvements?: string[];
+    } | null;
   };
   chaser_count: number;
 }
@@ -55,7 +72,7 @@ async function getPendingChasers(): Promise<ChaserData[]> {
 
   const { data, error } = await supabase
     .from("chasers")
-    .select("id, draft_content, created_at, script_id, client_id, status, hitl_state, clients(name, company, email, whatsapp_number, preferred_channel, avg_response_hours, approved_count, rejected_count, changes_requested_count, total_scripts), scripts(title, content, platform, assigned_writer, sent_at)")
+    .select("id, draft_content, created_at, script_id, client_id, status, hitl_state, clients(name, company, email, whatsapp_number, preferred_channel, avg_response_hours, approved_count, rejected_count, changes_requested_count, total_scripts), scripts(title, content, platform, assigned_writer, sent_at, status, client_feedback, reviewed_at, quality_score)")
     .in("status", ["pending_hitl", "draft_saved"])
     .order("created_at", { ascending: false });
 
@@ -130,29 +147,21 @@ export default async function HitlPage() {
   const memories = await getClientMemories(clientIds);
 
   return (
-    <div className="min-h-screen bg-[var(--bg)] p-6 max-w-[1600px] mx-auto transition-colors duration-300">
-      <header className="flex items-center justify-between mb-8">
-        <div className="flex items-center gap-4">
-          <Link
-            href="/dashboard"
-            className="flex items-center gap-1.5 text-xs text-[var(--muted)] hover:text-[var(--text)] transition-colors"
-          >
-            <ArrowLeft size={14} />
-            Dashboard
-          </Link>
-          <div className="h-4 w-px bg-[var(--border)]" />
-          <div>
-            <h1 className="text-lg font-semibold text-[var(--text)]">HITL Review Panel</h1>
-          </div>
-        </div>
-        {chasers.length > 0 && (
-          <span className="text-xs text-[var(--muted)]">
-            <span className="text-orange-400 font-medium">{chasers.length}</span> pending
-          </span>
-        )}
-      </header>
+    <div className="min-h-screen bg-[var(--bg)] flex transition-colors duration-300">
+      <AppSidebar />
 
-      <HitlList initialChasers={chasers} memories={memories} />
+      <main className="flex-1 ml-[220px] min-h-screen p-6 max-w-[1600px]">
+        <header className="flex items-center justify-between mb-8">
+          <h1 className="text-lg font-semibold text-[var(--text)]">HITL Review Panel</h1>
+          {chasers.length > 0 && (
+            <span className="text-xs text-[var(--muted)]">
+              <span className="text-orange-400 font-medium">{chasers.length}</span> pending
+            </span>
+          )}
+        </header>
+
+        <HitlList initialChasers={chasers} memories={memories} />
+      </main>
     </div>
   );
 }

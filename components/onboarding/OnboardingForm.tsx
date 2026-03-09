@@ -49,12 +49,7 @@ export default function OnboardingForm() {
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<OnboardingResult | null>(null);
 
-  // Checklist state (for manual items post-submit)
-  const [checklist, setChecklist] = useState({
-    google_drive: false,
-    notion_page: false,
-    airtable_entry: false,
-  });
+  // Checklist state no longer needed — all items are automated
 
   const [form, setForm] = useState<FormData>({
     name: "",
@@ -111,9 +106,9 @@ export default function OnboardingForm() {
         return;
       }
 
-      await res.json();
+      const data = await res.json() as OnboardingResult;
+      setResult(data);
       toast("success", `${form.name} onboarded successfully`);
-      router.push("/dashboard");
     } catch {
       toast("error", "Something went wrong");
     } finally {
@@ -131,7 +126,6 @@ export default function OnboardingForm() {
     });
     setStep(0);
     setResult(null);
-    setChecklist({ google_drive: false, notion_page: false, airtable_entry: false });
   }
 
 if (result) {
@@ -149,7 +143,7 @@ if (result) {
             </div>
           </div>
 
-          <div className="bg-[var(--card)] border border-[var(--border)] rounded-xl divide-y divide-[var(--border)]">
+          <div className="bg-[var(--card)] border border-[var(--border)] rounded-lg divide-y divide-[var(--border)]">
             {/* Automated */}
             <ChecklistItem
               label="Welcome Email"
@@ -170,21 +164,24 @@ if (result) {
               automated
             />
 
-            {/* Manual */}
-            <ManualChecklistItem
+            {/* Automated integrations */}
+            <ChecklistItem
               label="Google Drive Folder"
-              done={checklist.google_drive}
-              onMark={() => setChecklist((p) => ({ ...p, google_drive: true }))}
+              success={r.google_drive?.success ?? false}
+              error={r.google_drive?.error}
+              automated
             />
-            <ManualChecklistItem
+            <ChecklistItem
               label="Notion Page"
-              done={checklist.notion_page}
-              onMark={() => setChecklist((p) => ({ ...p, notion_page: true }))}
+              success={r.notion_page?.success ?? false}
+              error={r.notion_page?.error}
+              automated
             />
-            <ManualChecklistItem
+            <ChecklistItem
               label="Airtable Entry"
-              done={checklist.airtable_entry}
-              onMark={() => setChecklist((p) => ({ ...p, airtable_entry: true }))}
+              success={r.airtable_entry?.success ?? false}
+              error={r.airtable_entry?.error}
+              automated
             />
 
             {/* First Brief */}
@@ -209,7 +206,7 @@ if (result) {
           <div className="flex items-center gap-3 mt-6">
             <Link
               href="/dashboard"
-              className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-xs font-bold bg-[var(--accent-primary)] text-white hover:bg-[var(--accent-primary)]/90 glow-primary transition-colors"
+              className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-xs font-bold bg-[var(--accent-primary)] text-white hover:bg-[var(--accent-primary)]/90 transition-colors"
             >
               View on Dashboard
               <ArrowRight size={12} />
@@ -374,7 +371,7 @@ return (
             <div className="space-y-5">
               <h2 className="text-lg font-semibold text-[var(--text)]">Review & Submit</h2>
 
-              <div className="bg-[var(--card)] border border-[var(--border)] rounded-xl divide-y divide-[var(--border)]">
+              <div className="bg-[var(--card)] border border-[var(--border)] rounded-lg divide-y divide-[var(--border)]">
                 <ReviewRow label="Name" value={form.name} />
                 <ReviewRow label="Email" value={form.email} />
                 <ReviewRow label="Company" value={form.company} />
@@ -391,13 +388,16 @@ return (
                 <ReviewRow label="Brand Voice" value={form.brand_voice ? (form.brand_voice.length > 80 ? form.brand_voice.slice(0, 80) + "..." : form.brand_voice) : ""} />
               </div>
 
-              <div className="bg-amber-500/5 border border-amber-500/10 rounded-xl p-4">
-                <p className="text-xs text-amber-400">On submit, Greenlit will:</p>
+              <div className="bg-amber-500/5 border border-amber-500/10 rounded-lg p-4">
+                <p className="text-xs text-amber-400">On submit, Greenlit will automatically:</p>
                 <ul className="text-xs text-[var(--muted)] mt-2 space-y-1">
                   <li>1. Create the client in the database</li>
                   <li>2. Seed 3 AI memories with embeddings (brand voice, preferences, channel)</li>
                   <li>3. Send a welcome email to {form.email || "the client"}</li>
                   <li>4. Notify you via WhatsApp</li>
+                  <li>5. Create a Google Drive folder (if configured)</li>
+                  <li>6. Create a Notion project page (if configured)</li>
+                  <li>7. Add to Airtable tracker (if configured)</li>
                 </ul>
               </div>
             </div>
@@ -420,7 +420,7 @@ return (
           <button
             onClick={() => setStep(step + 1)}
             disabled={!canProceed()}
-            className="flex items-center gap-1.5 px-5 py-2.5 rounded-lg text-xs font-bold bg-[var(--accent-primary)] text-white hover:bg-[var(--accent-primary)]/90 glow-primary transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            className="flex items-center gap-1.5 px-5 py-2.5 rounded-lg text-xs font-bold bg-[var(--accent-primary)] text-white hover:bg-[var(--accent-primary)]/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
             Next
             <ChevronRight size={14} />
@@ -429,7 +429,7 @@ return (
           <button
             onClick={handleSubmit}
             disabled={submitting || !form.name.trim() || !form.email.trim()}
-            className="flex items-center gap-2 px-6 py-2.5 rounded-lg text-xs font-bold bg-[var(--accent-primary)] text-white hover:bg-[var(--accent-primary)]/90 glow-primary transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            className="flex items-center gap-2 px-6 py-2.5 rounded-lg text-xs font-bold bg-[var(--accent-primary)] text-white hover:bg-[var(--accent-primary)]/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {submitting ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
             {submitting ? "Onboarding..." : "Submit & Onboard"}
@@ -487,31 +487,3 @@ function ChecklistItem({ label, success, error, automated }: { label: string; su
   );
 }
 
-function ManualChecklistItem({ label, done, onMark }: { label: string; done: boolean; onMark: () => void }) {
-  return (
-    <div className="flex items-center justify-between p-4">
-      <div className="flex items-center gap-3">
-        {done ? (
-          <CheckCircle2 size={14} className="text-[var(--accent-success)]" />
-        ) : (
-          <Clock size={14} className="text-amber-400" />
-        )}
-        <div>
-          <p className="text-sm text-[var(--text)]">{label}</p>
-          <p className="text-[10px] text-[var(--muted)]">Manual</p>
-        </div>
-      </div>
-      {done ? (
-        <span className="text-[10px] text-[var(--accent-success)] font-medium">Done</span>
-      ) : (
-        <button
-          onClick={onMark}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium border border-[var(--border)] text-[var(--muted)] hover:text-[var(--text)] hover:bg-[var(--surface-elevated)] transition-colors"
-        >
-          <Check size={10} />
-          Mark done
-        </button>
-      )}
-    </div>
-  );
-}

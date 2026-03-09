@@ -3,6 +3,9 @@ import { createServiceClientDirect } from "@/lib/supabase/server";
 import { requireSession } from "@/lib/auth/requireSession";
 import { storeClientMemory } from "@/lib/agent/nodes/memoryUpdate";
 import { sendWelcomeEmail } from "@/lib/resend/sendWelcomeEmail";
+import { createClientFolder } from "@/lib/integrations/googleDrive";
+import { createClientPage } from "@/lib/integrations/notion";
+import { addClientRecord } from "@/lib/integrations/airtable";
 import twilio from "twilio";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -146,6 +149,105 @@ export async function POST(request: Request) {
     }
   } else {
     results.whatsapp = { success: false, error: "Twilio not configured" };
+  }
+
+  // Google Drive: Create client folder
+  try {
+    const driveResult = await createClientFolder({
+      clientName: name,
+      company: company || undefined,
+      clientEmail: email,
+    });
+    results.google_drive = driveResult;
+
+    if (driveResult.success) {
+      await supabase
+        .from("clients")
+        .update({
+          onboarding_checklist: {
+            ...(client.onboarding_checklist ?? {}),
+            welcome_email: results.welcome_email?.success ?? false,
+            google_drive: true,
+            google_drive_url: driveResult.folderUrl,
+          },
+        })
+        .eq("id", clientId);
+    }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Google Drive failed";
+    console.error("[onboarding] Google Drive error:", msg);
+    results.google_drive = { success: false, error: msg };
+  }
+
+  // Notion: Create client page
+  try {
+    const notionResult = await createClientPage({
+      clientName: name,
+      company: company || undefined,
+      email,
+      accountManager: account_manager || undefined,
+      platforms: platform_focus?.length > 0 ? platform_focus : undefined,
+      brandVoice: brand_voice || undefined,
+      contractStart: contract_start || undefined,
+      monthlyVolume: monthly_volume ? parseInt(monthly_volume) : undefined,
+    });
+    results.notion_page = notionResult;
+
+    if (notionResult.success) {
+      const currentChecklist = (
+        await supabase.from("clients").select("onboarding_checklist").eq("id", clientId).single()
+      ).data?.onboarding_checklist ?? {};
+
+      await supabase
+        .from("clients")
+        .update({
+          onboarding_checklist: {
+            ...currentChecklist,
+            notion_page: true,
+            notion_page_url: notionResult.pageUrl,
+          },
+        })
+        .eq("id", clientId);
+    }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Notion failed";
+    console.error("[onboarding] Notion error:", msg);
+    results.notion_page = { success: false, error: msg };
+  }
+
+  // Airtable: Add client record
+  try {
+    const airtableResult = await addClientRecord({
+      clientName: name,
+      company: company || undefined,
+      email,
+      accountManager: account_manager || undefined,
+      platforms: platform_focus?.length > 0 ? platform_focus : undefined,
+      monthlyVolume: monthly_volume ? parseInt(monthly_volume) : undefined,
+      contractStart: contract_start || undefined,
+    });
+    results.airtable_entry = airtableResult;
+
+    if (airtableResult.success) {
+      const currentChecklist = (
+        await supabase.from("clients").select("onboarding_checklist").eq("id", clientId).single()
+      ).data?.onboarding_checklist ?? {};
+
+      await supabase
+        .from("clients")
+        .update({
+          onboarding_checklist: {
+            ...currentChecklist,
+            airtable_entry: true,
+            airtable_record_url: airtableResult.recordUrl,
+          },
+        })
+        .eq("id", clientId);
+    }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Airtable failed";
+    console.error("[onboarding] Airtable error:", msg);
+    results.airtable_entry = { success: false, error: msg };
   }
 
   try {

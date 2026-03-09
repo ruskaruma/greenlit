@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
-  Check, X, Loader2, Clock, User, FileText, RotateCcw,
+  Check, X, Loader2, User, RotateCcw,
   ChevronDown, ChevronUp, Mail, Phone, Send, Save,
   AlertTriangle, MessageSquare, Zap,
 } from "lucide-react";
@@ -17,11 +17,20 @@ interface ChaserCardProps {
   onActionComplete: () => void;
 }
 
-const SCORE_LABELS: Record<string, string> = {
-  professionalism: "Tone",
+const CHASER_SCORE_LABELS: Record<string, string> = {
+  professionalism: "Professionalism",
   personalization: "Personalisation",
   clarity: "Clarity",
-  persuasiveness: "Urgency",
+  persuasiveness: "Persuasiveness",
+};
+
+const SCRIPT_SCORE_LABELS: Record<string, string> = {
+  hook_strength: "Hook Strength",
+  cta_clarity: "CTA Clarity",
+  brand_alignment: "Brand Alignment",
+  platform_fit: "Platform Fit",
+  pacing_structure: "Pacing & Structure",
+  tone_consistency: "Tone Consistency",
 };
 
 const TONE_OPTIONS = ["gentle", "neutral", "firm", "urgent"] as const;
@@ -35,15 +44,46 @@ const QUICK_CHIPS = [
   "Change tone to firm",
 ] as const;
 
+function scoreLabel(val: number): string {
+  if (val >= 8) return "Strong";
+  if (val >= 6) return "Solid";
+  if (val >= 4) return "Fair";
+  return "Weak";
+}
+
+function scoreBarColor(val: number): string {
+  if (val >= 8) return "bg-emerald-400";
+  if (val >= 6) return "bg-sky-400";
+  if (val >= 4) return "bg-amber-400";
+  return "bg-red-400";
+}
+
+function ScoreBar({ label, value }: { label: string; value: number }) {
+  const pct = Math.min(100, Math.max(0, (value / 10) * 100));
+  return (
+    <div className="flex items-center gap-3">
+      <span className="text-[11px] text-[var(--muted)] w-[120px] shrink-0 truncate">{label}</span>
+      <div className="flex-1 h-[6px] rounded-full bg-[var(--surface-elevated)] overflow-hidden">
+        <div className={cn("h-full rounded-full transition-all", scoreBarColor(value))} style={{ width: `${pct}%` }} />
+      </div>
+      <span className="text-[10px] text-[var(--muted)] w-[44px] text-right shrink-0">{scoreLabel(value)}</span>
+    </div>
+  );
+}
+
 export default function ChaserCard({ chaser, memories, onActionComplete }: ChaserCardProps) {
   const { id, script_id: scriptId, client, script, hitl_state: hitlState } = chaser;
   const [editedContent, setEditedContent] = useState(chaser.draft_content);
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
   const [result, setResult] = useState<{ action: string; success: boolean } | null>(null);
   const [saving, setSaving] = useState(false);
-  const [expanded, setExpanded] = useState(false);
+  const [scoresExpanded, setScoresExpanded] = useState(false);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { toast } = useToast();
+
+  // Undo toast state
+  const [undoTimer, setUndoTimer] = useState<ReturnType<typeof setTimeout> | null>(null);
+  const [pendingApprove, setPendingApprove] = useState(false);
 
   // Regeneration state
   const [instruction, setInstruction] = useState("");
@@ -72,6 +112,13 @@ export default function ChaserCard({ chaser, memories, onActionComplete }: Chase
 
   // Side-by-side comparison active
   const comparing = previousDraft !== null && newDraft !== null;
+
+  // Cleanup undo timer on unmount
+  useEffect(() => {
+    return () => {
+      if (undoTimer) clearTimeout(undoTimer);
+    };
+  }, [undoTimer]);
 
   const debouncedSave = useCallback(
     (content: string) => {
@@ -150,30 +197,47 @@ export default function ChaserCard({ chaser, memories, onActionComplete }: Chase
   }
 
   async function handleApprove() {
-    setLoadingAction("approve");
-    try {
-      const res = await fetch(`/api/hitl/${id}/approve`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          editedContent: hasEdits ? editedContent : undefined,
-          channel: selectedChannel,
-        }),
-      });
-      if (!res.ok) throw new Error("Failed");
-      const data = await res.json();
-      setResult({ action: hasEdits ? "edited" : "approved", success: true });
-      if (data.warning) {
-        toast("info", data.warning);
-      } else {
-        toast("success", hasEdits ? "Edited draft sent" : "Draft approved and sent");
+    setPendingApprove(true);
+    toast("info", "Sending in 3 seconds — click undo to cancel");
+
+    const timer = setTimeout(async () => {
+      setPendingApprove(false);
+      setLoadingAction("approve");
+      try {
+        const res = await fetch(`/api/hitl/${id}/approve`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            editedContent: hasEdits ? editedContent : undefined,
+            channel: selectedChannel,
+          }),
+        });
+        if (!res.ok) throw new Error("Failed");
+        const data = await res.json();
+        setResult({ action: hasEdits ? "edited" : "approved", success: true });
+        if (data.warning) {
+          toast("info", data.warning);
+        } else {
+          toast("success", hasEdits ? "Edited draft sent" : "Draft approved and sent");
+        }
+        onActionComplete();
+      } catch {
+        toast("error", "Failed to approve draft");
+      } finally {
+        setLoadingAction(null);
       }
-      setTimeout(onActionComplete, 1500);
-    } catch {
-      toast("error", "Failed to approve draft");
-    } finally {
-      setLoadingAction(null);
+    }, 3000);
+
+    setUndoTimer(timer);
+  }
+
+  function handleUndoApprove() {
+    if (undoTimer) {
+      clearTimeout(undoTimer);
+      setUndoTimer(null);
     }
+    setPendingApprove(false);
+    toast("info", "Send cancelled");
   }
 
   async function handleSaveDraft() {
@@ -228,55 +292,77 @@ export default function ChaserCard({ chaser, memories, onActionComplete }: Chase
 
   if (result?.success) {
     return (
-      <motion.div initial={{ opacity: 1 }} animate={{ opacity: 0.6 }} className="bg-[var(--card)] border border-[var(--border)] rounded-xl p-6">
-        <p className="text-sm text-[var(--muted)] text-center mb-3">
-          {result.action === "approved" && "Approved and sent"}
-          {result.action === "edited" && "Edited and sent"}
-          {result.action === "rejected" && "Draft rejected"}
-        </p>
-        {result.action === "rejected" && (
-          <div className="flex justify-center">
+      <motion.div initial={{ opacity: 1 }} animate={{ opacity: 0.6 }} className="flex items-center justify-center h-full">
+        <div className="text-center">
+          <p className="text-[13px] text-[var(--muted)] mb-3">
+            {result.action === "approved" && "Approved and sent"}
+            {result.action === "edited" && "Edited and sent"}
+            {result.action === "rejected" && "Draft rejected"}
+          </p>
+          {result.action === "rejected" && (
             <button
               onClick={handleLegacyRegenerate}
               disabled={loadingAction === "regenerate"}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-medium border border-[var(--border)] text-[var(--muted)] hover:text-[var(--text)] hover:bg-[var(--surface-elevated)] disabled:opacity-40"
+              className="flex items-center gap-2 px-4 py-2 rounded-lg text-[11px] font-medium border border-[var(--border)] text-[var(--muted)] hover:text-[var(--text)] hover:bg-[var(--surface-elevated)] disabled:opacity-40 mx-auto"
             >
               {loadingAction === "regenerate" ? <Loader2 size={12} className="animate-spin" /> : <RotateCcw size={12} />}
               Re-generate Draft
             </button>
-          </div>
-        )}
+          )}
+        </div>
       </motion.div>
     );
   }
 
-  const scriptPreview = script.content.length > 300 ? script.content.slice(0, 300) + "..." : script.content;
   const chaserLabel = chaser.chaser_count > 0 ? `Chaser #${chaser.chaser_count + 1}` : "First chaser";
   const approvalRate = client.total_scripts > 0
     ? Math.round((client.approved_count / client.total_scripts) * 100)
     : null;
 
+  // Collect all scores for rendering
+  const allScoreEntries: { label: string; value: number; group: string }[] = [];
+
+  if (script.quality_score) {
+    for (const [key, label] of Object.entries(SCRIPT_SCORE_LABELS)) {
+      const val = (script.quality_score as Record<string, unknown>)?.[key];
+      if (val != null && typeof val === "number") {
+        allScoreEntries.push({ label, value: val, group: "Script Quality" });
+      }
+    }
+  }
+
+  if (scores) {
+    for (const [key, label] of Object.entries(CHASER_SCORE_LABELS)) {
+      const val = scores[key as keyof typeof scores];
+      if (val != null && typeof val === "number") {
+        allScoreEntries.push({ label, value: val, group: "Chaser Quality" });
+      }
+    }
+  }
+
   return (
-    <motion.div layout initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="bg-[var(--card)] border border-[var(--border)] rounded-xl overflow-hidden">
-      <div className="px-6 py-4 border-b border-[var(--border)] flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <FileText size={13} className="text-[var(--muted)]" />
-          <span className="text-sm font-medium text-[var(--text)]">{script.title}</span>
-          {script.platform && <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--surface-elevated)] border border-[var(--border)] text-[var(--muted)]">{script.platform}</span>}
-          {isSaved && (
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--surface-elevated)] border border-[var(--border)] text-[var(--muted)]">
-              Saved — not sent yet
+    <div className="flex flex-col h-full">
+      {/* Top context bar */}
+      <div className="px-6 py-3 border-b border-[var(--border)] bg-[var(--card)]">
+        <div className="flex items-center gap-3 flex-wrap">
+          <span className="text-[13px] font-medium text-[var(--text)]">{script.title}</span>
+          {script.platform && (
+            <span className="text-[10px] px-1.5 py-0.5 rounded-lg bg-[var(--surface-elevated)] border border-[var(--border)] text-[var(--muted)]">
+              {script.platform}
             </span>
           )}
+          {isSaved && (
+            <span className="text-[10px] px-1.5 py-0.5 rounded-lg bg-[var(--surface-elevated)] border border-[var(--border)] text-[var(--muted)]">
+              Saved
+            </span>
+          )}
+          <span className="text-[11px] text-[var(--muted)] opacity-50 ml-auto">
+            Generated {formatTimeAgo(chaser.created_at)}
+          </span>
         </div>
-        <span className="text-[11px] text-[var(--muted)] opacity-50">
-          Generated {formatTimeAgo(chaser.created_at)}
-        </span>
-      </div>
 
-      {/* Client Risk Panel */}
-      <div className="px-6 py-3 bg-amber-500/5 border-b border-amber-500/10">
-        <div className="flex items-center gap-4 flex-wrap">
+        {/* Client risk line */}
+        <div className="flex items-center gap-4 flex-wrap mt-2">
           <div className="flex items-center gap-1.5">
             <AlertTriangle size={11} className="text-amber-400" />
             <span className="text-[11px] font-medium text-amber-400">{chaserLabel}</span>
@@ -286,115 +372,156 @@ export default function ChaserCard({ chaser, memories, onActionComplete }: Chase
               <span className="text-red-400 font-medium">{daysSinceSent}d</span> since sent
             </span>
           )}
-          {client.avg_response_hours != null && (
-            <span className="text-[11px] text-[var(--muted)]">
-              Avg response: <span className="text-[var(--text)] font-medium">{Math.round(client.avg_response_hours)}hrs</span>
-            </span>
-          )}
+          <div className="flex items-center gap-1.5">
+            <User size={10} className="text-[var(--muted)]" />
+            <span className="text-[11px] text-[var(--text)]">{client.name}</span>
+            {client.company && <span className="text-[11px] text-[var(--muted)] opacity-60">/ {client.company}</span>}
+          </div>
           {approvalRate !== null && (
             <span className="text-[11px] text-[var(--muted)]">
-              Approval rate: <span className={cn("font-medium", approvalRate >= 70 ? "text-emerald-400" : approvalRate >= 40 ? "text-amber-400" : "text-red-400")}>{approvalRate}%</span>
+              Approval: <span className={cn("font-medium", approvalRate >= 70 ? "text-emerald-400" : approvalRate >= 40 ? "text-amber-400" : "text-red-400")}>{approvalRate}%</span>
             </span>
           )}
-          {client.changes_requested_count > 0 && (
+          {hitlState?.urgency_score != null && (
             <span className="text-[11px] text-[var(--muted)]">
-              Changes requested: <span className="text-amber-400 font-medium">{client.changes_requested_count}x</span>
+              Urgency: <span className={cn("font-medium",
+                (hitlState.urgency_score as number) >= 7 ? "text-red-400" :
+                (hitlState.urgency_score as number) >= 4 ? "text-amber-400" : "text-emerald-400"
+              )}>{hitlState.urgency_score as number}/10</span>
             </span>
           )}
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 divide-y lg:divide-y-0 lg:divide-x divide-[var(--border)]">
-        {/* Left: Context */}
-        <div className="p-6 space-y-5">
-          <div>
-            <p className="text-[10px] uppercase tracking-widest text-[var(--muted)] opacity-50 mb-2">Script Content</p>
-            <div className="bg-[var(--card)] border border-[var(--border)] rounded-xl px-4 py-3">
-              <p className="text-xs text-[var(--muted)] leading-relaxed whitespace-pre-wrap">
-                {expanded ? script.content : scriptPreview}
-              </p>
-              {script.content.length > 300 && (
-                <button onClick={() => setExpanded(!expanded)} className="flex items-center gap-1 mt-2 text-[10px] text-[var(--muted)] hover:text-[var(--text)]">
-                  {expanded ? <><ChevronUp size={10} /> Show less</> : <><ChevronDown size={10} /> Show full script</>}
-                </button>
-              )}
-            </div>
-          </div>
-
-          <div>
-            <p className="text-[10px] uppercase tracking-widest text-[var(--muted)] opacity-50 mb-2">Client</p>
-            <div className="space-y-1.5">
-              <div className="flex items-center gap-2">
-                <User size={12} className="text-[var(--muted)]" />
-                <span className="text-xs text-[var(--text)]">{client.name}</span>
-                {client.company && <span className="text-xs text-[var(--muted)] opacity-60">/ {client.company}</span>}
-              </div>
-              <div className="flex items-center gap-4 text-[11px] text-[var(--muted)]">
-                {client.email && (
-                  <span className="flex items-center gap-1"><Mail size={10} /> {client.email}</span>
-                )}
-                {client.whatsapp_number && (
-                  <span className="flex items-center gap-1"><Phone size={10} /> {client.whatsapp_number}</span>
-                )}
-              </div>
-              {script.assigned_writer && (
-                <div className="text-[11px] text-[var(--muted)]">Writer: {script.assigned_writer}</div>
-              )}
-            </div>
-          </div>
-
-          {memories.length > 0 && (
-            <div>
-              <p className="text-[10px] uppercase tracking-widest text-[var(--muted)] opacity-50 mb-2">Client History</p>
-              <div className="space-y-2">
-                {memories.map((m, i) => (
-                  <div key={i} className="flex items-start gap-2">
-                    <div className="w-1.5 h-1.5 rounded-full bg-[var(--muted)] opacity-40 mt-1.5 shrink-0" />
-                    <div>
-                      <p className="text-xs text-[var(--text)] opacity-80">{m.content}</p>
-                      <p className="text-[10px] text-[var(--muted)] opacity-40">
-                        {m.memory_type} &middot; {new Date(m.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+      {/* Collapsible scores section */}
+      {allScoreEntries.length > 0 && (
+        <div className="border-b border-[var(--border)]">
+          <button
+            onClick={() => setScoresExpanded(!scoresExpanded)}
+            className="w-full px-6 py-2 flex items-center justify-between hover:bg-[var(--surface-elevated)]/50 transition-colors"
+          >
+            <span className="text-[10px] uppercase tracking-widest text-[var(--muted)] opacity-50">
+              Scores
+            </span>
+            {scoresExpanded ? <ChevronUp size={12} className="text-[var(--muted)]" /> : <ChevronDown size={12} className="text-[var(--muted)]" />}
+          </button>
+          {scoresExpanded && (
+            <div className="px-6 pb-4">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-8 gap-y-4">
+                {/* Script quality */}
+                {script.quality_score && (
+                  <div>
+                    <p className="text-[10px] uppercase tracking-widest text-[var(--muted)] opacity-50 mb-2">Script Quality</p>
+                    <div className="space-y-2">
+                      {allScoreEntries.filter((e) => e.group === "Script Quality").map((e) => (
+                        <ScoreBar key={e.label} label={e.label} value={e.value} />
+                      ))}
+                      {(script.quality_score as { average?: number })?.average != null && (
+                        <div className="flex items-center gap-3 pt-1 border-t border-[var(--border)]">
+                          <span className="text-[11px] text-[var(--muted)] w-[120px] shrink-0 font-medium">Average</span>
+                          <span className="text-[11px] font-semibold text-[var(--text)]">
+                            {((script.quality_score as { average: number }).average).toFixed(1)}/10
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                    {(script.quality_score as { feedback?: string })?.feedback && (
+                      <p className="text-[11px] text-[var(--muted)] opacity-70 italic mt-2">
+                        {(script.quality_score as { feedback: string }).feedback}
                       </p>
-                    </div>
+                    )}
+                    {((script.quality_score as { strengths?: string[] })?.strengths ?? []).length > 0 && (
+                      <div className="mt-2">
+                        <p className="text-[10px] text-emerald-400 font-medium mb-1">Strengths</p>
+                        {((script.quality_score as { strengths?: string[] }).strengths ?? []).map((s, i) => (
+                          <p key={i} className="text-[11px] text-[var(--text)] opacity-70">+ {s}</p>
+                        ))}
+                      </div>
+                    )}
+                    {((script.quality_score as { improvements?: string[] })?.improvements ?? []).length > 0 && (
+                      <div className="mt-2">
+                        <p className="text-[10px] text-amber-400 font-medium mb-1">To Improve</p>
+                        {((script.quality_score as { improvements?: string[] }).improvements ?? []).map((s, i) => (
+                          <p key={i} className="text-[11px] text-[var(--text)] opacity-70">- {s}</p>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                ))}
-              </div>
-            </div>
-          )}
+                )}
 
-          {scores && (
-            <div>
-              <p className="text-[10px] uppercase tracking-widest text-[var(--muted)] opacity-50 mb-2">Critique Scores</p>
-              <div className="grid grid-cols-2 gap-2">
-                {Object.entries(SCORE_LABELS).map(([key, label]) => {
-                  const val = scores[key as keyof typeof scores];
-                  if (val == null) return null;
-                  const num = typeof val === "number" ? val : 0;
-                  return (
-                    <div key={key} className="flex items-center justify-between bg-[var(--card)] border border-[var(--border)] rounded px-3 py-1.5">
-                      <span className="text-[11px] text-[var(--muted)]">{label}</span>
-                      <span className={cn("text-xs font-medium", num >= 8 ? "text-[var(--accent-success)]" : num >= 5 ? "text-amber-400" : "text-red-400")}>
-                        {num}/10
-                      </span>
+                {/* Chaser quality */}
+                {scores && (
+                  <div>
+                    <p className="text-[10px] uppercase tracking-widest text-[var(--muted)] opacity-50 mb-2">Chaser Quality</p>
+                    <div className="space-y-2">
+                      {allScoreEntries.filter((e) => e.group === "Chaser Quality").map((e) => (
+                        <ScoreBar key={e.label} label={e.label} value={e.value} />
+                      ))}
+                      {scores.average != null && (
+                        <div className="flex items-center gap-3 pt-1 border-t border-[var(--border)]">
+                          <span className="text-[11px] text-[var(--muted)] w-[120px] shrink-0 font-medium">Average</span>
+                          <span className="text-[11px] font-semibold text-[var(--text)]">
+                            {scores.average.toFixed(1)}/10
+                          </span>
+                        </div>
+                      )}
                     </div>
-                  );
-                })}
-                {scores.average != null && (
-                  <div className="flex items-center justify-between bg-[var(--card)] border border-[var(--border)] rounded px-3 py-1.5 col-span-2">
-                    <span className="text-[11px] text-[var(--muted)]">Average</span>
-                    <span className={cn("text-xs font-semibold", scores.average >= 8 ? "text-[var(--accent-success)]" : scores.average >= 5 ? "text-amber-400" : "text-red-400")}>
-                      {scores.average.toFixed(1)}/10
-                    </span>
+                    {hitlState?.critique_feedback && (
+                      <p className="text-[11px] text-[var(--muted)] opacity-70 italic mt-2">{hitlState.critique_feedback as string}</p>
+                    )}
+                    {(hitlState?.revision_count as number) > 0 && (
+                      <p className="text-[10px] text-[var(--muted)] opacity-50 mt-1">
+                        Revised {hitlState?.revision_count as number} time{(hitlState?.revision_count as number) > 1 ? "s" : ""} by agent
+                      </p>
+                    )}
                   </div>
                 )}
               </div>
             </div>
           )}
         </div>
+      )}
 
-        {/* Right: Draft + Controls */}
-        <div className="p-6 flex flex-col">
-          {/* Tone Selector */}
+      {/* Client review response */}
+      {script.status && script.status !== "pending_review" && script.status !== "draft" && (
+        <div className="px-6 py-3 border-b border-[var(--border)]">
+          <div className={cn(
+            "border rounded-lg px-4 py-3",
+            script.status === "approved" ? "bg-emerald-500/5 border-emerald-500/20" :
+            script.status === "rejected" ? "bg-red-500/5 border-red-500/20" :
+            script.status === "changes_requested" ? "bg-amber-500/5 border-amber-500/20" :
+            "bg-[var(--card)] border-[var(--border)]"
+          )}>
+            <div className="flex items-center gap-2 mb-1">
+              <span className={cn(
+                "text-[11px] font-semibold capitalize",
+                script.status === "approved" ? "text-emerald-400" :
+                script.status === "rejected" ? "text-red-400" :
+                "text-amber-400"
+              )}>
+                {script.status === "changes_requested" ? "Changes Requested" : script.status}
+              </span>
+              {script.reviewed_at && (
+                <span className="text-[10px] text-[var(--muted)] opacity-50">
+                  &middot; {formatTimeAgo(script.reviewed_at)}
+                </span>
+              )}
+            </div>
+            {script.client_feedback ? (
+              <p className="text-[11px] text-[var(--text)] opacity-80 leading-relaxed whitespace-pre-wrap">
+                &ldquo;{script.client_feedback}&rdquo;
+              </p>
+            ) : (
+              <p className="text-[11px] text-[var(--muted)] opacity-50 italic">No feedback provided</p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Main content: side-by-side drafts */}
+      <div className="flex-1 overflow-y-auto">
+        <div className="p-6">
+          {/* Tone selector */}
           <div className="mb-4">
             <p className="text-[10px] uppercase tracking-widest text-[var(--muted)] opacity-50 mb-2">Tone</p>
             <div className="flex gap-1.5">
@@ -409,10 +536,10 @@ export default function ChaserCard({ chaser, memories, onActionComplete }: Chase
                   }}
                   disabled={regenerating}
                   className={cn(
-                    "px-3 py-1.5 rounded text-[11px] font-medium capitalize transition-colors disabled:opacity-40",
+                    "px-3 py-1.5 rounded-lg text-[11px] font-medium capitalize transition-colors disabled:opacity-40",
                     selectedTone === t
                       ? "border border-[var(--accent-primary)] text-[var(--accent-primary)] bg-[var(--accent-primary)]/10"
-                      : "bg-[var(--surface-elevated)] text-[var(--text)] hover:text-[var(--text)] hover:bg-[var(--surface-elevated)]"
+                      : "bg-[var(--surface-elevated)] text-[var(--text)] hover:bg-[var(--surface-elevated)]"
                   )}
                 >
                   {t}
@@ -421,51 +548,38 @@ export default function ChaserCard({ chaser, memories, onActionComplete }: Chase
             </div>
           </div>
 
-          {/* Draft label */}
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-[10px] uppercase tracking-widest text-[var(--muted)] opacity-50">
-              {isSaved ? "Saved Draft" : hasEdits ? "Edited Draft" : "AI-Generated Draft"}
-            </p>
-            {saving && <span className="text-[10px] text-[var(--muted)] animate-pulse">Saving...</span>}
-            {regenerating && (
-              <span className="flex items-center gap-1 text-[10px] text-amber-400">
-                <Loader2 size={10} className="animate-spin" />
-                Regenerating...
-              </span>
-            )}
-          </div>
-
+          {/* Subject line */}
           {hitlState?.email_subject && !comparing && (
-            <div className="mb-3">
+            <div className="mb-4">
               <p className="text-[10px] text-[var(--muted)] opacity-50 mb-0.5">Subject</p>
-              <p className="text-sm text-[var(--text)] opacity-80">{newSubject ?? (hitlState.email_subject as string)}</p>
+              <p className="text-[13px] text-[var(--text)] opacity-80">{newSubject ?? (hitlState.email_subject as string)}</p>
             </div>
           )}
 
-          {/* Side-by-side comparison OR single draft */}
+          {/* Side-by-side comparison (after regen) */}
           {comparing ? (
-            <div className="grid grid-cols-2 gap-3 mb-3">
+            <div className="grid grid-cols-2 gap-4 mb-4">
               <div className="flex flex-col">
-                <p className="text-[10px] uppercase text-[var(--muted)] opacity-50 mb-1">Previous</p>
-                <div className="flex-1 px-3 py-2.5 bg-[var(--input-bg)] border border-[var(--border)] rounded-lg text-xs text-[var(--text)] opacity-70 leading-relaxed whitespace-pre-wrap overflow-y-auto max-h-[400px]">
+                <p className="text-[10px] uppercase text-[var(--muted)] opacity-50 mb-1.5">Previous</p>
+                <div className="flex-1 px-4 py-3 bg-[var(--input-bg)] border border-[var(--border)] rounded-lg text-[13px] text-[var(--text)] opacity-70 leading-relaxed whitespace-pre-wrap overflow-y-auto max-h-[400px]">
                   {previousDraft}
                 </div>
                 <button
                   onClick={() => pickDraft("old")}
-                  className="mt-2 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded text-[11px] font-medium border border-[var(--border)] text-[var(--muted)] hover:text-[var(--text)] hover:bg-[var(--surface-elevated)]"
+                  className="mt-2 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium border border-[var(--border)] text-[var(--muted)] hover:text-[var(--text)] hover:bg-[var(--surface-elevated)]"
                 >
                   <RotateCcw size={10} />
                   Keep original
                 </button>
               </div>
               <div className="flex flex-col">
-                <p className="text-[10px] uppercase text-emerald-400 opacity-80 mb-1">New version</p>
-                <div className="flex-1 px-3 py-2.5 bg-[var(--input-bg)] border border-emerald-500/30 rounded-lg text-xs text-[var(--text)] opacity-80 leading-relaxed whitespace-pre-wrap overflow-y-auto max-h-[400px]">
+                <p className="text-[10px] uppercase text-emerald-400 opacity-80 mb-1.5">New version</p>
+                <div className="flex-1 px-4 py-3 bg-[var(--input-bg)] border border-emerald-500/30 rounded-lg text-[13px] text-[var(--text)] opacity-80 leading-relaxed whitespace-pre-wrap overflow-y-auto max-h-[400px]">
                   {newDraft}
                 </div>
                 <button
                   onClick={() => pickDraft("new")}
-                  className="mt-2 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded text-[11px] font-medium bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20"
+                  className="mt-2 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20"
                 >
                   <Check size={10} />
                   Use this version
@@ -473,17 +587,46 @@ export default function ChaserCard({ chaser, memories, onActionComplete }: Chase
               </div>
             </div>
           ) : (
-            <textarea
-              value={editedContent}
-              onChange={(e) => handleEditChange(e.target.value)}
-              rows={12}
-              className="flex-1 w-full px-4 py-3 bg-[var(--input-bg)] border border-[var(--border)] rounded-lg text-sm text-[var(--text)] opacity-90 leading-relaxed focus:outline-none focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)] resize-y min-h-[280px]"
-            />
+            /* AI Draft (read-only) vs Your Version (editable) */
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+              {/* AI Draft — read-only */}
+              <div className="flex flex-col">
+                <div className="flex items-center justify-between mb-1.5">
+                  <p className="text-[10px] uppercase tracking-widest text-[var(--muted)] opacity-50">AI Draft</p>
+                  {regenerating && (
+                    <span className="flex items-center gap-1 text-[10px] text-amber-400">
+                      <Loader2 size={10} className="animate-spin" />
+                      Regenerating...
+                    </span>
+                  )}
+                </div>
+                <div className="flex-1 px-4 py-3 bg-[var(--surface-elevated)] border border-[var(--border)] rounded-lg text-[13px] text-[var(--text)] opacity-70 leading-relaxed whitespace-pre-wrap overflow-y-auto min-h-[280px] max-h-[500px]">
+                  {chaser.draft_content}
+                </div>
+              </div>
+
+              {/* Editable version */}
+              <div className="flex flex-col">
+                <div className="flex items-center justify-between mb-1.5">
+                  <p className="text-[10px] uppercase tracking-widest text-[var(--muted)] opacity-50">Your Version</p>
+                  <div className="flex items-center gap-2">
+                    {saving && <span className="text-[10px] text-[var(--muted)] animate-pulse">Saving...</span>}
+                    <span className="text-[10px] text-[var(--muted)] opacity-40">{editedContent.length} chars</span>
+                  </div>
+                </div>
+                <textarea
+                  value={editedContent}
+                  onChange={(e) => handleEditChange(e.target.value)}
+                  rows={12}
+                  className="flex-1 w-full px-4 py-3 bg-[var(--input-bg)] border border-[var(--border)] rounded-lg text-[13px] text-[var(--text)] opacity-90 leading-relaxed focus:outline-none focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)] resize-y min-h-[280px]"
+                />
+              </div>
+            </div>
           )}
 
           {/* Quick feedback chips */}
           {!comparing && (
-            <div className="flex flex-wrap gap-1.5 mt-3">
+            <div className="flex flex-wrap gap-1.5 mb-3">
               {QUICK_CHIPS.map((chip) => (
                 <button
                   key={chip}
@@ -502,7 +645,7 @@ export default function ChaserCard({ chaser, memories, onActionComplete }: Chase
 
           {/* Instruction input */}
           {!comparing && (
-            <div className="flex gap-2 mt-3">
+            <div className="flex gap-2 mb-4">
               <input
                 value={instruction}
                 onChange={(e) => setInstruction(e.target.value)}
@@ -512,12 +655,12 @@ export default function ChaserCard({ chaser, memories, onActionComplete }: Chase
                   }
                 }}
                 placeholder="Tell the agent what to change..."
-                className="flex-1 px-3 py-2 bg-[var(--input-bg)] border border-[var(--border)] rounded-lg text-xs text-[var(--text)] placeholder:text-[var(--muted)] focus:outline-none focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)]"
+                className="flex-1 px-3 py-2 bg-[var(--input-bg)] border border-[var(--border)] rounded-lg text-[13px] text-[var(--text)] placeholder:text-[var(--muted)] focus:outline-none focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)]"
               />
               <button
                 onClick={() => handleRegenerate()}
                 disabled={regenerating || !instruction.trim()}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium border border-[var(--border)] text-[var(--muted)] hover:text-[var(--text)] hover:bg-[var(--surface-elevated)] disabled:opacity-30"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-[11px] font-medium border border-[var(--border)] text-[var(--muted)] hover:text-[var(--text)] hover:bg-[var(--surface-elevated)] disabled:opacity-30"
               >
                 {regenerating ? <Loader2 size={11} className="animate-spin" /> : <Zap size={11} />}
                 Regenerate
@@ -525,8 +668,8 @@ export default function ChaserCard({ chaser, memories, onActionComplete }: Chase
             </div>
           )}
 
-          {/* Send Channel Selector */}
-          <div className="mt-4 mb-3">
+          {/* Channel selector */}
+          <div className="mb-3">
             <p className="text-[10px] uppercase tracking-widest text-[var(--muted)] opacity-50 mb-2">Send via</p>
             <div className="flex gap-1.5">
               {(["email", "whatsapp", "both"] as const).map((ch) => {
@@ -540,10 +683,10 @@ export default function ChaserCard({ chaser, memories, onActionComplete }: Chase
                     onClick={() => !disabled && setSelectedChannel(ch)}
                     disabled={disabled}
                     className={cn(
-                      "flex items-center gap-1.5 px-3 py-1.5 rounded text-[11px] font-medium capitalize transition-colors",
+                      "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium capitalize transition-colors",
                       selectedChannel === ch
                         ? "border border-[var(--accent-primary)] text-[var(--accent-primary)] bg-[var(--accent-primary)]/10"
-                        : "bg-[var(--surface-elevated)] text-[var(--text)] hover:text-[var(--text)] hover:bg-[var(--surface-elevated)]",
+                        : "bg-[var(--surface-elevated)] text-[var(--text)] hover:bg-[var(--surface-elevated)]",
                       disabled && "opacity-30 cursor-not-allowed"
                     )}
                   >
@@ -562,49 +705,91 @@ export default function ChaserCard({ chaser, memories, onActionComplete }: Chase
             )}
           </div>
 
-          {/* Character count */}
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-[10px] text-[var(--muted)] opacity-40">{editedContent.length} characters</span>
-          </div>
-
-          {/* Action buttons */}
-          <div className="flex items-center gap-2 flex-wrap">
-            <button
-              onClick={handleApprove}
-              disabled={loadingAction !== null || comparing}
-              className={cn(
-                "flex items-center gap-2 px-5 py-2.5 rounded-lg text-xs font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed",
-                hasEdits
-                  ? "bg-amber-500 text-white hover:bg-amber-400"
-                  : "bg-[var(--accent-primary)] text-white hover:bg-[var(--accent-primary)]/90 glow-primary"
-              )}
-            >
-              {loadingAction === "approve" ? <Loader2 size={12} className="animate-spin" /> : <Send size={12} />}
-              {isSaved ? "Send Now" : hasEdits ? "Edit & Approve" : "Approve & Send Now"}
-            </button>
-
-            {!isSaved && (
-              <button
-                onClick={handleSaveDraft}
-                disabled={loadingAction !== null || comparing}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-medium border border-[var(--border)] text-[var(--muted)] hover:text-[var(--text)] hover:bg-[var(--surface-elevated)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                {loadingAction === "save" ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
-                Save Draft
-              </button>
+          {/* Client details + memories (collapsed context) */}
+          <div className="flex items-center gap-4 text-[11px] text-[var(--muted)] mb-2">
+            {client.email && (
+              <span className="flex items-center gap-1"><Mail size={10} /> {client.email}</span>
             )}
-
-            <button
-              onClick={handleReject}
-              disabled={loadingAction !== null || comparing}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-medium border border-[var(--border)] text-[var(--muted)] hover:border-red-500/50 hover:text-red-400 transition-colors disabled:opacity-40 disabled:cursor-not-allowed ml-auto"
-            >
-              {loadingAction === "reject" ? <Loader2 size={12} className="animate-spin" /> : <X size={12} />}
-              Reject
-            </button>
+            {client.whatsapp_number && (
+              <span className="flex items-center gap-1"><Phone size={10} /> {client.whatsapp_number}</span>
+            )}
+            {script.assigned_writer && (
+              <span>Writer: {script.assigned_writer}</span>
+            )}
+            {client.avg_response_hours != null && (
+              <span>Avg response: {Math.round(client.avg_response_hours)}hrs</span>
+            )}
+            {client.changes_requested_count > 0 && (
+              <span>Changes requested: {client.changes_requested_count}x</span>
+            )}
           </div>
+
+          {memories.length > 0 && (
+            <div className="mb-4">
+              <p className="text-[10px] uppercase tracking-widest text-[var(--muted)] opacity-50 mb-2">Client History</p>
+              <div className="space-y-1.5">
+                {memories.map((m, i) => (
+                  <div key={i} className="flex items-start gap-2">
+                    <div className="w-1.5 h-1.5 rounded-full bg-[var(--muted)] opacity-40 mt-1.5 shrink-0" />
+                    <div>
+                      <p className="text-[11px] text-[var(--text)] opacity-80">{m.content}</p>
+                      <p className="text-[10px] text-[var(--muted)] opacity-40">
+                        {m.memory_type} &middot; {new Date(m.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
-    </motion.div>
+
+      {/* Sticky bottom action bar */}
+      <div className="sticky bottom-0 border-t border-[var(--border)] bg-[var(--bg)] px-6 py-3 flex items-center justify-between">
+        <div>
+          <button
+            onClick={handleReject}
+            disabled={loadingAction !== null || comparing || pendingApprove}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg text-[11px] font-medium border border-red-500/40 text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            {loadingAction === "reject" ? <Loader2 size={12} className="animate-spin" /> : <X size={12} />}
+            Reject
+          </button>
+        </div>
+        <div className="flex items-center gap-2">
+          {pendingApprove && (
+            <button
+              onClick={handleUndoApprove}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-[11px] font-medium border border-[var(--border)] text-amber-400 hover:bg-amber-500/10 transition-colors"
+            >
+              <RotateCcw size={11} />
+              Undo
+            </button>
+          )}
+          {!isSaved && (
+            <button
+              onClick={handleSaveDraft}
+              disabled={loadingAction !== null || comparing || pendingApprove}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg text-[11px] font-medium border border-[var(--border)] text-[var(--muted)] hover:text-[var(--text)] hover:bg-[var(--surface-elevated)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              {loadingAction === "save" ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
+              Save Draft
+            </button>
+          )}
+          <button
+            onClick={handleApprove}
+            disabled={loadingAction !== null || comparing || pendingApprove}
+            className={cn(
+              "flex items-center gap-2 px-5 py-2 rounded-lg text-[11px] font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed",
+              "bg-[var(--accent-primary)] text-white hover:bg-[var(--accent-primary)]/90"
+            )}
+          >
+            {loadingAction === "approve" ? <Loader2 size={12} className="animate-spin" /> : <Send size={12} />}
+            {isSaved ? "Send Now" : "Approve & Send"}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }

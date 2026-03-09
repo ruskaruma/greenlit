@@ -31,13 +31,41 @@ export async function POST(
     return NextResponse.json({ error: "Script not found" }, { status: 404 });
   }
 
-  if (script.status !== "draft") {
-    return NextResponse.json({ error: "Script already sent" }, { status: 409 });
+  // Allow sending from draft OR re-sending after changes_requested/rejected
+  const allowedStatuses = ["draft", "changes_requested", "rejected"];
+  if (!allowedStatuses.includes(script.status)) {
+    return NextResponse.json(
+      { error: `Cannot send script with status "${script.status}"` },
+      { status: 409 }
+    );
+  }
+
+  const isResend = script.status !== "draft";
+
+  // Generate a new review token for re-sends so the old link is invalidated
+  let reviewToken = script.review_token;
+  if (isResend) {
+    const newToken = crypto.randomUUID();
+    const { error: tokenError } = await supabase
+      .from("scripts")
+      .update({
+        review_token: newToken,
+        client_feedback: null,
+        reviewed_at: null,
+        version: (script.version ?? 1) + 1,
+      })
+      .eq("id", id);
+
+    if (tokenError) {
+      console.error("[scripts/send] Failed to regenerate review token:", tokenError.message);
+    } else {
+      reviewToken = newToken;
+    }
   }
 
   const client = script.client;
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-  const reviewUrl = `${appUrl}/review/${script.review_token}`;
+  const reviewUrl = `${appUrl}/review/${reviewToken}`;
   const channel: string = review_channel || client.preferred_channel || "email";
 
   let anySendSucceeded = false;

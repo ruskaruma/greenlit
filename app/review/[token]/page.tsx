@@ -74,7 +74,7 @@ function ExpiredLink() {
         </div>
         <h1 className="text-lg font-semibold text-[var(--text)] mb-2">Review link expired</h1>
         <p className="text-sm text-[var(--muted)]">
-          This review link has expired. Please contact your Scrollhouse team for a new link.
+          This review link has expired. Please contact your team for a new link.
         </p>
       </div>
     </div>
@@ -124,9 +124,7 @@ export default async function ReviewPage({
         <div className="max-w-2xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
           <div>
             <span className="text-xs text-[var(--muted)]">
-              Greenlit for Scrollhouse
-              <span className="opacity-40"> &middot; </span>
-              by ruskaruma
+              {process.env.NEXT_PUBLIC_AGENCY_NAME || "Your Agency"}
             </span>
           </div>
           <StatusBadge status={script.status} />

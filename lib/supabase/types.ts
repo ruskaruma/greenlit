@@ -66,7 +66,19 @@ export interface Script {
   review_channel: string;
   response_deadline_minutes: number;
   archived: boolean;
-  quality_score: { hook_strength: number; cta_clarity: number; tone_consistency?: number; average: number } | null;
+  brief_id: string | null;
+  quality_score: {
+    hook_strength: number;
+    cta_clarity: number;
+    tone_consistency?: number | null;
+    brand_alignment?: number;
+    platform_fit?: number;
+    pacing_structure?: number;
+    average: number;
+    feedback?: string;
+    strengths?: string[];
+    improvements?: string[];
+  } | null;
   created_at: string;
   updated_at: string;
 }
@@ -148,6 +160,42 @@ export interface ReportWithClient extends Report {
   client: Client;
 }
 
+export type BriefStatus =
+  | "intake"
+  | "parsing"
+  | "parsed"
+  | "assigned"
+  | "in_progress"
+  | "script_uploaded"
+  | "archived";
+
+export interface Brief {
+  id: string;
+  client_id: string;
+  raw_input: string;
+  content_type: string;
+  platform: string | null;
+  topic: string | null;
+  target_audience: string | null;
+  key_messages: string | null;
+  tone: string | null;
+  reference_links: string | null;
+  deadline: string | null;
+  special_instructions: string | null;
+  parsed_brief: Record<string, unknown> | null;
+  status: BriefStatus;
+  assigned_writer: string | null;
+  script_id: string | null;
+  parsed_at: string | null;
+  assigned_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface BriefWithClient extends Brief {
+  client: Client;
+}
+
 export interface Database {
   public: {
     Tables: {
@@ -207,6 +255,7 @@ export interface Database {
           review_channel?: string;
           response_deadline_minutes?: number;
           archived?: boolean;
+          brief_id?: string | null;
           quality_score?: Record<string, unknown> | null;
           created_at?: string;
           updated_at?: string;
@@ -228,6 +277,7 @@ export interface Database {
           review_channel?: string;
           response_deadline_minutes?: number;
           archived?: boolean;
+          brief_id?: string | null;
           quality_score?: Record<string, unknown> | null;
           updated_at?: string;
         };
@@ -324,6 +374,67 @@ export interface Database {
             columns: ["client_id"];
             isOneToOne: false;
             referencedRelation: "clients";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+      briefs: {
+        Row: Brief;
+        Insert: {
+          id?: string;
+          client_id: string;
+          raw_input: string;
+          content_type?: string;
+          platform?: string | null;
+          topic?: string | null;
+          target_audience?: string | null;
+          key_messages?: string | null;
+          tone?: string | null;
+          reference_links?: string | null;
+          deadline?: string | null;
+          special_instructions?: string | null;
+          parsed_brief?: Record<string, unknown> | null;
+          status?: BriefStatus;
+          assigned_writer?: string | null;
+          script_id?: string | null;
+          parsed_at?: string | null;
+          assigned_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          client_id?: string;
+          raw_input?: string;
+          content_type?: string;
+          platform?: string | null;
+          topic?: string | null;
+          target_audience?: string | null;
+          key_messages?: string | null;
+          tone?: string | null;
+          reference_links?: string | null;
+          deadline?: string | null;
+          special_instructions?: string | null;
+          parsed_brief?: Record<string, unknown> | null;
+          status?: BriefStatus;
+          assigned_writer?: string | null;
+          script_id?: string | null;
+          parsed_at?: string | null;
+          assigned_at?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "briefs_client_id_fkey";
+            columns: ["client_id"];
+            isOneToOne: false;
+            referencedRelation: "clients";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "briefs_script_id_fkey";
+            columns: ["script_id"];
+            isOneToOne: false;
+            referencedRelation: "scripts";
             referencedColumns: ["id"];
           }
         ];

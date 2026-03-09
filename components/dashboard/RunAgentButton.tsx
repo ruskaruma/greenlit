@@ -278,7 +278,7 @@ export default function RunAgentButton({ scripts, mode, singleScript, onOpenChan
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="relative w-full max-w-md bg-[var(--card)] border border-[var(--border)] rounded-xl overflow-hidden"
+              className="relative w-full max-w-md bg-[var(--card)] border border-[var(--border)] rounded-lg overflow-hidden"
             >
               <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)]">
                 <h3 className="text-sm font-semibold text-[var(--text)]">Run Chase Agent</h3>
@@ -317,7 +317,7 @@ export default function RunAgentButton({ scripts, mode, singleScript, onOpenChan
                   </button>
                   <button
                     onClick={() => runSingle(singleScript.id)}
-                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded text-xs font-bold bg-[var(--accent-primary)] text-white hover:bg-[var(--accent-primary)]/90 glow-primary"
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded text-xs font-bold bg-[var(--accent-primary)] text-white hover:bg-[var(--accent-primary)]/90"
                   >
                     <Bot size={12} />
                     Run Agent
@@ -371,7 +371,7 @@ export default function RunAgentButton({ scripts, mode, singleScript, onOpenChan
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="relative w-full max-w-lg bg-[var(--card)] border border-[var(--border)] rounded-xl overflow-hidden"
+              className="relative w-full max-w-lg bg-[var(--card)] border border-[var(--border)] rounded-lg overflow-hidden"
             >
               <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)]">
                 <h3 className="text-sm font-semibold text-[var(--text)]">Run Chase Agent</h3>
@@ -437,7 +437,7 @@ export default function RunAgentButton({ scripts, mode, singleScript, onOpenChan
                   </button>
                   <button
                     onClick={runBatch}
-                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded text-xs font-bold bg-[var(--accent-primary)] text-white hover:bg-[var(--accent-primary)]/90 glow-primary"
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded text-xs font-bold bg-[var(--accent-primary)] text-white hover:bg-[var(--accent-primary)]/90"
                   >
                     <Bot size={12} />
                     Run on All ({overdueScripts.length})

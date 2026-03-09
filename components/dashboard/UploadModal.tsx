@@ -11,8 +11,14 @@ type ToastState = { type: "success" | "error"; message: string } | null;
 interface QualityScore {
   hook_strength: number;
   cta_clarity: number;
-  tone_consistency?: number;
+  tone_consistency?: number | null;
+  brand_alignment?: number;
+  platform_fit?: number;
+  pacing_structure?: number;
   average: number;
+  feedback?: string;
+  strengths?: string[];
+  improvements?: string[];
 }
 
 function Toast({ toast, onDismiss }: { toast: NonNullable<ToastState>; onDismiss: () => void }) {
@@ -194,7 +200,7 @@ export default function UploadModal({ clients, onScriptUploaded }: UploadModalPr
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 10 }}
               transition={{ duration: 0.15 }}
-              className="relative w-full max-w-lg bg-[var(--card)] border border-[var(--border)] rounded-xl shadow-2xl"
+              className="relative w-full max-w-lg bg-[var(--card)] border border-[var(--border)] rounded-lg shadow-2xl"
             >
               <div className="flex items-center justify-between p-5 border-b border-[var(--border)]">
                 <h2 className="text-base font-semibold text-[var(--text)]">Upload Script</h2>
@@ -324,27 +330,37 @@ export default function UploadModal({ clients, onScriptUploaded }: UploadModalPr
                         </span>
                       </div>
                       <div className="space-y-1 text-xs text-[var(--muted)]">
-                        <div className="flex justify-between">
-                          <span>Hook Strength</span>
-                          <span className={cn(scoreResult.score.hook_strength < 6 ? "text-red-400" : "text-[var(--text)]")}>
-                            {scoreResult.score.hook_strength}/10
-                          </span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>CTA Clarity</span>
-                          <span className={cn(scoreResult.score.cta_clarity < 6 ? "text-red-400" : "text-[var(--text)]")}>
-                            {scoreResult.score.cta_clarity}/10
-                          </span>
-                        </div>
-                        {scoreResult.score.tone_consistency !== undefined && (
-                          <div className="flex justify-between">
-                            <span>Tone Consistency</span>
-                            <span className={cn(scoreResult.score.tone_consistency < 6 ? "text-red-400" : "text-[var(--text)]")}>
-                              {scoreResult.score.tone_consistency}/10
-                            </span>
-                          </div>
-                        )}
+                        {([
+                          ["hook_strength", "Hook Strength"],
+                          ["cta_clarity", "CTA Clarity"],
+                          ["brand_alignment", "Brand Alignment"],
+                          ["platform_fit", "Platform Fit"],
+                          ["pacing_structure", "Pacing"],
+                          ["tone_consistency", "Tone Match"],
+                        ] as const).map(([key, label]) => {
+                          const val = (scoreResult.score as unknown as Record<string, unknown>)[key];
+                          if (val == null) return null;
+                          const num = typeof val === "number" ? val : 0;
+                          return (
+                            <div key={key} className="flex justify-between">
+                              <span>{label}</span>
+                              <span className={cn(num < 6 ? "text-red-400" : "text-[var(--text)]")}>
+                                {num}/10
+                              </span>
+                            </div>
+                          );
+                        })}
                       </div>
+                      {scoreResult.score.feedback && (
+                        <p className="text-[11px] text-[var(--muted)] opacity-70 italic mt-2">{scoreResult.score.feedback}</p>
+                      )}
+                      {scoreResult.score.improvements && scoreResult.score.improvements.length > 0 && (
+                        <div className="mt-1">
+                          {scoreResult.score.improvements.map((s, i) => (
+                            <p key={i} className="text-[11px] text-amber-400/80">- {s}</p>
+                          ))}
+                        </div>
+                      )}
                     </div>
                     <div className="flex gap-2">
                       <button
