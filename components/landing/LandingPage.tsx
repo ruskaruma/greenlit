@@ -2,29 +2,131 @@
 
 import { motion } from "framer-motion";
 import Link from "next/link";
-
-import { Bot, ShieldCheck, BarChart3 } from "lucide-react";
+import {
+  Search,
+  Activity,
+  GitBranch,
+  PenTool,
+  ShieldCheck,
+  RefreshCw,
+  UserCheck,
+  BarChart3,
+  GraduationCap,
+  Brain,
+  AlertTriangle,
+  UserPlus,
+  FileText,
+  RotateCcw,
+  ChevronRight,
+  FolderOpen,
+  BookOpen,
+  Table2,
+  Camera,
+  Youtube,
+  Mail,
+  MessageSquare,
+} from "lucide-react";
 import ThemeToggle from "@/components/dashboard/ThemeToggle";
 
 const words = ["AI-POWERED", "SCRIPT", "APPROVAL", "ENGINE"];
 
-const features = [
+const badges = [
+  "LANGGRAPH AGENT",
+  "HITL REVIEW",
+  "6D SCORING",
+  "FEW-SHOT LEARNING",
+  "MULTI-CHANNEL",
+  "AUTO-ESCALATION",
+];
+
+const pipelineSteps = [
+  { icon: Search, label: "RAG Retrieval" },
+  { icon: Activity, label: "Sentiment" },
+  { icon: GitBranch, label: "Channel Strategy" },
+  { icon: PenTool, label: "Generation" },
+  { icon: ShieldCheck, label: "Self-Critique" },
+  { icon: RefreshCw, label: "Revision" },
+  { icon: UserCheck, label: "HITL Review" },
+];
+
+const capabilities = [
   {
-    icon: Bot,
-    title: "AI Agent",
-    desc: "Autonomous email and WhatsApp chasing with configurable escalation schedules and tone adaptation.",
-  },
-  {
-    icon: ShieldCheck,
+    icon: UserCheck,
     title: "Human-in-the-Loop",
-    desc: "Review and approve every AI-drafted message before it reaches your client. Full control, zero surprises.",
+    desc: "LangGraph interrupt() pauses the pipeline. Team leads review, edit, or reject every AI draft before delivery. State persisted across sessions.",
   },
   {
     icon: BarChart3,
     title: "Quality Scoring",
-    desc: "Claude-powered script analysis across hook strength, CTA clarity, and tone consistency.",
+    desc: "6-dimension analysis: hook strength, CTA clarity, brand alignment, platform fit, pacing, tone consistency. Binary pass/fail self-critique prevents score inflation.",
+  },
+  {
+    icon: GraduationCap,
+    title: "Few-Shot Learning",
+    desc: "The agent learns from team lead edits. Last 3 approved examples injected per client to continuously improve future generations.",
+  },
+  {
+    icon: GitBranch,
+    title: "Channel Strategy",
+    desc: "Sliding-window response-rate comparison between email and WhatsApp. Automatically selects the channel with 20%+ advantage. Escalation sends both.",
+  },
+  {
+    icon: Brain,
+    title: "Memory System",
+    desc: "RAG retrieval with pgvector embeddings. AI consolidation summarizes 20+ memories into 6 actionable statements using Claude Haiku.",
+  },
+  {
+    icon: AlertTriangle,
+    title: "Auto-Escalation",
+    desc: "After 3 failed chasers, scripts escalate automatically. Overdue cron job triggers the full agent pipeline on a schedule.",
   },
 ];
+
+const integrations = [
+  { icon: FolderOpen, label: "Google Drive" },
+  { icon: BookOpen, label: "Notion" },
+  { icon: Table2, label: "Airtable" },
+  { icon: Camera, label: "Instagram" },
+  { icon: Youtube, label: "YouTube" },
+  { icon: Mail, label: "Resend" },
+  { icon: MessageSquare, label: "Twilio" },
+];
+
+const workflows = [
+  {
+    icon: UserPlus,
+    title: "Client Onboarding",
+    desc: "SSE-streamed automation: welcome email, Google Drive folder, Notion page, Airtable record, WhatsApp notification. All optional, graceful skip.",
+  },
+  {
+    icon: FileText,
+    title: "Content Briefs",
+    desc: "Form intake parsed by Claude into structured briefs. Context-aware: pulls client brand voice and memories for accurate parsing.",
+  },
+  {
+    icon: RotateCcw,
+    title: "Review Cycle",
+    desc: "Versioned review links via Resend. Each chase bumps the version, generates a new token, and clears stale feedback. One-click approval.",
+  },
+];
+
+const techStack = [
+  "Next.js 16",
+  "React 19",
+  "Supabase",
+  "LangGraph",
+  "Claude",
+  "pgvector",
+  "Resend",
+  "Twilio",
+];
+
+const sectionAnim = {
+  initial: { opacity: 0, y: 24 },
+  whileInView: { opacity: 1, y: 0 },
+  viewport: { once: true, margin: "-60px" },
+  transition: { duration: 0.5 },
+};
 
 export default function LandingPage() {
   return (
@@ -53,9 +155,11 @@ export default function LandingPage() {
         </div>
       </nav>
 
-      <main className="flex-1 flex flex-col items-center justify-center px-6">
+      <main className="flex-1 flex flex-col items-center px-6">
         <div className="max-w-5xl mx-auto w-full">
-          <div className="text-center mb-12 md:mb-16">
+
+          {/* ── Hero ── */}
+          <section className="text-center pt-16 md:pt-24 pb-16 md:pb-20">
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
@@ -87,19 +191,20 @@ export default function LandingPage() {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.6, duration: 0.5 }}
-              className="text-sm md:text-base text-[var(--muted)] mb-8 max-w-xl mx-auto leading-relaxed italic"
+              className="text-sm md:text-base text-[var(--muted)] mb-8 max-w-2xl mx-auto leading-relaxed italic"
             >
-              AI-orchestrated video script approvals with autonomous chasing,
-              human-in-the-loop review, and quality scoring.
+              A 7-stage autonomous agent pipeline that drafts, critiques, and
+              delivers client chasers — with human oversight at every step,
+              few-shot learning from your edits, and multi-channel delivery.
             </motion.p>
 
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.75, duration: 0.4 }}
-              className="flex items-center justify-center gap-3 mb-8 flex-wrap"
+              className="flex items-center justify-center gap-2 md:gap-3 mb-8 flex-wrap"
             >
-              {["AUTO-CHASE", "HITL REVIEW", "AI SCORING"].map((b) => (
+              {badges.map((b) => (
                 <span key={b} className="px-3 py-1 rounded-full border border-[var(--border)] text-[10px] tracking-[0.1em] uppercase text-[var(--muted)]">
                   {b}
                 </span>
@@ -121,45 +226,178 @@ export default function LandingPage() {
                 </motion.span>
               </Link>
             </motion.div>
-          </div>
+          </section>
 
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 1.1, duration: 0.5 }}
-            className="text-center mb-6"
-          >
+          {/* ── Agent Pipeline ── */}
+          <motion.section {...sectionAnim} className="py-16 md:py-20">
+            <div className="text-center mb-10">
+              <h2
+                className="text-2xl md:text-3xl font-bold text-[var(--text)] mb-2 tracking-tight italic"
+                style={{ fontFamily: "var(--font-playfair), serif" }}
+              >
+                Agent Pipeline
+              </h2>
+              <p className="text-sm text-[var(--muted)]">
+                Seven autonomous stages from memory retrieval to human approval.
+              </p>
+            </div>
+
+            <div className="flex items-center justify-center gap-1 md:gap-2 overflow-x-auto pb-2">
+              {pipelineSteps.map((step, i) => (
+                <div key={step.label} className="flex items-center gap-1 md:gap-2 shrink-0">
+                  <motion.div
+                    initial={{ opacity: 0, y: 12 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ delay: i * 0.08, duration: 0.35 }}
+                    className="flex flex-col items-center gap-2 px-3 py-3 md:px-5 md:py-4 rounded-lg bg-[var(--card)] border border-[var(--border)] min-w-[80px] md:min-w-[100px]"
+                  >
+                    <div className="w-8 h-8 rounded-lg border border-[var(--accent-primary)]/30 bg-[var(--accent-primary)]/5 flex items-center justify-center">
+                      <step.icon size={14} className="text-[var(--accent-primary)]" />
+                    </div>
+                    <span className="text-[10px] md:text-[11px] text-[var(--muted)] whitespace-nowrap">
+                      {step.label}
+                    </span>
+                  </motion.div>
+                  {i < pipelineSteps.length - 1 && (
+                    <ChevronRight size={14} className="text-[var(--border)] shrink-0" />
+                  )}
+                </div>
+              ))}
+            </div>
+          </motion.section>
+
+          {/* ── Core Capabilities ── */}
+          <motion.section {...sectionAnim} className="py-16 md:py-20">
+            <div className="text-center mb-10">
+              <h2
+                className="text-2xl md:text-3xl font-bold text-[var(--text)] mb-2 tracking-tight italic"
+                style={{ fontFamily: "var(--font-playfair), serif" }}
+              >
+                Core Capabilities
+              </h2>
+              <p className="text-sm text-[var(--muted)]">
+                Everything the agent does, and how you stay in control.
+              </p>
+            </div>
+
+            <div className="grid md:grid-cols-2 gap-4">
+              {capabilities.map((f, i) => (
+                <motion.div
+                  key={f.title}
+                  initial={{ opacity: 0, y: 16 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: i * 0.08, duration: 0.4 }}
+                  className="p-5 rounded-lg bg-[var(--card)] border border-[var(--border)]"
+                >
+                  <div className="w-9 h-9 rounded-lg border border-[var(--accent-primary)]/30 bg-[var(--accent-primary)]/5 flex items-center justify-center mb-4">
+                    <f.icon size={18} className="text-[var(--accent-primary)]" />
+                  </div>
+                  <h3 className="text-sm font-semibold text-[var(--text)] mb-2">{f.title}</h3>
+                  <p className="text-xs text-[var(--muted)] leading-relaxed">{f.desc}</p>
+                </motion.div>
+              ))}
+            </div>
+          </motion.section>
+
+          {/* ── Integrations ── */}
+          <motion.section {...sectionAnim} className="py-16 md:py-20">
+            <div className="text-center mb-10">
+              <h2
+                className="text-2xl md:text-3xl font-bold text-[var(--text)] mb-2 tracking-tight italic"
+                style={{ fontFamily: "var(--font-playfair), serif" }}
+              >
+                Integrations
+              </h2>
+              <p className="text-sm text-[var(--muted)]">
+                Connected services for onboarding, delivery, and analytics.
+              </p>
+            </div>
+
+            <div className="flex items-center justify-center gap-3 flex-wrap">
+              {integrations.map((item, i) => (
+                <motion.div
+                  key={item.label}
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  whileInView={{ opacity: 1, scale: 1 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: i * 0.05, duration: 0.3 }}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-[var(--border)] bg-[var(--card)]"
+                >
+                  <item.icon size={14} className="text-[var(--accent-primary)]" />
+                  <span className="text-[11px] text-[var(--muted)]">{item.label}</span>
+                </motion.div>
+              ))}
+            </div>
+          </motion.section>
+
+          {/* ── Workflow Highlights ── */}
+          <motion.section {...sectionAnim} className="py-16 md:py-20">
+            <div className="text-center mb-10">
+              <h2
+                className="text-2xl md:text-3xl font-bold text-[var(--text)] mb-2 tracking-tight italic"
+                style={{ fontFamily: "var(--font-playfair), serif" }}
+              >
+                End-to-End Workflows
+              </h2>
+              <p className="text-sm text-[var(--muted)]">
+                From onboarding to final approval, fully automated.
+              </p>
+            </div>
+
+            <div className="grid md:grid-cols-3 gap-4">
+              {workflows.map((f, i) => (
+                <motion.div
+                  key={f.title}
+                  initial={{ opacity: 0, y: 16 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: i * 0.08, duration: 0.4 }}
+                  className="p-5 rounded-lg bg-[var(--card)] border border-[var(--border)]"
+                >
+                  <div className="w-9 h-9 rounded-lg border border-[var(--accent-primary)]/30 bg-[var(--accent-primary)]/5 flex items-center justify-center mb-4">
+                    <f.icon size={18} className="text-[var(--accent-primary)]" />
+                  </div>
+                  <h3 className="text-sm font-semibold text-[var(--text)] mb-2">{f.title}</h3>
+                  <p className="text-xs text-[var(--muted)] leading-relaxed">{f.desc}</p>
+                </motion.div>
+              ))}
+            </div>
+          </motion.section>
+
+          {/* ── Tech Stack ── */}
+          <motion.section {...sectionAnim} className="py-12 md:py-16 border-t border-[var(--border)]">
+            <div className="flex items-center justify-center gap-3 flex-wrap">
+              {techStack.map((t) => (
+                <span key={t} className="px-3 py-1 rounded-full border border-[var(--border)] text-[11px] text-[var(--muted)]">
+                  {t}
+                </span>
+              ))}
+            </div>
+          </motion.section>
+
+          {/* ── CTA Footer ── */}
+          <motion.section {...sectionAnim} className="py-16 md:py-24 text-center">
             <h2
-              className="text-2xl md:text-3xl font-bold text-[var(--text)] mb-2 tracking-tight italic"
+              className="text-2xl md:text-3xl font-bold text-[var(--text)] mb-3 tracking-tight italic"
               style={{ fontFamily: "var(--font-playfair), serif" }}
             >
-              Unlock Automated Approvals
+              Ready to automate approvals?
             </h2>
-            <p className="text-sm text-[var(--muted)]">Everything you need to get scripts approved faster.</p>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 1.2, duration: 0.5 }}
-            className="grid md:grid-cols-3 gap-4"
-          >
-            {features.map((f, i) => (
-              <motion.div
-                key={f.title}
-                initial={{ opacity: 0, y: 15 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 1.3 + i * 0.08, duration: 0.4 }}
-                className="p-5 rounded-lg bg-[var(--card)] border border-[var(--border)]"
+            <p className="text-sm text-[var(--muted)] mb-8 max-w-md mx-auto">
+              Set up your pipeline in minutes. Let the agent handle the chasing while you focus on creative.
+            </p>
+            <Link href="/login">
+              <motion.span
+                className="inline-block px-8 py-3.5 rounded-lg font-semibold text-base bg-[var(--accent-primary)] text-white cursor-pointer"
+                whileHover={{ scale: 1.03, y: -1 }}
+                whileTap={{ scale: 0.98 }}
               >
-                <div className="w-9 h-9 rounded-lg border border-[var(--accent-primary)]/30 bg-[var(--accent-primary)]/5 flex items-center justify-center mb-4">
-                  <f.icon size={18} className="text-[var(--accent-primary)]" />
-                </div>
-                <h3 className="text-sm font-semibold text-[var(--text)] mb-2">{f.title}</h3>
-                <p className="text-xs text-[var(--muted)] leading-relaxed">{f.desc}</p>
-              </motion.div>
-            ))}
-          </motion.div>
+                get started
+              </motion.span>
+            </Link>
+          </motion.section>
         </div>
       </main>
 
