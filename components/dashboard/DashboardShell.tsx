@@ -363,6 +363,7 @@ function DashboardShellInner({
             onConnectionChange={setConnected}
             refreshKey={refreshKey}
             onArchive={handleArchive}
+            activeClientId={activeClientId}
           />
         </div>
         </>

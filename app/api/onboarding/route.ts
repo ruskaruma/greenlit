@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServiceClientDirect } from "@/lib/supabase/server";
 import { requireSession } from "@/lib/auth/requireSession";
+import { createClient as createClientInDb } from "@/lib/clients/createClient";
 import { storeClientMemory } from "@/lib/agent/nodes/memoryUpdate";
 import { sendWelcomeEmail } from "@/lib/resend/sendWelcomeEmail";
 import { createClientFolder } from "@/lib/integrations/googleDrive";
@@ -39,46 +40,37 @@ export async function POST(request: Request) {
     platform_focus,
   } = body;
 
-  if (!name || !email) {
-    return NextResponse.json({ error: "Name and email are required" }, { status: 400 });
-  }
-
-  const supabase: SupabaseAny = createServiceClientDirect();
-
-
-  const insertData: Record<string, unknown> = {
+  const clientResult = await createClientInDb({
     name,
     email,
+    company: company || null,
+    whatsapp_number: whatsapp_number || null,
     preferred_channel: preferred_channel || "email",
-  };
-  if (company) insertData.company = company;
-  if (whatsapp_number) insertData.whatsapp_number = whatsapp_number;
-  if (instagram_handle) insertData.instagram_handle = instagram_handle;
-  if (youtube_channel_id) insertData.youtube_channel_id = youtube_channel_id;
-  if (twitter_handle) insertData.twitter_handle = twitter_handle;
-  if (linkedin_url) insertData.linkedin_url = linkedin_url;
-  if (brand_voice) insertData.brand_voice = brand_voice;
-  if (account_manager) insertData.account_manager = account_manager;
-  if (contract_start) insertData.contract_start = contract_start;
-  if (monthly_volume) insertData.monthly_volume = parseInt(monthly_volume);
-  if (platform_focus?.length > 0) insertData.platform_focus = platform_focus;
-  insertData.onboarding_checklist = {
-    welcome_email: false,
-    google_drive: false,
-    notion_page: false,
-    airtable_entry: false,
-    first_brief: false,
-  };
+    instagram_handle: instagram_handle || null,
+    youtube_channel_id: youtube_channel_id || null,
+    twitter_handle: twitter_handle || null,
+    linkedin_url: linkedin_url || null,
+    brand_voice: brand_voice || null,
+    account_manager: account_manager || null,
+    contract_start: contract_start || null,
+    monthly_volume: monthly_volume ? parseInt(monthly_volume) : null,
+    platform_focus: platform_focus?.length > 0 ? platform_focus : null,
+    onboarding_checklist: {
+      welcome_email: false,
+      google_drive: false,
+      notion_page: false,
+      airtable_entry: false,
+      first_brief: false,
+    },
+  });
 
-  const { data: client, error: insertErr } = await supabase
-    .from("clients")
-    .insert(insertData)
-    .select("*")
-    .single();
-
-  if (insertErr) {
-    return NextResponse.json({ error: insertErr.message }, { status: 500 });
+  if (clientResult.error) {
+    const status = clientResult.error === "Invalid email address" || clientResult.error.includes("required") ? 400 : 500;
+    return NextResponse.json({ error: clientResult.error }, { status });
   }
+
+  const client = clientResult.client as Record<string, unknown>;
+  const supabase: SupabaseAny = createServiceClientDirect();
 
   const clientId = client.id as string;
   const results: Record<string, { success: boolean; error?: string }> = {};
@@ -124,7 +116,7 @@ export async function POST(request: Request) {
     if (emailResult.success) {
       await supabase
         .from("clients")
-        .update({ onboarding_checklist: { ...client.onboarding_checklist, welcome_email: true } })
+        .update({ onboarding_checklist: { ...(client.onboarding_checklist as Record<string, boolean> ?? {}), welcome_email: true } })
         .eq("id", clientId);
     }
   } catch (err) {

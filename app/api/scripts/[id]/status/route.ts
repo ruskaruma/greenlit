@@ -1,20 +1,19 @@
 import { NextResponse } from "next/server";
 import { createServiceClientDirect } from "@/lib/supabase/server";
 import { requireSession } from "@/lib/auth/requireSession";
+import { isValidStatusTransition } from "@/lib/validation";
 import type { ScriptStatus } from "@/lib/supabase/types";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type SupabaseAny = any;
 
-// NOTE: Supabase Realtime must have UPDATE events enabled on the scripts table
-// publication for KanbanBoard to receive changes. As a fallback, ScriptDetailSheet
-// does an optimistic state update via onStatusChange callback.
 const validStatuses: ScriptStatus[] = [
   "draft",
   "pending_review",
   "changes_requested",
   "approved",
   "rejected",
+  "overdue",
   "closed",
 ];
 
@@ -34,7 +33,7 @@ export async function PATCH(
 
   const supabase: SupabaseAny = createServiceClientDirect();
 
-  // Fetch current status for audit trail
+  // Fetch current status for audit trail and transition validation
   const { data: current, error: fetchError } = await supabase
     .from("scripts")
     .select("status")
@@ -45,7 +44,14 @@ export async function PATCH(
     return NextResponse.json({ error: "Script not found" }, { status: 404 });
   }
 
-  const oldStatus = current.status;
+  const oldStatus = current.status as ScriptStatus;
+
+  if (!isValidStatusTransition(oldStatus, status)) {
+    return NextResponse.json(
+      { error: `Cannot transition from "${oldStatus}" to "${status}"` },
+      { status: 400 }
+    );
+  }
 
   const { error } = await supabase
     .from("scripts")

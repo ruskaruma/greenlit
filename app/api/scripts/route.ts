@@ -7,22 +7,41 @@ import type { Script, ScriptWithClient } from "@/lib/supabase/types";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type SupabaseAny = any;
 
-export async function GET() {
+export async function GET(request: Request) {
   const { error: authError } = await requireSession();
   if (authError) return authError;
 
+  const url = new URL(request.url);
+  const page = Math.max(1, parseInt(url.searchParams.get("page") ?? "1"));
+  const limit = Math.min(200, Math.max(1, parseInt(url.searchParams.get("limit") ?? "50")));
+  const offset = (page - 1) * limit;
+
   const supabase = createServiceClientDirect();
+
+  const { count, error: countError } = await (supabase as SupabaseAny)
+    .from("scripts")
+    .select("id", { count: "exact", head: true });
+
+  if (countError) {
+    return NextResponse.json({ error: countError.message }, { status: 500 });
+  }
 
   const { data, error } = await (supabase as SupabaseAny)
     .from("scripts")
     .select("*, client:clients(*)")
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    .range(offset, offset + limit - 1);
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json(data as ScriptWithClient[]);
+  return NextResponse.json({
+    data: data as ScriptWithClient[],
+    total: count ?? 0,
+    page,
+    limit,
+  });
 }
 
 export async function POST(request: Request) {

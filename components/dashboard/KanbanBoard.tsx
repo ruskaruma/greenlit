@@ -47,9 +47,10 @@ interface KanbanBoardProps {
   onConnectionChange?: (connected: boolean) => void;
   refreshKey?: number;
   onArchive?: (id: string, archived: boolean) => void;
+  activeClientId?: string | null;
 }
 
-export default function KanbanBoard({ initialScripts, onConnectionChange, refreshKey, onArchive }: KanbanBoardProps) {
+export default function KanbanBoard({ initialScripts, onConnectionChange, refreshKey, onArchive, activeClientId }: KanbanBoardProps) {
   const [scripts, setScripts] = useState<ScriptWithClient[]>(initialScripts);
   const [selectedScript, setSelectedScript] = useState<ScriptWithClient | null>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -65,8 +66,13 @@ export default function KanbanBoard({ initialScripts, onConnectionChange, refres
 
   const fetchScripts = useCallback(async () => {
     try {
-      const res = await fetch("/api/scripts");
-      if (res.ok) setScripts(await res.json() as ScriptWithClient[]);
+      const res = await fetch("/api/scripts?limit=200");
+      if (res.ok) {
+        const json = await res.json();
+        // Support both paginated { data } and legacy array responses
+        const scripts = Array.isArray(json) ? json : json.data;
+        if (scripts) setScripts(scripts as ScriptWithClient[]);
+      }
     } catch { /* silent */ }
   }, []);
 
@@ -90,9 +96,13 @@ export default function KanbanBoard({ initialScripts, onConnectionChange, refres
 
   useEffect(() => {
     const supabase = createClient();
+    // Scope realtime subscription to the active client filter when set
+    const filter = activeClientId
+      ? { event: "*" as const, schema: "public", table: "scripts", filter: `client_id=eq.${activeClientId}` }
+      : { event: "*" as const, schema: "public", table: "scripts" };
     const channel = supabase
-      .channel("scripts-realtime")
-      .on("postgres_changes", { event: "*", schema: "public", table: "scripts" }, handleScriptChange)
+      .channel(`scripts-realtime-${activeClientId ?? "all"}`)
+      .on("postgres_changes", filter, handleScriptChange)
       .subscribe((status: string) => {
         const isSubscribed = status === "SUBSCRIBED";
         subscribedRef.current = isSubscribed;
@@ -104,7 +114,7 @@ export default function KanbanBoard({ initialScripts, onConnectionChange, refres
       supabase.removeChannel(channel);
       if (pollingRef.current) { clearInterval(pollingRef.current); pollingRef.current = null; }
     };
-  }, [handleScriptChange, onConnectionChange, fetchScripts]);
+  }, [handleScriptChange, onConnectionChange, fetchScripts, activeClientId]);
 
   useEffect(() => {
     const interval = setInterval(() => setScripts((prev) => [...prev]), 60_000);

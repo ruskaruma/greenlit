@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { Bot, X, Loader2, CheckCircle, Circle, AlertCircle } from "lucide-react";
 import { useToast } from "@/components/ui/ToastProvider";
@@ -67,6 +68,7 @@ export default function RunAgentButton({ scripts, mode, singleScript, onOpenChan
   const batchEsRefs = useRef<Map<string, EventSource>>(new Map());
 
   const { toast } = useToast();
+  const router = useRouter();
 
   const overdueScripts = scripts
     .filter((s) => isOverdue(s.sent_at, s.status, s.response_deadline_minutes) || s.status === "overdue")
@@ -118,7 +120,7 @@ export default function RunAgentButton({ scripts, mode, singleScript, onOpenChan
           if (event.node === "result" && event.status === "error") {
             toast("error", `Agent error: ${event.data?.error ?? "unknown"}`);
           } else {
-            toast("success", "Draft ready — check HITL panel");
+            toast("success", "Draft ready — review in HITL panel");
           }
           return;
         }
@@ -326,9 +328,15 @@ export default function RunAgentButton({ scripts, mode, singleScript, onOpenChan
               )}
 
               {done && (
-                <div className="px-5 py-4 border-t border-[var(--border)]">
-                  <button onClick={close} className="w-full px-4 py-2 rounded text-xs font-medium border border-[var(--border)] text-[var(--muted)] hover:bg-[var(--surface-elevated)]">
+                <div className="flex gap-3 px-5 py-4 border-t border-[var(--border)]">
+                  <button onClick={close} className="flex-1 px-4 py-2 rounded text-xs font-medium border border-[var(--border)] text-[var(--muted)] hover:bg-[var(--surface-elevated)]">
                     Close
+                  </button>
+                  <button
+                    onClick={() => { close(); router.push("/hitl"); }}
+                    className="flex-1 px-4 py-2 rounded text-xs font-bold bg-[var(--accent-primary)] text-white hover:bg-[var(--accent-primary)]/90"
+                  >
+                    Review in HITL
                   </button>
                 </div>
               )}
@@ -446,9 +454,15 @@ export default function RunAgentButton({ scripts, mode, singleScript, onOpenChan
               )}
 
               {done && (
-                <div className="px-5 py-4 border-t border-[var(--border)]">
-                  <button onClick={close} className="w-full px-4 py-2 rounded text-xs font-medium border border-[var(--border)] text-[var(--muted)] hover:bg-[var(--surface-elevated)]">
+                <div className="flex gap-3 px-5 py-4 border-t border-[var(--border)]">
+                  <button onClick={close} className="flex-1 px-4 py-2 rounded text-xs font-medium border border-[var(--border)] text-[var(--muted)] hover:bg-[var(--surface-elevated)]">
                     Close
+                  </button>
+                  <button
+                    onClick={() => { close(); router.push("/hitl"); }}
+                    className="flex-1 px-4 py-2 rounded text-xs font-bold bg-[var(--accent-primary)] text-white hover:bg-[var(--accent-primary)]/90"
+                  >
+                    Review in HITL
                   </button>
                 </div>
               )}
