@@ -150,7 +150,7 @@ export default async function HitlPage() {
     <div className="min-h-screen bg-[var(--bg)] flex transition-colors duration-300">
       <AppSidebar />
 
-      <main className="flex-1 ml-[220px] min-h-screen p-6 max-w-[1600px]">
+      <main className="flex-1 md:ml-[220px] ml-0 min-h-screen p-6 max-w-[1600px]">
         <header className="flex items-center justify-between mb-8">
           <h1 className="text-lg font-semibold text-[var(--text)]">HITL Review Panel</h1>
           {chasers.length > 0 && (

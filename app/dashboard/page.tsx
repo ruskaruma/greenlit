@@ -29,12 +29,12 @@ async function getScripts(): Promise<ScriptWithClient[]> {
   return scripts;
 }
 
-async function getClients(): Promise<{ id: string; name: string; email: string; whatsapp_number: string | null; preferred_channel: string }[]> {
+async function getClients(): Promise<{ id: string; name: string; email: string; whatsapp_number: string | null; preferred_channel: string; monthly_volume: number | null; total_scripts: number | null }[]> {
   const supabase: SupabaseAny = createServiceClientDirect();
 
   const { data, error } = await supabase
     .from("clients")
-    .select("id, name, email, whatsapp_number, preferred_channel")
+    .select("id, name, email, whatsapp_number, preferred_channel, monthly_volume, total_scripts")
     .order("name", { ascending: true });
 
   if (error) return [];

@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, Shield, BarChart3, UserPlus, FileText,
   ChevronLeft, ChevronRight, Plus, MoreHorizontal, Trash2, Pencil,
-  Mail, Phone, Eye,
+  Mail, Phone, Eye, Menu,
 } from "lucide-react";
 import LogoutButton from "./LogoutButton";
 import ThemeToggle from "./ThemeToggle";
@@ -32,15 +32,27 @@ const navItems = [
 
 export default function Sidebar({ clients, onClientFilter, activeClientId, onClientsChange, onEditClient }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
   const pathname = usePathname();
   const { toast } = useToast();
 
   return (
+    <>
+    <button
+      onClick={() => setMobileOpen(true)}
+      className="md:hidden fixed top-3 left-3 z-50 p-2 rounded bg-[var(--card)] border border-[var(--border)] text-[var(--muted)]"
+    >
+      <Menu size={18} />
+    </button>
+    {mobileOpen && (
+      <div className="md:hidden fixed inset-0 z-30 bg-black/40 backdrop-blur-sm" onClick={() => setMobileOpen(false)} />
+    )}
     <aside
       className={cn(
-        "fixed left-0 top-0 h-screen bg-[var(--bg)] border-r border-[var(--border)] flex flex-col z-40",
-        collapsed ? "w-[52px]" : "w-[220px]"
+        "fixed left-0 top-0 h-screen bg-[var(--bg)] border-r border-[var(--border)] flex flex-col z-40 transition-transform md:translate-x-0",
+        collapsed ? "w-[52px]" : "w-[220px]",
+        mobileOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
       )}
     >
       <div className="px-4 pt-5 pb-6">
@@ -62,6 +74,7 @@ export default function Sidebar({ clients, onClientFilter, activeClientId, onCli
             <Link
               key={item.label}
               href={item.href}
+              onClick={() => setMobileOpen(false)}
               className={cn(
                 "flex items-center gap-2.5 px-2.5 py-2 rounded text-xs",
                 isActive
@@ -77,7 +90,28 @@ export default function Sidebar({ clients, onClientFilter, activeClientId, onCli
         })}
       </nav>
 
-      {!collapsed && (
+      {collapsed ? (
+        <div className="flex-1 px-1.5 pt-6 pb-3 overflow-y-auto flex flex-col items-center gap-1">
+          {clients.map((client) => {
+            const initials = client.name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase();
+            return (
+              <button
+                key={client.id}
+                onClick={() => onClientFilter(client.id)}
+                title={client.name}
+                className={cn(
+                  "w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-semibold shrink-0",
+                  activeClientId === client.id
+                    ? "bg-[var(--surface-elevated)] text-[var(--text)] ring-1 ring-[var(--text)]/20"
+                    : "text-[var(--muted)] hover:text-[var(--text)] hover:bg-[var(--surface-elevated)]"
+                )}
+              >
+                {initials}
+              </button>
+            );
+          })}
+        </div>
+      ) : (
         <div className="flex-1 px-3 pt-6 pb-3 overflow-hidden flex flex-col">
           <p className="text-[10px] uppercase tracking-widest text-[var(--muted)] opacity-50 mb-2 px-1">
             Clients
@@ -151,6 +185,7 @@ export default function Sidebar({ clients, onClientFilter, activeClientId, onCli
         </button>
       </div>
     </aside>
+    </>
   );
 }
 

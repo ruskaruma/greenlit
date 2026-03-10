@@ -85,6 +85,19 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
   }
 
+  // Validate period dates
+  const startDate = new Date(period_start);
+  const endDate = new Date(period_end);
+  if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+    return NextResponse.json({ error: "Invalid date format for period_start or period_end" }, { status: 400 });
+  }
+  if (startDate >= endDate) {
+    return NextResponse.json({ error: "period_start must be before period_end" }, { status: 400 });
+  }
+  if (endDate > new Date()) {
+    return NextResponse.json({ error: "period_end cannot be in the future" }, { status: 400 });
+  }
+
   if (entries.length === 0) {
     return NextResponse.json({ error: "At least one content entry is required" }, { status: 400 });
   }

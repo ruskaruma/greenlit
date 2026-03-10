@@ -22,6 +22,8 @@ export interface ClientItem {
   email: string;
   whatsapp_number: string | null;
   preferred_channel: string;
+  monthly_volume: number | null;
+  total_scripts: number | null;
 }
 
 interface Theme {
@@ -219,7 +221,7 @@ function DashboardShellInner({
         onEditClient={openEditDrawer}
       />
 
-      <main className="flex-1 ml-[220px] min-h-screen">
+      <main className="flex-1 md:ml-[220px] ml-0 min-h-screen">
         {isSandbox && (
           <div className="flex items-center gap-2 px-6 py-2 bg-amber-500/10 border-b border-amber-500/20 text-xs text-amber-400">
             <AlertTriangle size={12} />
@@ -273,7 +275,7 @@ function DashboardShellInner({
           </div>
         ) : (
         <>
-        <header className="flex items-center justify-between h-14 px-6 border-b border-[var(--border)]">
+        <header className="flex flex-wrap items-center justify-between gap-2 min-h-[56px] px-4 md:px-6 py-2 md:py-0 border-b border-[var(--border)]">
           <div className="flex items-center gap-3">
             <h2 className="text-sm font-medium text-[var(--text)]">Dashboard</h2>
             <div className="flex items-center gap-1.5 ml-2">

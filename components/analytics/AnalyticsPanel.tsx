@@ -101,6 +101,7 @@ export default function AnalyticsPanel() {
   const [range, setRange] = useState<string>("30");
   const [sortKey, setSortKey] = useState<SortKey>("sentAt");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
+  const [sparklines, setSparklines] = useState<Record<string, { day: string; value: number }[]>>({});
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -121,6 +122,12 @@ export default function AnalyticsPanel() {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  useEffect(() => {
+    fetch("/api/analytics/sparklines")
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d) setSparklines(d); });
+  }, []);
 
   /* ---- Sorting ---- */
 
@@ -201,15 +208,17 @@ export default function AnalyticsPanel() {
     <div className="px-6 py-6 space-y-6">
       {/* ---- Row 1: KPI Cards ---- */}
       <div className="grid grid-cols-4 gap-4">
-        <KPICard label="Pending Review" value={kpis.pending} />
+        <KPICard label="Pending Review" value={kpis.pending} sparkline={sparklines.pending} />
         <KPICard
           label="Avg Approval Time"
           value={kpis.avgApprovalHours != null ? `${kpis.avgApprovalHours}h` : "-"}
+          sparkline={sparklines.approvalHours}
         />
-        <KPICard label="Chasers Sent" value={kpis.chasersSent} />
+        <KPICard label="Chasers Sent" value={kpis.chasersSent} sparkline={sparklines.chasers} />
         <KPICard
           label="Approval Rate"
           value={kpis.approvalRate != null ? `${kpis.approvalRate}%` : "-"}
+          sparkline={sparklines.approvals}
         />
       </div>
 
@@ -394,11 +403,18 @@ export default function AnalyticsPanel() {
 /*  Sub-components                                                     */
 /* ------------------------------------------------------------------ */
 
-function KPICard({ label, value }: { label: string; value: string | number }) {
+function KPICard({ label, value, sparkline }: { label: string; value: string | number; sparkline?: { day: string; value: number }[] }) {
   return (
     <div className="bg-[var(--card)] border border-[var(--border)] rounded-lg p-4">
       <p className="text-[10px] uppercase tracking-wider text-[var(--muted)]">{label}</p>
       <p className="text-[28px] font-semibold text-[var(--text)] mt-1">{value}</p>
+      {sparkline && sparkline.length > 0 && (
+        <ResponsiveContainer width="100%" height={32}>
+          <LineChart data={sparkline}>
+            <Line type="monotone" dataKey="value" stroke="var(--muted)" strokeWidth={1.5} dot={false} />
+          </LineChart>
+        </ResponsiveContainer>
+      )}
     </div>
   );
 }

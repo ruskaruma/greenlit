@@ -76,10 +76,10 @@ export async function POST(request: Request) {
     );
   }
 
-  // Fetch client to validate contact info before inserting
+  // Fetch client to validate contact info and quota before inserting
   const { data: client, error: clientError } = await supabase
     .from("clients")
-    .select("name, email, total_scripts, whatsapp_number, preferred_channel")
+    .select("name, email, total_scripts, monthly_volume, whatsapp_number, preferred_channel")
     .eq("id", client_id)
     .single();
 
@@ -144,11 +144,16 @@ export async function POST(request: Request) {
     console.error("[scripts/POST] Scorer failed (non-blocking):", err);
   }
 
+  const quotaWarning = client.monthly_volume && (client.total_scripts ?? 0) >= client.monthly_volume
+    ? `Monthly quota reached (${(client.total_scripts ?? 0) + 1}/${client.monthly_volume})`
+    : null;
+
   return NextResponse.json(
     {
       ...typedScript,
       quality_score: qualityScore,
       review_channel: review_channel || client.preferred_channel || "email",
+      quota_warning: quotaWarning,
     },
     { status: 201 }
   );

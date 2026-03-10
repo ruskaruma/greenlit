@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
-import { AnimatePresence } from "framer-motion";
-import { Plus, Upload, FileEdit, Search } from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
+import { Plus, Upload, FileEdit, Search, Undo2 } from "lucide-react";
 import { DragDropContext, Droppable, Draggable, type DropResult } from "@hello-pangea/dnd";
 import { createClient } from "@/lib/supabase/client";
 import ScriptCard from "./ScriptCard";
@@ -54,6 +54,8 @@ export default function KanbanBoard({ initialScripts, onConnectionChange, refres
   const [scripts, setScripts] = useState<ScriptWithClient[]>(initialScripts);
   const [selectedScript, setSelectedScript] = useState<ScriptWithClient | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [undoToast, setUndoToast] = useState<{ scriptId: string; oldStatus: ScriptStatus; newStatus: ScriptStatus; colLabel: string } | null>(null);
+  const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const subscribedRef = useRef(false);
 
@@ -141,6 +143,18 @@ export default function KanbanBoard({ initialScripts, onConnectionChange, refres
 
   const onDragStart = useCallback(() => setIsDragging(true), []);
 
+  const handleUndo = useCallback(async (scriptId: string, oldStatus: ScriptStatus) => {
+    if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
+    setUndoToast(null);
+    handleStatusChange(scriptId, oldStatus);
+    try {
+      await fetch(`/api/scripts/${scriptId}/status`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: oldStatus }),
+      });
+    } catch { /* silent — optimistic already reverted */ }
+  }, [handleStatusChange]);
+
   const onDragEnd = useCallback(async (result: DropResult) => {
     setIsDragging(false);
     if (!result.destination) return;
@@ -156,6 +170,13 @@ export default function KanbanBoard({ initialScripts, onConnectionChange, refres
     if (categorizeScript({ ...script, status: newStatus }) === categorizeScript(script)) return;
 
     handleStatusChange(scriptId, newStatus);
+
+    // Show undo toast
+    if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
+    const colLabel = columns.find((c) => c.key === destCol)?.label ?? destCol;
+    setUndoToast({ scriptId, oldStatus, newStatus, colLabel });
+    undoTimerRef.current = setTimeout(() => setUndoToast(null), 4000);
+
     try {
       const res = await fetch(`/api/scripts/${scriptId}/status`, {
         method: "PATCH", headers: { "Content-Type": "application/json" },
@@ -180,9 +201,9 @@ export default function KanbanBoard({ initialScripts, onConnectionChange, refres
   return (
     <>
       <DragDropContext onDragStart={onDragStart} onDragEnd={onDragEnd}>
-        <div className="flex gap-4 min-w-max">
+        <div className="flex flex-col md:flex-row gap-4 md:min-w-max">
           {columns.map((col) => (
-            <div key={col.key} className="flex flex-col w-[280px] shrink-0">
+            <div key={col.key} className="flex flex-col w-full md:w-[280px] md:shrink-0">
               <div className="flex items-center gap-2.5 mb-3 px-1">
                 <div className="w-1.5 h-1.5 rounded-sm bg-[var(--muted)] opacity-40" />
                 <h2 className="text-[11px] font-medium uppercase tracking-widest text-[var(--muted)]">{col.label}</h2>
@@ -267,6 +288,26 @@ export default function KanbanBoard({ initialScripts, onConnectionChange, refres
           key={agentScript.id}
         />
       )}
+
+      <AnimatePresence>
+        {undoToast && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+            className="fixed bottom-6 right-6 z-[60] flex items-center gap-3 px-4 py-3 rounded-lg bg-[var(--card)] border border-[var(--border)] shadow-lg text-sm"
+          >
+            <span className="text-[var(--text)]">Moved to {undoToast.colLabel}</span>
+            <button
+              onClick={() => handleUndo(undoToast.scriptId, undoToast.oldStatus)}
+              className="flex items-center gap-1.5 text-xs font-semibold text-[var(--accent-primary)] hover:opacity-80"
+            >
+              <Undo2 size={12} />
+              Undo
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </>
   );
 }

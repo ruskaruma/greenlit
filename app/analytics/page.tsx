@@ -44,7 +44,7 @@ export default async function AnalyticsPage() {
     <div className="min-h-screen bg-[var(--bg)] flex transition-colors duration-300">
       <AppSidebar />
 
-      <main className="flex-1 ml-[220px] min-h-screen">
+      <main className="flex-1 md:ml-[220px] ml-0 min-h-screen">
         <header className="flex items-center gap-4 px-6 h-14 border-b border-[var(--border)]">
           <h1 className="text-sm font-medium text-[var(--text)]">Analytics</h1>
         </header>

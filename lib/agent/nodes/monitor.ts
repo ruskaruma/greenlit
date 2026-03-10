@@ -37,6 +37,8 @@ export async function monitorOverdueScripts(): Promise<AgentState[]> {
   const recentChaserCutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
   const results: AgentState[] = [];
+  let skippedRecentChaser = 0;
+  let skippedNoClient = 0;
 
   for (const script of overdueScripts) {
     const { data: recentChasers } = await supabase
@@ -46,10 +48,18 @@ export async function monitorOverdueScripts(): Promise<AgentState[]> {
       .gte("created_at", recentChaserCutoff)
       .limit(1);
 
-    if (recentChasers && recentChasers.length > 0) continue;
+    if (recentChasers && recentChasers.length > 0) {
+      skippedRecentChaser++;
+      console.log(`[monitor] Skipped "${script.title}" (id=${script.id}): chaser already sent in last 24h`);
+      continue;
+    }
 
     const client = script.clients;
-    if (!client) continue;
+    if (!client) {
+      skippedNoClient++;
+      console.log(`[monitor] Skipped "${script.title}" (id=${script.id}): no client linked`);
+      continue;
+    }
 
     const sentDate = new Date(script.sent_at);
     const hoursOverdue = Math.round((Date.now() - sentDate.getTime()) / (1000 * 60 * 60));
@@ -77,6 +87,7 @@ export async function monitorOverdueScripts(): Promise<AgentState[]> {
     });
   }
 
-  console.log(`[monitor] Found ${results.length} overdue scripts needing chasers`);
+  const totalOverdue = overdueScripts.length;
+  console.log(`[monitor] ${totalOverdue} overdue scripts: ${results.length} need chasers, ${skippedRecentChaser} skipped (recent chaser), ${skippedNoClient} skipped (no client)`);
   return results;
 }

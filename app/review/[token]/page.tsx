@@ -21,6 +21,8 @@ interface ScriptData {
   due_date: string | null;
   expires_at: string | null;
   reviewed_at: string | null;
+  version: number;
+  previous_feedback: string | null;
   client: { name: string; company: string | null } | null;
 }
 
@@ -29,12 +31,28 @@ async function getScript(token: string): Promise<ScriptData | null> {
 
   const { data, error } = await supabase
     .from("scripts")
-    .select("id, title, content, status, review_token, client_feedback, due_date, expires_at, reviewed_at, client:clients(name, company)")
+    .select("id, title, content, status, review_token, client_feedback, due_date, expires_at, reviewed_at, version, client_id, client:clients(name, company)")
     .eq("review_token", token)
     .single();
 
   if (error || !data) return null;
-  return data as ScriptData;
+
+  let previous_feedback: string | null = null;
+  if (data.version > 1) {
+    const { data: prevScript } = await supabase
+      .from("scripts")
+      .select("client_feedback")
+      .eq("client_id", data.client_id)
+      .neq("id", data.id)
+      .in("status", ["changes_requested", "rejected"])
+      .not("client_feedback", "is", null)
+      .order("reviewed_at", { ascending: false })
+      .limit(1)
+      .single();
+    previous_feedback = prevScript?.client_feedback ?? null;
+  }
+
+  return { ...data, previous_feedback } as ScriptData;
 }
 
 function AlreadyReviewed({ status, clientName }: { status: ScriptStatus; clientName: string }) {
@@ -106,7 +124,6 @@ export default async function ReviewPage({
     );
   }
 
-  // Check expiry
   if (script.expires_at && new Date(script.expires_at) < new Date()) {
     return <ExpiredLink />;
   }
@@ -119,7 +136,6 @@ export default async function ReviewPage({
 
   return (
     <div className="min-h-screen bg-[var(--bg)] transition-colors duration-300">
-      {/* Top bar */}
       <header className="border-b border-[var(--border)]">
         <div className="max-w-2xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
           <div>
@@ -131,16 +147,22 @@ export default async function ReviewPage({
         </div>
       </header>
 
-      {/* Main content */}
       <main className="max-w-2xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
         {isReviewed ? (
           <AlreadyReviewed status={script.status} clientName={clientName} />
         ) : (
           <>
             <div className="mb-6 sm:mb-8">
-              <h1 className="text-xl sm:text-2xl font-semibold text-[var(--text)] tracking-tight mb-3">
-                {script.title}
-              </h1>
+              <div className="flex items-center gap-2 mb-3">
+                <h1 className="text-xl sm:text-2xl font-semibold text-[var(--text)] tracking-tight">
+                  {script.title}
+                </h1>
+                {script.version > 1 && (
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-[var(--surface-elevated)] border border-[var(--border)] text-[var(--muted)]">
+                    Version {script.version}
+                  </span>
+                )}
+              </div>
               <p className="text-sm text-[var(--muted)]">
                 Hi {clientName}, here&apos;s your script for review. Please read it carefully and let us know your thoughts.
               </p>
@@ -151,11 +173,24 @@ export default async function ReviewPage({
             <div className="mb-6">
               <p className="text-[10px] uppercase tracking-widest text-[var(--muted)] opacity-50 mb-2">Script Content</p>
               <div className="bg-[var(--card)] border border-[var(--border)] rounded-lg p-4 sm:p-6 max-h-[500px] overflow-y-auto">
-                <pre className="font-mono text-sm text-[var(--text)] opacity-80 whitespace-pre-wrap leading-relaxed">
+                <div className="text-sm text-[var(--text)] opacity-80 whitespace-pre-wrap leading-relaxed">
                   {script.content}
-                </pre>
+                </div>
               </div>
             </div>
+
+            {script.previous_feedback && (
+              <details className="mb-6 group">
+                <summary className="text-[10px] uppercase tracking-widest text-[var(--muted)] opacity-50 cursor-pointer hover:opacity-80 mb-2">
+                  Previous feedback
+                </summary>
+                <div className="bg-[var(--card)] border border-[var(--border)] rounded-lg p-4">
+                  <p className="text-sm text-[var(--muted)] whitespace-pre-wrap leading-relaxed">
+                    {script.previous_feedback}
+                  </p>
+                </div>
+              </details>
+            )}
 
             {script.due_date && (() => {
               const dueDate = new Date(script.due_date);

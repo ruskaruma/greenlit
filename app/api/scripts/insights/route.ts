@@ -12,16 +12,12 @@ interface Theme {
   example: string;
 }
 
-let cachedResult: { themes: Theme[]; fetchedAt: number } | null = null;
+let cachedResult: { themes: Theme[]; fetchedAt: number; feedbackHash: string } | null = null;
 const CACHE_TTL = 60 * 60 * 1000; // 1 hour
 
 export async function GET() {
   const { error: authError } = await requireSession();
   if (authError) return authError;
-
-  if (cachedResult && Date.now() - cachedResult.fetchedAt < CACHE_TTL) {
-    return NextResponse.json({ themes: cachedResult.themes });
-  }
 
   const supabase: SupabaseAny = createServiceClientDirect();
 
@@ -41,6 +37,13 @@ export async function GET() {
   const feedbackItems: string[] = (data ?? [])
     .map((row: { client_feedback: string | null }) => row.client_feedback)
     .filter((f: string | null): f is string => !!f && f.trim().length > 0);
+
+  // Simple hash to detect feedback changes and bust cache
+  const feedbackHash = feedbackItems.length + ":" + feedbackItems.slice(0, 10).join("|").slice(0, 200);
+
+  if (cachedResult && Date.now() - cachedResult.fetchedAt < CACHE_TTL && cachedResult.feedbackHash === feedbackHash) {
+    return NextResponse.json({ themes: cachedResult.themes });
+  }
 
   if (feedbackItems.length < 3) {
     return NextResponse.json({ insights: [], message: "Not enough data yet" });
@@ -69,7 +72,7 @@ JSON:`,
     const parsed = JSON.parse(text.replace(/```json\n?|\n?```/g, "").trim());
     const themes: Theme[] = parsed.themes ?? [];
 
-    cachedResult = { themes, fetchedAt: Date.now() };
+    cachedResult = { themes, fetchedAt: Date.now(), feedbackHash };
 
     return NextResponse.json({ themes });
   } catch (err) {

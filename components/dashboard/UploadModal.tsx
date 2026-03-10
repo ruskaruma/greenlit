@@ -165,6 +165,38 @@ export default function UploadModal({ clients, onScriptUploaded }: UploadModalPr
     }
   }
 
+  async function handleSaveAsDraft() {
+    if (!title || !clientId || !content) return;
+    setIsLoading(true);
+    try {
+      const res = await fetch("/api/scripts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title,
+          content,
+          client_id: clientId,
+          due_date: dueDate || undefined,
+          review_channel: reviewChannel,
+          response_deadline_minutes: parseInt(responseDeadline, 10),
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed to save draft");
+      }
+      setIsOpen(false);
+      resetForm();
+      setToast({ type: "success", message: "Script saved as draft" });
+      onScriptUploaded?.();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Something went wrong";
+      setToast({ type: "error", message });
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
   function handleKeepAsDraft() {
     setIsOpen(false);
     resetForm();
@@ -179,7 +211,7 @@ export default function UploadModal({ clients, onScriptUploaded }: UploadModalPr
         className="flex items-center gap-2 px-4 py-1.5 rounded-[4px] bg-[var(--text)] text-[var(--bg)] text-xs font-semibold hover:opacity-80"
       >
         <Upload size={14} />
-        Upload Script
+        Add Script
       </button>
 
       <AnimatePresence>
@@ -203,7 +235,7 @@ export default function UploadModal({ clients, onScriptUploaded }: UploadModalPr
               className="relative w-full max-w-lg bg-[var(--card)] border border-[var(--border)] rounded-lg shadow-2xl"
             >
               <div className="flex items-center justify-between p-5 border-b border-[var(--border)]">
-                <h2 className="text-base font-semibold text-[var(--text)]">Upload Script</h2>
+                <h2 className="text-base font-semibold text-[var(--text)]">Add Script</h2>
                 <button
                   onClick={() => setIsOpen(false)}
                   className="text-[var(--muted)] hover:text-[var(--text)] transition-colors"
@@ -320,6 +352,15 @@ export default function UploadModal({ clients, onScriptUploaded }: UploadModalPr
                   <p className="text-xs text-amber-400">This client has no contact info configured. Delivery will fail.</p>
                 )}
 
+                {selectedClient && selectedClient.monthly_volume && (selectedClient.total_scripts ?? 0) >= selectedClient.monthly_volume && (
+                  <div className="flex items-center gap-2 p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                    <AlertTriangle size={14} className="text-amber-400 shrink-0" />
+                    <p className="text-xs text-amber-400">
+                      Monthly quota reached ({selectedClient.total_scripts ?? 0}/{selectedClient.monthly_volume} scripts). You can still save, but the client&apos;s plan may need updating.
+                    </p>
+                  </div>
+                )}
+
                 {scoreResult ? (
                   <div className="space-y-3">
                     <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
@@ -392,23 +433,34 @@ export default function UploadModal({ clients, onScriptUploaded }: UploadModalPr
                     </div>
                   </div>
                 ) : (
-                  <button
-                    type="submit"
-                    disabled={isLoading || !title || !clientId || !content}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-[4px] bg-[var(--text)] text-[var(--bg)] text-sm font-semibold hover:opacity-80 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {isLoading ? (
-                      <>
-                        <Loader2 size={14} className="animate-spin" />
-                        Scoring &amp; saving...
-                      </>
-                    ) : (
-                      <>
-                        <Check size={14} />
-                        Send for Review
-                      </>
-                    )}
-                  </button>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      disabled={isLoading || !title || !clientId || !content}
+                      onClick={handleSaveAsDraft}
+                      className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-[4px] bg-[var(--surface-elevated)] text-[var(--text)] text-sm font-medium border border-[var(--border)] hover:bg-[var(--border)] disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <FileText size={14} />
+                      Save as Draft
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isLoading || !title || !clientId || !content}
+                      className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-[4px] bg-[var(--text)] text-[var(--bg)] text-sm font-semibold hover:opacity-80 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {isLoading ? (
+                        <>
+                          <Loader2 size={14} className="animate-spin" />
+                          Scoring &amp; saving...
+                        </>
+                      ) : (
+                        <>
+                          <Check size={14} />
+                          Send for Review
+                        </>
+                      )}
+                    </button>
+                  </div>
                 )}
               </form>
             </motion.div>

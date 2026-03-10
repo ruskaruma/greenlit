@@ -198,7 +198,7 @@ if (result) {
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium border border-[var(--border)] text-[var(--muted)] hover:text-[var(--text)] hover:bg-[var(--surface-elevated)] transition-colors"
               >
                 <FileText size={11} />
-                Upload Script
+                Add Script
               </Link>
             </div>
           </div>
