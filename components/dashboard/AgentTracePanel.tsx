@@ -63,9 +63,7 @@ export default function AgentTracePanel({
           return;
         }
         setEvents((prev) => [...prev, event]);
-      } catch {
-        // ignore parse errors
-      }
+      } catch {}
     };
 
     es.onerror = () => {
@@ -95,7 +93,6 @@ export default function AgentTracePanel({
       exit={{ opacity: 0, y: 8 }}
       className="bg-[var(--card)] border border-[var(--border)] rounded overflow-hidden"
     >
-      {/* Header */}
       <div className="px-5 py-3 border-b border-[var(--border)] flex items-center justify-between">
         <div className="min-w-0">
           <p className="text-sm font-medium text-[var(--text)] truncate">
@@ -130,7 +127,6 @@ export default function AgentTracePanel({
         </div>
       </div>
 
-      {/* Pipeline visualization */}
       <div className="px-5 py-4">
         <div className="flex items-center gap-1">
           {PIPELINE_NODES.map((node, i) => {
@@ -163,7 +159,6 @@ export default function AgentTracePanel({
         </div>
       </div>
 
-      {/* Execution log */}
       {events.length > 0 && (
         <div className="px-5 pb-4">
           <p className="text-[10px] uppercase tracking-widest text-[var(--muted)] opacity-60 mb-2">
@@ -208,7 +203,6 @@ export default function AgentTracePanel({
         </div>
       )}
 
-      {/* Result summary */}
       {resultEvent?.data && done && (
         <div className="px-5 pb-4 border-t border-[var(--border)] pt-3">
           <p className="text-xs text-[var(--muted)]">

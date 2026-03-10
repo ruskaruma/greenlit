@@ -3,6 +3,7 @@ import { createServiceClientDirect } from "@/lib/supabase/server";
 import { storeClientMemory, buildClientResponseMemory } from "@/lib/agent/nodes/memoryUpdate";
 import { notifyTeam } from "@/lib/notifications/notifyTeam";
 import { isRateLimited } from "@/lib/rateLimit";
+import { sanitizeFeedback } from "@/lib/validation";
 import type { ScriptStatus } from "@/lib/supabase/types";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -53,7 +54,7 @@ export async function PATCH(
   const supabase: SupabaseAny = createServiceClientDirect();
   const body = await request.json();
 
-  const { action, feedback } = body as {
+  const { action, feedback: rawFeedback } = body as {
     action: "approved" | "rejected" | "changes_requested";
     feedback?: string;
   };
@@ -66,42 +67,37 @@ export async function PATCH(
     );
   }
 
-  // Fetch script to get client_id and verify token
-  const { data: script, error: fetchError } = await supabase
-    .from("scripts")
-    .select("id, client_id, status, sent_at")
-    .eq("review_token", token)
-    .single();
-
-  if (fetchError || !script) {
-    return NextResponse.json(
-      { error: "Script not found" },
-      { status: 404 }
-    );
+  if (rawFeedback !== undefined && typeof rawFeedback !== "string") {
+    return NextResponse.json({ error: "feedback must be a string" }, { status: 400 });
+  }
+  if (typeof rawFeedback === "string" && rawFeedback.length > 10_000) {
+    return NextResponse.json({ error: "feedback exceeds 10,000 character limit" }, { status: 400 });
   }
 
-  // Part 5: Idempotency — prevent double-submit for all terminal review states
-  if (script.status === "approved" || script.status === "rejected" || script.status === "changes_requested") {
+  const feedback = rawFeedback ? sanitizeFeedback(rawFeedback) : null;
+
+  const respondedAt = new Date();
+
+  const { data: updated, error: updateError } = await supabase
+    .from("scripts")
+    .update({
+      status: action,
+      client_feedback: feedback,
+      reviewed_at: respondedAt.toISOString(),
+    })
+    .eq("review_token", token)
+    .eq("status", "pending_review")
+    .select("id, client_id, sent_at")
+    .single();
+
+  if (updateError || !updated) {
     return NextResponse.json(
-      { error: "already_reviewed", status: script.status },
+      { error: "already_reviewed" },
       { status: 409 }
     );
   }
 
-  const respondedAt = new Date();
-
-  const { error: updateError } = await supabase
-    .from("scripts")
-    .update({
-      status: action,
-      client_feedback: feedback ?? null,
-      reviewed_at: respondedAt.toISOString(),
-    })
-    .eq("id", script.id);
-
-  if (updateError) {
-    return NextResponse.json({ error: updateError.message }, { status: 500 });
-  }
+  const script = updated;
 
   await supabase.from("audit_log").insert({
     entity_type: "script",
@@ -111,7 +107,6 @@ export async function PATCH(
     metadata: { feedback: feedback ?? null, review_token: token },
   });
 
-  // Update client stats + avg_response_hours
   const statField =
     action === "approved"
       ? "approved_count"
@@ -126,9 +121,6 @@ export async function PATCH(
     .single();
 
   if (client) {
-    const currentCount = (client as Record<string, number>)[statField] ?? 0;
-
-    // Calculate avg_response_hours using exponential moving average
     const sentAt = script.sent_at ? new Date(script.sent_at) : null;
     const responseHours = sentAt
       ? (respondedAt.getTime() - sentAt.getTime()) / (1000 * 60 * 60)
@@ -140,16 +132,25 @@ export async function PATCH(
       ? alpha * responseHours + (1 - alpha) * oldAvg
       : oldAvg;
 
-    await supabase
-      .from("clients")
-      .update({
-        [statField]: currentCount + 1,
-        avg_response_hours: newAvg,
-      })
-      .eq("id", script.client_id);
+    await supabase.rpc("increment_client_stat", {
+      client_id: script.client_id,
+      stat_field: statField,
+      new_avg_response_hours: newAvg,
+    }).then(({ error: rpcError }: { error: { message: string } | null }) => {
+      if (rpcError) {
+        console.error("[review] RPC increment failed, falling back:", rpcError.message);
+        const currentCount = (client as Record<string, number>)[statField] ?? 0;
+        supabase
+          .from("clients")
+          .update({
+            [statField]: currentCount + 1,
+            avg_response_hours: newAvg,
+          })
+          .eq("id", script.client_id);
+      }
+    });
   }
 
-  // Get script title for memory + team notification
   const { data: scriptForMemory } = await supabase
     .from("scripts")
     .select("title")
@@ -157,7 +158,6 @@ export async function PATCH(
     .single();
 
   if (scriptForMemory) {
-    // Part 3: Notify team
     if (client) {
       await notifyTeam({ clientName: client.name, action, scriptTitle: scriptForMemory.title, feedback: feedback ?? null, channel: "both" });
     }

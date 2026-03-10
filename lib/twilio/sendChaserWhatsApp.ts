@@ -21,7 +21,6 @@ export async function sendChaserWhatsApp({
   const from = process.env.TWILIO_WHATSAPP_FROM || "whatsapp:+14155238886";
   const toNumber = to.startsWith("whatsapp:") ? to : `whatsapp:${to}`;
 
-  // Strip SUBJECT:/BODY: formatting if present
   let body = draftContent;
   const bodyMatch = draftContent.match(/BODY:\s*([\s\S]+)/i);
   if (bodyMatch) {

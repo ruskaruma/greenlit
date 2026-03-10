@@ -38,7 +38,6 @@ export async function POST(
   const { id } = await params;
   const supabase: SupabaseAny = createServiceClientDirect();
 
-  // Fetch the brief
   const { data: brief, error: briefError } = await supabase
     .from("briefs")
     .select("*, client:clients(id, name, email)")
@@ -49,7 +48,6 @@ export async function POST(
     return NextResponse.json({ error: "Brief not found" }, { status: 404 });
   }
 
-  // Must be assigned or in_progress
   if (brief.status !== "assigned" && brief.status !== "in_progress") {
     return NextResponse.json(
       { error: `Brief must be assigned or in progress to create a script (current: ${brief.status})` },
@@ -57,7 +55,6 @@ export async function POST(
     );
   }
 
-  // Must not already have a script
   if (brief.script_id) {
     return NextResponse.json(
       { error: "Brief already has a linked script" },
@@ -71,7 +68,6 @@ export async function POST(
     ? buildContentFromBrief(parsed)
     : brief.raw_input || "";
 
-  // Create the script
   const { data: script, error: scriptError } = await supabase
     .from("scripts")
     .insert({
@@ -91,7 +87,6 @@ export async function POST(
     return NextResponse.json({ error: scriptError.message }, { status: 500 });
   }
 
-  // Link script back to brief and update brief status
   await supabase
     .from("briefs")
     .update({
@@ -101,7 +96,6 @@ export async function POST(
     })
     .eq("id", id);
 
-  // Audit log
   await supabase.from("audit_log").insert({
     entity_type: "script",
     entity_id: script.id,

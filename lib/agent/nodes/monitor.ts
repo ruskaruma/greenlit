@@ -21,7 +21,6 @@ export async function monitorOverdueScripts(): Promise<AgentState[]> {
 
   if (!scripts || scripts.length === 0) return [];
 
-  // Filter to only scripts past their response deadline
   const nowMs = Date.now();
   const overdueScripts = scripts.filter(
     (s: { sent_at: string; due_date: string | null; response_deadline_minutes: number | null }) => {
@@ -33,22 +32,25 @@ export async function monitorOverdueScripts(): Promise<AgentState[]> {
     }
   );
 
-  // Filter out scripts that already have a chaser sent in the last 24 hours
   const recentChaserCutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+
+  const overdueIds = overdueScripts.map((s: { id: string }) => s.id);
+  const { data: recentChasersData } = await supabase
+    .from("chasers")
+    .select("script_id")
+    .in("script_id", overdueIds)
+    .gte("created_at", recentChaserCutoff);
+
+  const scriptsWithRecentChaser = new Set(
+    (recentChasersData ?? []).map((c: { script_id: string }) => c.script_id)
+  );
 
   const results: AgentState[] = [];
   let skippedRecentChaser = 0;
   let skippedNoClient = 0;
 
   for (const script of overdueScripts) {
-    const { data: recentChasers } = await supabase
-      .from("chasers")
-      .select("id")
-      .eq("script_id", script.id)
-      .gte("created_at", recentChaserCutoff)
-      .limit(1);
-
-    if (recentChasers && recentChasers.length > 0) {
+    if (scriptsWithRecentChaser.has(script.id)) {
       skippedRecentChaser++;
       console.log(`[monitor] Skipped "${script.title}" (id=${script.id}): chaser already sent in last 24h`);
       continue;

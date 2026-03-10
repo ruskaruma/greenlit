@@ -102,7 +102,6 @@ export default function HitlList({ initialChasers, memories }: HitlListProps) {
     <ToastProvider>
       <div className="flex flex-col md:flex-row min-h-[600px]">
         <div className="w-full md:w-[240px] md:shrink-0 border-b md:border-b-0 md:border-r border-[var(--border)] flex flex-col">
-          {/* Filter pills */}
           <div className="px-3 py-3 border-b border-[var(--border)] flex flex-wrap gap-1.5">
             {FILTER_PILLS.map((pill) => {
               const count = pill.key === "all"
@@ -129,7 +128,6 @@ export default function HitlList({ initialChasers, memories }: HitlListProps) {
             })}
           </div>
 
-          {/* Scrollable queue list */}
           <div className="flex-1 overflow-y-auto py-1 max-h-[200px] md:max-h-none">
             {filtered.length === 0 && (
               <p className="text-[11px] text-[var(--muted)] opacity-50 px-3 py-6 text-center">
@@ -150,7 +148,6 @@ export default function HitlList({ initialChasers, memories }: HitlListProps) {
                       : "hover:bg-[var(--surface-elevated)]/50"
                   }`}
                 >
-                  {/* Urgency left border */}
                   <div className={`w-[3px] shrink-0 ${urgencyColor}`} />
                   <div className="flex-1 px-3 py-2.5 min-w-0">
                     <p className={`text-[13px] font-medium truncate ${isActive ? "text-[var(--text)]" : "text-[var(--muted)]"}`}>
@@ -166,7 +163,6 @@ export default function HitlList({ initialChasers, memories }: HitlListProps) {
           </div>
         </div>
 
-        {/* Main panel */}
         <div className="flex-1 min-w-0">
           {selected ? (
             <ChaserCard

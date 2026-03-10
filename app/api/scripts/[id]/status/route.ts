@@ -33,7 +33,6 @@ export async function PATCH(
 
   const supabase: SupabaseAny = createServiceClientDirect();
 
-  // Fetch current status for audit trail and transition validation
   const { data: current, error: fetchError } = await supabase
     .from("scripts")
     .select("status")
@@ -59,10 +58,10 @@ export async function PATCH(
     .eq("id", id);
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error("[scripts/status] Update failed:", error.message);
+    return NextResponse.json({ error: "Failed to update status" }, { status: 500 });
   }
 
-  // Audit log with old→new status and actor email
   await supabase.from("audit_log").insert({
     entity_type: "script",
     entity_id: id,

@@ -27,7 +27,8 @@ export async function PATCH(
     .eq("id", id);
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error("[hitl/draft] Update failed:", error.message);
+    return NextResponse.json({ error: "Failed to update draft" }, { status: 500 });
   }
 
   return NextResponse.json({ success: true });

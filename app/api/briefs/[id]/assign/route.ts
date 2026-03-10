@@ -25,7 +25,6 @@ export async function POST(
     );
   }
 
-  // Verify brief exists
   const { data: brief, error: fetchError } = await supabase
     .from("briefs")
     .select("id, status, client_id")
@@ -54,7 +53,6 @@ export async function POST(
     return NextResponse.json({ error: updateError.message }, { status: 500 });
   }
 
-  // Audit log
   await supabase.from("audit_log").insert({
     entity_type: "brief",
     entity_id: id,

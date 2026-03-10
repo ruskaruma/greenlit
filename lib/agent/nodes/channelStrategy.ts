@@ -5,6 +5,7 @@ import type { AgentState } from "../types";
 type SupabaseAny = any;
 
 const CHANNEL_ADVANTAGE_THRESHOLD = 0.20;
+const SLIDING_WINDOW_DAYS = 90;
 
 interface ChannelStats {
   sent: number;
@@ -35,10 +36,14 @@ async function fetchClient(supabase: SupabaseAny, clientId: string) {
 }
 
 async function fetchChaserHistory(supabase: SupabaseAny, clientId: string) {
+  // Fix 9: Add 90-day sliding window filter
+  const windowCutoff = new Date(Date.now() - SLIDING_WINDOW_DAYS * 24 * 60 * 60 * 1000).toISOString();
+
   const { data, error } = await supabase
     .from("chasers")
     .select("id, script_id, scripts!inner(review_channel, reviewed_at)")
-    .eq("scripts.client_id", clientId);
+    .eq("scripts.client_id", clientId)
+    .gte("created_at", windowCutoff);
   if (error) throw new Error(`[channelStrategy] Failed to fetch chaser history: ${error.message}`);
   return (data ?? []) as Array<{
     id: string;

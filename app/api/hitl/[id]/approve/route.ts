@@ -83,17 +83,15 @@ export async function POST(
   const clientEmail = chaser.clients?.email;
   const clientName = chaser.clients?.name ?? "there";
 
-  // Use AI-generated subject from hitl_state, fall back to generic
   const hitlSubject = chaser.hitl_state?.email_subject as string | undefined;
   const emailSubject = hitlSubject || `Following up: ${chaser.scripts?.title ?? "your script"}`;
 
-  // Determine delivery channel
   const clientWhatsApp = chaser.clients?.whatsapp_number as string | undefined;
   const sendChannel = channel ?? (chaser.clients as Record<string, unknown>)?.preferred_channel as string ?? "email";
   const sendEmail = sendChannel === "email" || sendChannel === "both";
   const sendWa = sendChannel === "whatsapp" || sendChannel === "both";
 
-  // Attempt delivery — failure should not block approval
+  // Delivery failure should not block approval
   let emailFailed = false;
   let emailError = "";
   let waFailed = false;
@@ -145,7 +143,6 @@ export async function POST(
 
   const allDeliveryFailed = (sendEmail ? emailFailed || !clientEmail : true) && (sendWa ? waFailed || !clientWhatsApp : true);
 
-  // Always mark the chaser as approved regardless of delivery outcome
   const updatePayload: Record<string, unknown> = {
     status: newStatus,
     sent_at: allDeliveryFailed ? null : new Date().toISOString(),
@@ -164,7 +161,6 @@ export async function POST(
     return NextResponse.json({ error: updateError.message }, { status: 500 });
   }
 
-  // Resume the LangGraph thread (best-effort — doesn't block approval)
   const threadId = `chaser-${chaser.script_id}`;
   resumeChaserGraph(
     threadId,
@@ -174,10 +170,10 @@ export async function POST(
     console.error("[hitl/approve] Graph resume failed (non-blocking):", err)
   );
 
-  // Store few-shot example if team lead edited
   if (wasEdited && editedContent) {
     storeFewShotExample({
       clientId: chaser.client_id,
+      chaserId: chaser.id,
       originalDraft: chaser.draft_content,
       editedDraft: editedContent,
       scriptTitle: chaser.scripts?.title ?? null,
@@ -186,7 +182,6 @@ export async function POST(
     );
   }
 
-  // Reset script status to pending_review so client can re-review via the chaser's review link
   if (!allDeliveryFailed) {
     const { error: scriptResetError } = await supabase
       .from("scripts")
@@ -243,7 +238,6 @@ export async function POST(
     { chaser_id: id, script_id: chaser.script_id }
   ).catch((err: unknown) => console.error("[hitl/approve] Memory storage failed:", err));
 
-  // Return success with a warning if any delivery failed
   const warnings: string[] = [];
   if (emailFailed && sendEmail) warnings.push(`Email failed: ${emailError}`);
   if (waFailed && sendWa) warnings.push(`WhatsApp failed: ${waError}`);

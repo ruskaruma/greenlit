@@ -20,7 +20,7 @@ export async function PATCH(
     const body = await request.json();
     if (body.archived === false) archived = false;
   } catch {
-    // No body means archive (backwards compatible)
+    // Backwards compatible: no body means archive
   }
 
   const { error } = await supabase
@@ -30,7 +30,7 @@ export async function PATCH(
 
   if (error) {
     console.error("[archive] DB write failed:", error.message);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: "Failed to update archive status" }, { status: 500 });
   }
 
   console.log(`[archive] script=${id} archived=${archived} — DB write success`);

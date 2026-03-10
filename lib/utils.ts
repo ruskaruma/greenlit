@@ -14,7 +14,7 @@ export function getScriptAge(sentAt: string): number {
 export function isOverdue(sentAt: string | null, status: ScriptStatus, responseDeadlineMinutes?: number): boolean {
   if (!sentAt) return false;
   if (status === "approved" || status === "rejected" || status === "draft" || status === "closed") return false;
-  const deadlineMinutes = responseDeadlineMinutes ?? 2880; // default 48 hours
+  const deadlineMinutes = responseDeadlineMinutes ?? 2880;
   const deadlineHours = deadlineMinutes / 60;
   return getScriptAge(sentAt) > deadlineHours;
 }
@@ -30,7 +30,7 @@ export function getChaseCountdown(sentAt: string | null, responseDeadlineMinutes
   const deadlineTime = sentTime + deadlineMinutes * 60 * 1000;
   const remainingMs = deadlineTime - Date.now();
 
-  if (remainingMs <= 0) return null; // already overdue
+  if (remainingMs <= 0) return null;
 
   const remainingMinutes = Math.round(remainingMs / (60 * 1000));
   if (remainingMinutes < 60) return `Chase in ${remainingMinutes}m`;

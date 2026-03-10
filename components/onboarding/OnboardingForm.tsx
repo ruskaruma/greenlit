@@ -1,17 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   User, Mail, Building2, Phone, Globe, Instagram, Youtube,
   Twitter, Linkedin,
   Mic, UserCheck, Calendar, Hash, ChevronRight, ChevronLeft,
   Loader2, Check, ArrowRight, Plus,
-  CheckCircle2, Clock, FileText,
+  CheckCircle2, Circle, AlertCircle, MinusCircle, Clock, FileText,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/components/ui/ToastProvider";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 
 
@@ -33,9 +32,37 @@ interface FormData {
 }
 
 interface OnboardingResult {
-  client: { id: string; name: string };
+  client: { id: string; name: string } | null;
   results: Record<string, { success: boolean; error?: string }>;
 }
+
+interface SSEEvent {
+  step: string;
+  status: "started" | "completed" | "error" | "skipped";
+  label: string;
+  error?: string;
+  data?: Record<string, unknown>;
+}
+
+type StepStatus = "pending" | "running" | "completed" | "error" | "skipped";
+
+interface OnboardingStep {
+  step: string;
+  label: string;
+  status: StepStatus;
+  error?: string;
+}
+
+const INITIAL_STEPS: OnboardingStep[] = [
+  { step: "client_create", label: "Creating client in database", status: "pending" },
+  { step: "memories", label: "Seeding AI memories", status: "pending" },
+  { step: "welcome_email", label: "Sending welcome email", status: "pending" },
+  { step: "whatsapp", label: "Sending WhatsApp notification", status: "pending" },
+  { step: "google_drive", label: "Creating Google Drive folder", status: "pending" },
+  { step: "notion_page", label: "Creating Notion page", status: "pending" },
+  { step: "airtable_entry", label: "Adding Airtable record", status: "pending" },
+  { step: "audit_log", label: "Logging to audit trail", status: "pending" },
+];
 
 const PLATFORMS = ["Instagram", "YouTube", "LinkedIn", "TikTok", "X/Twitter"] as const;
 const CHANNELS = ["email", "whatsapp", "both"] as const;
@@ -44,12 +71,17 @@ const STEPS = ["Client Basics", "Contract Details", "Brand Intelligence", "Revie
 
 export default function OnboardingForm() {
   const { toast } = useToast();
-  const router = useRouter();
-  const [step, setStep] = useState(0);
-  const [submitting, setSubmitting] = useState(false);
-  const [result, setResult] = useState<OnboardingResult | null>(null);
+  const [formStep, setFormStep] = useState(0);
+  const [phase, setPhase] = useState<"form" | "streaming" | "done">("form");
+  const [steps, setSteps] = useState<OnboardingStep[]>(INITIAL_STEPS);
+  const [finalResult, setFinalResult] = useState<OnboardingResult | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
-  // Checklist state no longer needed — all items are automated
+  useEffect(() => {
+    return () => {
+      abortControllerRef.current?.abort();
+    };
+  }, []);
 
   const [form, setForm] = useState<FormData>({
     name: "",
@@ -82,39 +114,94 @@ export default function OnboardingForm() {
   }
 
   function canProceed(): boolean {
-    if (step === 0) return !!form.name.trim() && !!form.email.trim();
+    if (formStep === 0) return !!form.name.trim() && !!form.email.trim();
     return true;
   }
 
-  async function handleSubmit() {
+  const handleSubmit = useCallback(async () => {
     if (!form.name.trim() || !form.email.trim()) {
       toast("error", "Name and email are required");
       return;
     }
 
-    setSubmitting(true);
+    setPhase("streaming");
+    setSteps(INITIAL_STEPS.map((s) => ({ ...s, status: "pending" as StepStatus })));
+
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+
     try {
       const res = await fetch("/api/onboarding", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
+        signal: abortController.signal,
       });
 
-      if (!res.ok) {
-        const e = await res.json();
-        toast("error", e.error ?? "Onboarding failed");
+      if (!res.ok || !res.body) {
+        let errMsg = "Onboarding failed";
+        try {
+          const e = await res.json();
+          errMsg = e.error ?? errMsg;
+        } catch { /* non-JSON response */ }
+        toast("error", errMsg);
+        setPhase("form");
         return;
       }
 
-      const data = await res.json() as OnboardingResult;
-      setResult(data);
-      toast("success", `${form.name} onboarded successfully`);
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const chunks = buffer.split("\n\n");
+        buffer = chunks.pop() ?? "";
+
+        for (const chunk of chunks) {
+          const line = chunk.trim();
+          if (!line.startsWith("data: ")) continue;
+
+          let event: SSEEvent;
+          try {
+            event = JSON.parse(line.slice(6));
+          } catch {
+            continue;
+          }
+
+          if (event.step === "done") {
+            const data = event.data as { client: { id: string; name: string } | null; results: Record<string, { success: boolean; error?: string }> };
+            setFinalResult({ client: data?.client ?? null, results: data?.results ?? {} });
+            setPhase("done");
+            if (data?.client) {
+              toast("success", `${form.name} onboarded successfully`);
+            }
+            continue;
+          }
+
+          const stepStatus: StepStatus =
+            event.status === "started" ? "running" :
+            event.status === "completed" ? "completed" :
+            event.status === "skipped" ? "skipped" :
+            "error";
+
+          setSteps((prev) =>
+            prev.map((s) =>
+              s.step === event.step
+                ? { ...s, status: stepStatus, label: event.label, error: event.error }
+                : s
+            )
+          );
+        }
+      }
     } catch {
-      toast("error", "Something went wrong");
-    } finally {
-      setSubmitting(false);
+      toast("error", "Connection lost during onboarding");
+      setPhase("form");
     }
-  }
+  }, [form, toast]);
 
   function handleReset() {
     setForm({
@@ -124,67 +211,122 @@ export default function OnboardingForm() {
       brand_voice: "", account_manager: "", contract_start: "",
       monthly_volume: "", platform_focus: [],
     });
-    setStep(0);
-    setResult(null);
+    setFormStep(0);
+    setPhase("form");
+    setFinalResult(null);
+    setSteps(INITIAL_STEPS);
   }
 
-if (result) {
-    const r = result.results;
+  if (phase === "streaming") {
+    const completedCount = steps.filter((s) => s.status === "completed").length;
+    const totalCount = steps.length;
+
+    return (
+      <div className="max-w-2xl mx-auto py-12 px-6">
+        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
+          <div className="flex items-center gap-3 mb-2">
+            <div className="w-10 h-10 rounded-full bg-[var(--accent-primary)]/10 border border-[var(--accent-primary)]/30 flex items-center justify-center">
+              <Loader2 size={20} className="text-[var(--accent-primary)] animate-spin" />
+            </div>
+            <div>
+              <h2 className="text-lg font-semibold text-[var(--text)]">Onboarding {form.name}...</h2>
+              <p className="text-xs text-[var(--muted)]">{completedCount} of {totalCount} steps completed</p>
+            </div>
+          </div>
+
+          <div className="h-1 bg-[var(--border)] rounded-full mb-6 overflow-hidden">
+            <motion.div
+              className="h-full bg-[var(--accent-primary)] rounded-full"
+              initial={{ width: 0 }}
+              animate={{ width: `${(completedCount / totalCount) * 100}%` }}
+              transition={{ duration: 0.4, ease: "easeOut" }}
+            />
+          </div>
+
+          <div className="bg-[var(--card)] border border-[var(--border)] rounded-lg divide-y divide-[var(--border)]">
+            {steps.map((s, i) => (
+              <motion.div
+                key={s.step}
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.04 }}
+                className="flex items-center gap-3 px-4 py-3.5"
+              >
+                <StepIcon status={s.status} />
+                <div className="flex-1 min-w-0">
+                  <p className={cn(
+                    "text-sm transition-colors",
+                    s.status === "completed" ? "text-[var(--text)]" :
+                    s.status === "running" ? "text-[var(--text)]" :
+                    s.status === "error" ? "text-red-400" :
+                    s.status === "skipped" ? "text-[var(--muted)]" :
+                    "text-[var(--muted)] opacity-50"
+                  )}>
+                    {s.label}
+                  </p>
+                  {s.error && (
+                    <p className="text-[10px] text-red-400 mt-0.5 truncate">{s.error}</p>
+                  )}
+                </div>
+                {s.status === "completed" && (
+                  <motion.span
+                    initial={{ opacity: 0, scale: 0.5 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="text-[10px] font-medium text-[var(--accent-success)]"
+                  >
+                    Done
+                  </motion.span>
+                )}
+                {s.status === "skipped" && (
+                  <span className="text-[10px] font-medium text-[var(--muted)]">Skipped</span>
+                )}
+              </motion.div>
+            ))}
+          </div>
+        </motion.div>
+      </div>
+    );
+  }
+
+  if (phase === "done" && finalResult) {
+    const r = finalResult.results;
+    const allSucceeded = Object.values(r).every((v) => v.success);
+
     return (
       <div className="max-w-2xl mx-auto py-12 px-6">
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
           <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 rounded-full bg-[var(--accent-success)]/10 border border-[var(--accent-success)]/30 flex items-center justify-center">
-              <CheckCircle2 size={20} className="text-[var(--accent-success)]" />
+            <div className={cn(
+              "w-10 h-10 rounded-full flex items-center justify-center border",
+              allSucceeded
+                ? "bg-[var(--accent-success)]/10 border-[var(--accent-success)]/30"
+                : "bg-amber-500/10 border-amber-500/30"
+            )}>
+              {allSucceeded
+                ? <CheckCircle2 size={20} className="text-[var(--accent-success)]" />
+                : <AlertCircle size={20} className="text-amber-400" />
+              }
             </div>
             <div>
-              <h2 className="text-lg font-semibold text-[var(--text)]">{result.client.name} onboarded</h2>
-              <p className="text-xs text-[var(--muted)]">Complete the checklist below to finish setup.</p>
+              <h2 className="text-lg font-semibold text-[var(--text)]">
+                {finalResult.client?.name ?? form.name} onboarded
+              </h2>
+              <p className="text-xs text-[var(--muted)]">
+                {allSucceeded ? "All steps completed successfully." : "Some steps had issues — see below."}
+              </p>
             </div>
           </div>
 
           <div className="bg-[var(--card)] border border-[var(--border)] rounded-lg divide-y divide-[var(--border)]">
-            {/* Automated */}
-            <ChecklistItem
-              label="Welcome Email"
-              success={r.welcome_email?.success ?? false}
-              error={r.welcome_email?.error}
-              automated
-            />
-            <ChecklistItem
-              label="Client Memories Seeded"
-              success={r.memories?.success ?? false}
-              error={r.memories?.error}
-              automated
-            />
-            <ChecklistItem
-              label="WhatsApp Notification"
-              success={r.whatsapp?.success ?? false}
-              error={r.whatsapp?.error}
-              automated
-            />
+            <ChecklistItem label="Client Created" success={!!finalResult.client} automated />
+            <ChecklistItem label="AI Memories Seeded" success={r.memories?.success ?? false} error={r.memories?.error} automated />
+            <ChecklistItem label="Welcome Email" success={r.welcome_email?.success ?? false} error={r.welcome_email?.error} automated />
+            <ChecklistItem label="WhatsApp Notification" success={r.whatsapp?.success ?? false} error={r.whatsapp?.error} automated />
+            <ChecklistItem label="Google Drive Folder" success={r.google_drive?.success ?? false} error={r.google_drive?.error} automated />
+            <ChecklistItem label="Notion Page" success={r.notion_page?.success ?? false} error={r.notion_page?.error} automated />
+            <ChecklistItem label="Airtable Entry" success={r.airtable_entry?.success ?? false} error={r.airtable_entry?.error} automated />
+            <ChecklistItem label="Audit Log" success={r.audit_log?.success ?? false} error={r.audit_log?.error} automated />
 
-            {/* Automated integrations */}
-            <ChecklistItem
-              label="Google Drive Folder"
-              success={r.google_drive?.success ?? false}
-              error={r.google_drive?.error}
-              automated
-            />
-            <ChecklistItem
-              label="Notion Page"
-              success={r.notion_page?.success ?? false}
-              error={r.notion_page?.error}
-              automated
-            />
-            <ChecklistItem
-              label="Airtable Entry"
-              success={r.airtable_entry?.success ?? false}
-              error={r.airtable_entry?.error}
-              automated
-            />
-
-            {/* First Brief */}
             <div className="flex items-center justify-between p-4">
               <div className="flex items-center gap-3">
                 <Clock size={14} className="text-amber-400" />
@@ -204,12 +346,20 @@ if (result) {
           </div>
 
           <div className="flex items-center gap-3 mt-6">
+            {finalResult.client && (
+              <Link
+                href={`/clients/${finalResult.client.id}`}
+                className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-xs font-bold bg-[var(--accent-primary)] text-white hover:bg-[var(--accent-primary)]/90 transition-colors"
+              >
+                View Client
+                <ArrowRight size={12} />
+              </Link>
+            )}
             <Link
               href="/dashboard"
-              className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-xs font-bold bg-[var(--accent-primary)] text-white hover:bg-[var(--accent-primary)]/90 transition-colors"
+              className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs font-medium border border-[var(--border)] text-[var(--muted)] hover:text-[var(--text)] hover:bg-[var(--surface-elevated)] transition-colors"
             >
-              View on Dashboard
-              <ArrowRight size={12} />
+              Dashboard
             </Link>
             <button
               onClick={handleReset}
@@ -224,26 +374,25 @@ if (result) {
     );
   }
 
-return (
+  return (
     <div className="max-w-2xl mx-auto py-8 px-6">
-      {/* Step Indicator */}
       <div className="flex items-center gap-2 mb-8">
         {STEPS.map((label, i) => (
           <div key={label} className="flex items-center gap-2">
             <button
-              onClick={() => i <= step && setStep(i)}
+              onClick={() => i <= formStep && setFormStep(i)}
               className={cn(
                 "flex items-center gap-1.5 text-[11px] font-medium transition-colors",
-                i === step ? "text-[var(--accent-primary)]" : i < step ? "text-[var(--text)]" : "text-[var(--muted)] opacity-40"
+                i === formStep ? "text-[var(--accent-primary)]" : i < formStep ? "text-[var(--text)]" : "text-[var(--muted)] opacity-40"
               )}
             >
               <span className={cn(
                 "w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold border",
-                i === step ? "border-[var(--accent-primary)] text-[var(--accent-primary)] bg-[var(--accent-primary)]/10" :
-                i < step ? "border-[var(--accent-success)] text-[var(--accent-success)] bg-[var(--accent-success)]/10" :
+                i === formStep ? "border-[var(--accent-primary)] text-[var(--accent-primary)] bg-[var(--accent-primary)]/10" :
+                i < formStep ? "border-[var(--accent-success)] text-[var(--accent-success)] bg-[var(--accent-success)]/10" :
                 "border-[var(--border)] text-[var(--muted)]"
               )}>
-                {i < step ? <Check size={10} /> : i + 1}
+                {i < formStep ? <Check size={10} /> : i + 1}
               </span>
               {label}
             </button>
@@ -254,14 +403,13 @@ return (
 
       <AnimatePresence mode="wait">
         <motion.div
-          key={step}
+          key={formStep}
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
           exit={{ opacity: 0, x: -20 }}
           transition={{ duration: 0.2 }}
         >
-          {/* Step 0: Client Basics */}
-          {step === 0 && (
+          {formStep === 0 && (
             <div className="space-y-5">
               <h2 className="text-lg font-semibold text-[var(--text)]">Client Basics</h2>
 
@@ -311,8 +459,7 @@ return (
             </div>
           )}
 
-          {/* Step 1: Contract Details */}
-          {step === 1 && (
+          {formStep === 1 && (
             <div className="space-y-5">
               <h2 className="text-lg font-semibold text-[var(--text)]">Contract Details</h2>
 
@@ -348,8 +495,7 @@ return (
             </div>
           )}
 
-          {/* Step 2: Brand Intelligence */}
-          {step === 2 && (
+          {formStep === 2 && (
             <div className="space-y-5">
               <h2 className="text-lg font-semibold text-[var(--text)]">Brand Intelligence</h2>
               <p className="text-xs text-[var(--muted)]">This gets stored in client memory. The AI agent uses it to match tone in chasers and reports.</p>
@@ -366,8 +512,7 @@ return (
             </div>
           )}
 
-          {/* Step 3: Review & Submit */}
-          {step === 3 && (
+          {formStep === 3 && (
             <div className="space-y-5">
               <h2 className="text-lg font-semibold text-[var(--text)]">Review & Submit</h2>
 
@@ -405,20 +550,19 @@ return (
         </motion.div>
       </AnimatePresence>
 
-      {/* Navigation */}
       <div className="flex items-center justify-between mt-8">
         <button
-          onClick={() => setStep(Math.max(0, step - 1))}
-          disabled={step === 0}
+          onClick={() => setFormStep(Math.max(0, formStep - 1))}
+          disabled={formStep === 0}
           className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-medium text-[var(--muted)] hover:text-[var(--text)] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
         >
           <ChevronLeft size={14} />
           Back
         </button>
 
-        {step < STEPS.length - 1 ? (
+        {formStep < STEPS.length - 1 ? (
           <button
-            onClick={() => setStep(step + 1)}
+            onClick={() => setFormStep(formStep + 1)}
             disabled={!canProceed()}
             className="flex items-center gap-1.5 px-5 py-2.5 rounded-lg text-xs font-bold bg-[var(--accent-primary)] text-white hover:bg-[var(--accent-primary)]/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
@@ -428,11 +572,11 @@ return (
         ) : (
           <button
             onClick={handleSubmit}
-            disabled={submitting || !form.name.trim() || !form.email.trim()}
+            disabled={!form.name.trim() || !form.email.trim()}
             className="flex items-center gap-2 px-6 py-2.5 rounded-lg text-xs font-bold bg-[var(--accent-primary)] text-white hover:bg-[var(--accent-primary)]/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            {submitting ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
-            {submitting ? "Onboarding..." : "Submit & Onboard"}
+            <Check size={14} />
+            Submit & Onboard
           </button>
         )}
       </div>
@@ -442,6 +586,25 @@ return (
 
 
 const inputCls = "w-full px-3 py-2.5 bg-[var(--bg)] border border-[var(--border)] rounded-lg text-sm text-[var(--text)] placeholder:text-[var(--muted)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)] focus:border-transparent";
+
+function StepIcon({ status }: { status: StepStatus }) {
+  switch (status) {
+    case "completed":
+      return (
+        <motion.div initial={{ scale: 0.5 }} animate={{ scale: 1 }} transition={{ type: "spring", stiffness: 500, damping: 25 }}>
+          <CheckCircle2 size={16} className="text-[var(--accent-success)]" />
+        </motion.div>
+      );
+    case "running":
+      return <Loader2 size={16} className="text-[var(--accent-primary)] animate-spin" />;
+    case "error":
+      return <AlertCircle size={16} className="text-red-400" />;
+    case "skipped":
+      return <MinusCircle size={16} className="text-[var(--muted)] opacity-50" />;
+    default:
+      return <Circle size={16} className="text-[var(--muted)] opacity-30" />;
+  }
+}
 
 function Field({ icon: Icon, label, children }: { icon: typeof User; label: string; children: React.ReactNode }) {
   return (
@@ -471,7 +634,7 @@ function ChecklistItem({ label, success, error, automated }: { label: string; su
         {success ? (
           <CheckCircle2 size={14} className="text-[var(--accent-success)]" />
         ) : (
-          <Clock size={14} className="text-red-400" />
+          <AlertCircle size={14} className="text-red-400" />
         )}
         <div>
           <p className="text-sm text-[var(--text)]">{label}</p>
@@ -486,4 +649,3 @@ function ChecklistItem({ label, success, error, automated }: { label: string; su
     </div>
   );
 }
-

@@ -13,19 +13,16 @@ export interface AgentState {
   emailSubject: string | null;
   chaserId: string | null;
   error: string | null;
-  // Sentiment analysis (item 2)
   urgencyScore: number | null;
   toneRecommendation: string | null;
-  // Self-critique loop (item 3)
   critiqueScores: CritiqueScores | null;
   revisionCount: number;
-  // Execution log (items 2-4)
   nodeExecutionLog: NodeLogEntry[];
-  // HITL interrupt/resume (set during graph execution, not required at init)
   hitlAction?: string | null;
   hitlEditedContent?: string | null;
   recommendedChannel?: string | null;
   preferredChannel?: string | null;
+  ragEmpty?: boolean;
 }
 
 export interface CritiqueScores {
@@ -42,4 +39,8 @@ export interface NodeLogEntry {
   timestamp: string;
   durationMs: number;
   summary: string;
+}
+
+export function appendNodeLog(existing: NodeLogEntry[], incoming: NodeLogEntry[]): NodeLogEntry[] {
+  return [...existing, ...incoming];
 }

@@ -36,7 +36,6 @@ export async function POST(
     return NextResponse.json({ error: "instruction or tone required" }, { status: 400 });
   }
 
-  // Fetch chaser with related data
   const { data: chaser, error: fetchError } = await supabase
     .from("chasers")
     .select("id, script_id, client_id, draft_content, status, hitl_state, clients(name, company, email, avg_response_hours), scripts(title, content, sent_at, due_date, platform)")
@@ -51,7 +50,6 @@ export async function POST(
     return NextResponse.json({ error: `Chaser already ${chaser.status}` }, { status: 409 });
   }
 
-  // Fetch recent client memories for context
   const { data: memories } = await supabase
     .from("client_memories")
     .select("content")
@@ -116,13 +114,11 @@ Rewrite the email following the instruction. Keep the same general purpose but a
           .map((block) => block.text)
           .join("");
 
-    // Parse SUBJECT/BODY
     const subjectMatch = responseText.match(/SUBJECT:\s*(.+?)(?:\n|$)/i);
     const bodyMatch = responseText.match(/BODY:\s*([\s\S]+)/i);
     const newSubject = subjectMatch?.[1]?.trim() ?? (chaser.hitl_state?.email_subject as string) ?? `Following up: ${scriptTitle}`;
     const newBody = bodyMatch?.[1]?.trim() ?? responseText.trim();
 
-    // Update chaser with new draft
     const updatedHitlState = {
       ...(chaser.hitl_state ?? {}),
       email_subject: newSubject,
@@ -137,7 +133,6 @@ Rewrite the email following the instruction. Keep the same general purpose but a
       })
       .eq("id", id);
 
-    // Store instruction as memory (fire-and-forget)
     if (instruction) {
       storeClientMemory(
         chaser.client_id,

@@ -67,10 +67,10 @@ export async function PATCH(
     .single();
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error("[briefs/PATCH] Update failed:", error.message);
+    return NextResponse.json({ error: "Failed to update brief" }, { status: 500 });
   }
 
-  // Audit log
   await supabase.from("audit_log").insert({
     entity_type: "brief",
     entity_id: id,

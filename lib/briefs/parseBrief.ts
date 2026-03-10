@@ -37,6 +37,7 @@ export interface ParsedBrief {
   reference_notes?: string;
   estimated_word_count?: number;
   writer_notes: string;
+  error?: boolean;
 }
 
 const PLATFORM_CONSTRAINTS: Record<string, { format: string; max_duration?: string; aspect_ratio?: string; character_limit?: number }> = {
@@ -47,17 +48,38 @@ const PLATFORM_CONSTRAINTS: Record<string, { format: string; max_duration?: stri
   "X/Twitter": { format: "Short-form clip / Thread hook", max_duration: "2:20", aspect_ratio: "16:9 or 1:1", character_limit: 280 },
 };
 
+function isValidParsedBrief(parsed: unknown): parsed is Record<string, unknown> {
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) return false;
+  const obj = parsed as Record<string, unknown>;
+  return typeof obj.title === "string" && typeof obj.core_message === "string";
+}
+
+function fallbackBrief(reason: string): ParsedBrief {
+  console.error("[parseBrief] Returning fallback brief:", reason);
+  return {
+    title: "Untitled Brief",
+    hook_angle: "",
+    core_message: "",
+    key_talking_points: [],
+    cta: "",
+    tone_direction: "",
+    platform_constraints: { format: "General" },
+    target_audience_profile: "",
+    brand_alignment_notes: "",
+    writer_notes: `Brief parsing failed: ${reason}`,
+    error: true,
+  };
+}
+
 export async function parseBrief(input: BriefInput): Promise<ParsedBrief> {
   const supabase: SupabaseAny = createServiceClientDirect();
 
-  // Fetch client profile
   const { data: client } = await supabase
     .from("clients")
     .select("name, company, brand_voice, platform_focus")
     .eq("id", input.clientId)
     .single();
 
-  // Fetch recent client memories for behavioral context
   const { data: memories } = await supabase
     .from("client_memories")
     .select("content, memory_type")
@@ -70,7 +92,6 @@ export async function parseBrief(input: BriefInput): Promise<ParsedBrief> {
   const brandVoice = client?.brand_voice ?? "Not specified";
   const platformFocus = client?.platform_focus ?? [];
 
-  // Build memory context
   const memoryContext = memories && memories.length > 0
     ? memories.map((m: { content: string; memory_type: string }) => `- [${m.memory_type}] ${m.content}`).join("\n")
     : "No prior history available.";
@@ -82,13 +103,15 @@ export async function parseBrief(input: BriefInput): Promise<ParsedBrief> {
     ? `Format: ${constraints.format}, Max Duration: ${constraints.max_duration ?? "N/A"}, Aspect Ratio: ${constraints.aspect_ratio ?? "N/A"}, Character Limit: ${constraints.character_limit ?? "N/A"}`
     : "No specific platform constraints.";
 
-  const response = await anthropic.messages.create({
-    model: "claude-sonnet-4-5-20250514",
-    max_tokens: 1500,
-    messages: [
-      {
-        role: "user",
-        content: `You are a senior content strategist at a video content agency. Transform this raw brief intake into a structured internal brief that a scriptwriter can immediately work from.
+  let response;
+  try {
+    response = await anthropic.messages.create({
+      model: "claude-sonnet-4-5-20250514",
+      max_tokens: 1500,
+      messages: [
+        {
+          role: "user",
+          content: `You are a senior content strategist at a video content agency. Transform this raw brief intake into a structured internal brief that a scriptwriter can immediately work from.
 
 CLIENT PROFILE:
 - Name: ${clientName}
@@ -141,31 +164,51 @@ Return ONLY valid JSON with this exact structure:
 }
 
 JSON:`,
-      },
-    ],
-  });
+        },
+      ],
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "API call failed";
+    return fallbackBrief(message);
+  }
 
-  const text = response.content[0].type === "text" ? response.content[0].text : "";
+  const text = response.content[0]?.type === "text" ? response.content[0].text : "";
   const cleaned = text.replace(/```json\n?|\n?```/g, "").trim();
-  const parsed = JSON.parse(cleaned);
+
+  // C1: Wrap JSON.parse in try-catch
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(cleaned);
+  } catch {
+    console.error("[parseBrief] Failed to parse LLM response:", cleaned.slice(0, 500));
+    return fallbackBrief("LLM returned non-JSON response");
+  }
+
+  // A1: Validate shape
+  if (!isValidParsedBrief(parsed)) {
+    console.error("[parseBrief] Invalid response shape:", JSON.stringify(parsed).slice(0, 500));
+    return fallbackBrief("LLM returned invalid response shape");
+  }
+
+  const p = parsed as Record<string, unknown>;
 
   return {
-    title: typeof parsed.title === "string" ? parsed.title : "Untitled Brief",
-    hook_angle: typeof parsed.hook_angle === "string" ? parsed.hook_angle : "",
-    core_message: typeof parsed.core_message === "string" ? parsed.core_message : "",
-    key_talking_points: Array.isArray(parsed.key_talking_points) ? parsed.key_talking_points : [],
-    cta: typeof parsed.cta === "string" ? parsed.cta : "",
-    tone_direction: typeof parsed.tone_direction === "string" ? parsed.tone_direction : "",
+    title: typeof p.title === "string" ? p.title : "Untitled Brief",
+    hook_angle: typeof p.hook_angle === "string" ? p.hook_angle : "",
+    core_message: typeof p.core_message === "string" ? p.core_message : "",
+    key_talking_points: Array.isArray(p.key_talking_points) ? p.key_talking_points as string[] : [],
+    cta: typeof p.cta === "string" ? p.cta : "",
+    tone_direction: typeof p.tone_direction === "string" ? p.tone_direction : "",
     platform_constraints: {
-      format: parsed.platform_constraints?.format ?? constraints?.format ?? "General",
-      max_duration: parsed.platform_constraints?.max_duration ?? constraints?.max_duration ?? undefined,
-      aspect_ratio: parsed.platform_constraints?.aspect_ratio ?? constraints?.aspect_ratio ?? undefined,
-      character_limit: typeof parsed.platform_constraints?.character_limit === "number" ? parsed.platform_constraints.character_limit : (constraints?.character_limit ?? undefined),
+      format: (p.platform_constraints as Record<string, unknown>)?.format as string ?? constraints?.format ?? "General",
+      max_duration: (p.platform_constraints as Record<string, unknown>)?.max_duration as string ?? constraints?.max_duration ?? undefined,
+      aspect_ratio: (p.platform_constraints as Record<string, unknown>)?.aspect_ratio as string ?? constraints?.aspect_ratio ?? undefined,
+      character_limit: typeof (p.platform_constraints as Record<string, unknown>)?.character_limit === "number" ? (p.platform_constraints as Record<string, unknown>).character_limit as number : (constraints?.character_limit ?? undefined),
     },
-    target_audience_profile: typeof parsed.target_audience_profile === "string" ? parsed.target_audience_profile : "",
-    brand_alignment_notes: typeof parsed.brand_alignment_notes === "string" ? parsed.brand_alignment_notes : "",
-    reference_notes: typeof parsed.reference_notes === "string" ? parsed.reference_notes : undefined,
-    estimated_word_count: typeof parsed.estimated_word_count === "number" ? parsed.estimated_word_count : undefined,
-    writer_notes: typeof parsed.writer_notes === "string" ? parsed.writer_notes : "",
+    target_audience_profile: typeof p.target_audience_profile === "string" ? p.target_audience_profile : "",
+    brand_alignment_notes: typeof p.brand_alignment_notes === "string" ? p.brand_alignment_notes : "",
+    reference_notes: typeof p.reference_notes === "string" ? p.reference_notes : undefined,
+    estimated_word_count: typeof p.estimated_word_count === "number" ? p.estimated_word_count : undefined,
+    writer_notes: typeof p.writer_notes === "string" ? p.writer_notes : "",
   };
 }

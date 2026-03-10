@@ -1,8 +1,9 @@
 import { ChatAnthropic } from "@langchain/anthropic";
+import { MODEL_CLAUDE_HAIKU } from "../config";
 import type { AgentState, NodeLogEntry } from "../types";
 
 const model = new ChatAnthropic({
-  model: "claude-haiku-4-5-20251001",
+  model: MODEL_CLAUDE_HAIKU,
   maxTokens: 500,
   temperature: 0.5,
 });
@@ -57,7 +58,6 @@ Fix the listed issues and output in SUBJECT: / BODY: format.`;
     const newSubject = subjectMatch?.[1]?.trim() ?? state.emailSubject;
     const newBody = bodyMatch?.[1]?.trim() ?? state.generatedEmail;
 
-    // Validate non-empty
     if (!newBody || newBody.length < 20) {
       throw new Error("Revision produced empty or too-short email");
     }

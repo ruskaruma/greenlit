@@ -15,10 +15,6 @@ import {
   Cell,
 } from "recharts";
 
-/* ------------------------------------------------------------------ */
-/*  Types                                                              */
-/* ------------------------------------------------------------------ */
-
 interface KPIs {
   pending: number;
   avgApprovalHours: number | null;
@@ -56,10 +52,6 @@ interface AnalyticsData {
   clients: ClientOption[];
 }
 
-/* ------------------------------------------------------------------ */
-/*  Constants                                                          */
-/* ------------------------------------------------------------------ */
-
 const STATUS_COLORS: Record<string, string> = {
   draft: "#888888",
   pending_review: "#F97316",
@@ -89,10 +81,6 @@ const RANGE_OPTIONS = [
 
 type SortKey = keyof ScriptRow;
 type SortDir = "asc" | "desc";
-
-/* ------------------------------------------------------------------ */
-/*  Component                                                          */
-/* ------------------------------------------------------------------ */
 
 export default function AnalyticsPanel() {
   const [data, setData] = useState<AnalyticsData | null>(null);
@@ -129,8 +117,6 @@ export default function AnalyticsPanel() {
       .then(d => { if (d) setSparklines(d); });
   }, []);
 
-  /* ---- Sorting ---- */
-
   function handleSort(key: SortKey) {
     if (sortKey === key) {
       setSortDir(prev => (prev === "asc" ? "desc" : "asc"));
@@ -162,8 +148,6 @@ export default function AnalyticsPanel() {
     return sortDir === "asc" ? " \u2191" : " \u2193";
   };
 
-  /* ---- Donut data ---- */
-
   const donutData = data
     ? Object.entries(data.statusDistribution).map(([status, count]) => ({
         name: STATUS_LABELS[status] ?? status,
@@ -171,8 +155,6 @@ export default function AnalyticsPanel() {
         color: STATUS_COLORS[status] ?? "#888888",
       }))
     : [];
-
-  /* ---- Helpers ---- */
 
   function formatDate(iso: string | null) {
     if (!iso) return "-";
@@ -190,8 +172,6 @@ export default function AnalyticsPanel() {
     return STATUS_COLORS[status] ?? "#888888";
   }
 
-  /* ---- Loading state ---- */
-
   if (loading && !data) {
     return (
       <div className="flex items-center justify-center h-[40vh]">
@@ -206,7 +186,6 @@ export default function AnalyticsPanel() {
 
   return (
     <div className="px-6 py-6 space-y-6">
-      {/* ---- Row 1: KPI Cards ---- */}
       <div className="grid grid-cols-4 gap-4">
         <KPICard label="Pending Review" value={kpis.pending} sparkline={sparklines.pending} />
         <KPICard
@@ -222,7 +201,6 @@ export default function AnalyticsPanel() {
         />
       </div>
 
-      {/* ---- Row 2: Filters ---- */}
       <div className="flex items-center gap-4">
         <select
           value={clientId}
@@ -258,9 +236,7 @@ export default function AnalyticsPanel() {
         )}
       </div>
 
-      {/* ---- Row 3: Charts ---- */}
       <div className="grid grid-cols-3 gap-4">
-        {/* Line chart (2/3 width) */}
         <div className="col-span-2 bg-[var(--card)] border border-[var(--border)] rounded-lg p-4">
           <p className="text-[10px] uppercase tracking-wider text-[var(--muted)] mb-3">
             Scripts Over Time
@@ -295,7 +271,6 @@ export default function AnalyticsPanel() {
           </ResponsiveContainer>
         </div>
 
-        {/* Donut chart (1/3 width) */}
         <div className="bg-[var(--card)] border border-[var(--border)] rounded-lg p-4">
           <p className="text-[10px] uppercase tracking-wider text-[var(--muted)] mb-3">
             Status Distribution
@@ -344,7 +319,6 @@ export default function AnalyticsPanel() {
         </div>
       </div>
 
-      {/* ---- Row 4: Data Table ---- */}
       <div className="bg-[var(--card)] border border-[var(--border)] rounded-lg overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-[13px]">
@@ -398,10 +372,6 @@ export default function AnalyticsPanel() {
     </div>
   );
 }
-
-/* ------------------------------------------------------------------ */
-/*  Sub-components                                                     */
-/* ------------------------------------------------------------------ */
 
 function KPICard({ label, value, sparkline }: { label: string; value: string | number; sparkline?: { day: string; value: number }[] }) {
   return (

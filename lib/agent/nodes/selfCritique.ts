@@ -1,8 +1,9 @@
 import { ChatAnthropic } from "@langchain/anthropic";
+import { MODEL_CLAUDE_HAIKU } from "../config";
 import type { AgentState, CritiqueScores, NodeLogEntry } from "../types";
 
 const model = new ChatAnthropic({
-  model: "claude-haiku-4-5-20251001",
+  model: MODEL_CLAUDE_HAIKU,
   maxTokens: 800,
   temperature: 0,
 });
@@ -43,19 +44,15 @@ function clamp(val: unknown, min: number, max: number): number {
 function criteriaToScores(passCount: number, total: number, criteria: { name: string; result: string }[]): CritiqueScores {
   const passed = new Set(criteria.filter(c => c.result === "PASS").map(c => c.name));
 
-  // Professionalism: opens_with_purpose + no_cliches + no_guilt_tripping
   const profItems = ["opens_with_purpose", "no_cliches", "no_guilt_tripping"];
   const profScore = Math.round((profItems.filter(i => passed.has(i)).length / profItems.length) * 10);
 
-  // Personalization: mentions_script_name + personalized_content + references_overdue_time
   const persItems = ["mentions_script_name", "personalized_content", "references_overdue_time"];
   const persScore = Math.round((persItems.filter(i => passed.has(i)).length / persItems.length) * 10);
 
-  // Clarity: specific_ask + appropriate_length + no_placeholder_text
   const clarItems = ["specific_ask", "appropriate_length", "no_placeholder_text"];
   const clarScore = Math.round((clarItems.filter(i => passed.has(i)).length / clarItems.length) * 10);
 
-  // Persuasiveness: matches_target_tone + specific_ask + personalized_content
   const persuItems = ["matches_target_tone", "specific_ask", "personalized_content"];
   const persuScore = Math.round((persuItems.filter(i => passed.has(i)).length / persuItems.length) * 10);
 
@@ -68,6 +65,17 @@ function criteriaToScores(passCount: number, total: number, criteria: { name: st
     persuasiveness: persuScore,
     average: avg,
     feedback: "",
+  };
+}
+
+function failureCritiqueScores(reason: string): CritiqueScores {
+  return {
+    professionalism: 0,
+    personalization: 0,
+    clarity: 0,
+    persuasiveness: 0,
+    average: 0,
+    feedback: `Self-critique failed: ${reason}`,
   };
 }
 
@@ -96,7 +104,6 @@ export async function selfCritique(state: AgentState): Promise<AgentState> {
 
     const parsed = JSON.parse(text.replace(/```json\n?|\n?```/g, '').trim());
 
-    // Validate parsed output
     const criteria = Array.isArray(parsed.criteria) ? parsed.criteria : [];
     const passCount = clamp(parsed.pass_count, 0, 10);
     const total = clamp(parsed.total, 1, 10);
@@ -106,7 +113,6 @@ export async function selfCritique(state: AgentState): Promise<AgentState> {
     const scores = criteriaToScores(passCount, total, criteria);
     scores.feedback = feedback;
 
-    // Store the detailed criteria results in the feedback for the revision node
     const detailedFeedback = failedCriteria.length > 0
       ? `Failed criteria: ${failedCriteria.join(", ")}. ${feedback}`
       : feedback;
@@ -135,9 +141,10 @@ export async function selfCritique(state: AgentState): Promise<AgentState> {
       summary: `Error: ${message}`,
     };
 
+    // Fix 4: Return explicit failure scores (average=0) that route to revision instead of null
     return {
       ...state,
-      critiqueScores: null,
+      critiqueScores: failureCritiqueScores(message),
       nodeExecutionLog: [...state.nodeExecutionLog, entry],
     };
   }

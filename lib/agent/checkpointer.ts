@@ -47,7 +47,6 @@ export class SupabaseCheckpointSaver extends BaseCheckpointSaver {
     const { data, error } = await query.single();
     if (error || !data) return undefined;
 
-    // Load pending writes
     const { data: writes } = await supabase
       .from("agent_checkpoint_writes")
       .select("*")
@@ -102,6 +101,28 @@ export class SupabaseCheckpointSaver extends BaseCheckpointSaver {
       .select("*")
       .eq("thread_id", threadId)
       .order("created_at", { ascending: false });
+
+    if (options?.before) {
+      const beforeId = getCheckpointId(options.before);
+      if (beforeId) {
+        const { data: beforeRow } = await supabase
+          .from("agent_checkpoints")
+          .select("created_at")
+          .eq("thread_id", threadId)
+          .eq("checkpoint_id", beforeId)
+          .single();
+
+        if (beforeRow) {
+          query = query.lt("created_at", beforeRow.created_at);
+        }
+      }
+    }
+
+    if (options?.filter) {
+      for (const [key, value] of Object.entries(options.filter)) {
+        query = query.eq(key, value);
+      }
+    }
 
     if (options?.limit) {
       query = query.limit(options.limit);

@@ -1,3 +1,4 @@
+import { createHmac, timingSafeEqual } from "crypto";
 import { createServiceClientDirect } from "@/lib/supabase/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { storeClientMemory, buildClientResponseMemory } from "@/lib/agent/nodes/memoryUpdate";
@@ -57,7 +58,49 @@ JSON:`,
   }
 }
 
+function validateTwilioSignature(
+  url: string,
+  params: Record<string, string>,
+  signature: string,
+  authToken: string
+): boolean {
+  const sortedKeys = Object.keys(params).sort();
+  const paramString = sortedKeys.reduce((acc, key) => acc + key + params[key], "");
+  const data = url + paramString;
+  const computed = createHmac("sha1", authToken).update(data, "utf-8").digest("base64");
+
+  const sigBuf = Buffer.from(signature);
+  const computedBuf = Buffer.from(computed);
+  if (sigBuf.length !== computedBuf.length) return false;
+  return timingSafeEqual(sigBuf, computedBuf);
+}
+
 export async function POST(request: Request) {
+  const twilioAuthToken = process.env.TWILIO_AUTH_TOKEN;
+  if (twilioAuthToken) {
+    const twilioSignature = request.headers.get("x-twilio-signature") ?? "";
+    if (!twilioSignature) {
+      console.warn("[whatsapp-webhook] Missing X-Twilio-Signature header");
+      return new Response("Forbidden", { status: 403 });
+    }
+
+    const clonedRequest = request.clone();
+    const formDataForValidation = await clonedRequest.formData();
+    const params: Record<string, string> = {};
+    formDataForValidation.forEach((value, key) => {
+      params[key] = value.toString();
+    });
+
+    const proto = request.headers.get("x-forwarded-proto") ?? "https";
+    const host = request.headers.get("host") ?? "localhost";
+    const webhookUrl = `${proto}://${host}/api/webhooks/whatsapp`;
+
+    if (!validateTwilioSignature(webhookUrl, params, twilioSignature, twilioAuthToken)) {
+      console.warn("[whatsapp-webhook] Invalid Twilio signature");
+      return new Response("Forbidden", { status: 403 });
+    }
+  }
+
   const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
   if (isRateLimited(ip)) {
     return twiml("Too many requests, please try again later.");
@@ -85,17 +128,48 @@ export async function POST(request: Request) {
     return twiml("Sorry, we couldn't find your account. Please contact your team lead.");
   }
 
-  const { data: script, error: scriptError } = await supabase
+  const { data: pendingScripts } = await supabase
     .from("scripts")
     .select("id, title, status, sent_at")
     .eq("client_id", client.id)
     .eq("status", "pending_review")
-    .order("sent_at", { ascending: false })
-    .limit(1)
-    .single();
+    .order("sent_at", { ascending: false });
 
-  if (scriptError || !script) {
+  if (!pendingScripts || pendingScripts.length === 0) {
     return twiml("No pending scripts found for review. If you think this is an error, please contact your team lead.");
+  }
+
+  let script: { id: string; title: string; status: string; sent_at: string | null };
+
+  if (pendingScripts.length === 1) {
+    script = pendingScripts[0];
+  } else {
+    const numberMatch = body.match(/^(\d+)$/);
+    if (numberMatch) {
+      const idx = parseInt(numberMatch[1], 10) - 1;
+      if (idx >= 0 && idx < pendingScripts.length) {
+        script = pendingScripts[idx];
+      } else {
+        return twiml(`Invalid choice. Reply with a number between 1 and ${pendingScripts.length}.`);
+      }
+    } else {
+      const titleMatch = pendingScripts.find(
+        (s: { id: string; title: string }) =>
+          body.toLowerCase().includes(s.title.toLowerCase()) ||
+          body.includes(s.id)
+      );
+
+      if (titleMatch) {
+        script = titleMatch;
+      } else {
+        const listing = pendingScripts
+          .map((s: { title: string }, i: number) => `${i + 1}. ${s.title}`)
+          .join("\n");
+        return twiml(
+          `We have multiple scripts awaiting your review:\n${listing}\n\nReply with the number of the script you are reviewing.`
+        );
+      }
+    }
   }
 
   const { intent, feedback } = await classifyIntent(body);

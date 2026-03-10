@@ -37,7 +37,6 @@ interface ChaserRow {
 }
 
 export async function GET(request: Request) {
-  // Auth: CRON_SECRET header only
   const authHeader = request.headers.get("authorization");
   const cronSecret = process.env.CRON_SECRET;
 
@@ -115,7 +114,6 @@ const nowMs = Date.now();
     }
     deadlines.sort((a, b) => a.daysUntil - b.daysUntil);
 
-    // Build digest message
     const needsAction = hitlItems.length > 0 || overdueList.length > 0 || deadlines.length > 0;
     const lines: string[] = ["Good morning. Here's your Greenlit summary:\n"];
 
@@ -166,7 +164,6 @@ const nowMs = Date.now();
 
     const digestText = lines.join("\n");
 
-    // Send email digest
     const teamEmail = process.env.TEAM_EMAIL;
     if (teamEmail && resend) {
       try {
@@ -184,7 +181,6 @@ const nowMs = Date.now();
       }
     }
 
-    // Send WhatsApp digest
     const founderWhatsApp = process.env.FOUNDER_WHATSAPP || process.env.DEMO_WHATSAPP_NUMBER;
     if (founderWhatsApp) {
       const from = process.env.TWILIO_WHATSAPP_FROM || "whatsapp:+14155238886";
@@ -202,7 +198,6 @@ const nowMs = Date.now();
       }
     }
 
-    // Store audit log
     await supabase.from("audit_log").insert({
       entity_type: "system",
       entity_id: "digest",
@@ -217,7 +212,6 @@ const nowMs = Date.now();
       },
     });
 
-    // Chain: trigger agent scan after digest
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
     try {
       const agentRes = await fetch(`${appUrl}/api/agent/run`, {

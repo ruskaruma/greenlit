@@ -13,7 +13,6 @@ function getConfig() {
 }
 
 async function getAccessToken(email: string, privateKey: string): Promise<string> {
-  // Build JWT header and claim set for Google OAuth2
   const header = { alg: "RS256", typ: "JWT" };
   const now = Math.floor(Date.now() / 1000);
   const claimSet = {
@@ -42,6 +41,7 @@ async function getAccessToken(email: string, privateKey: string): Promise<string
       grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
       assertion: jwt,
     }),
+    signal: AbortSignal.timeout(15_000),
   });
 
   if (!res.ok) {
@@ -83,7 +83,6 @@ export async function createClientFolder({
     const token = await getAccessToken(config.email, config.privateKey);
     const folderName = company ? `${company} - ${clientName}` : clientName;
 
-    // Create folder under parent
     const createRes = await fetch("https://www.googleapis.com/drive/v3/files", {
       method: "POST",
       headers: {
@@ -95,6 +94,7 @@ export async function createClientFolder({
         mimeType: "application/vnd.google-apps.folder",
         parents: [config.parentFolderId],
       }),
+      signal: AbortSignal.timeout(15_000),
     });
 
     if (!createRes.ok) {
@@ -106,7 +106,6 @@ export async function createClientFolder({
     const folderId: string = folder.id;
     const folderUrl = `https://drive.google.com/drive/folders/${folderId}`;
 
-    // Share with client if email provided
     if (clientEmail) {
       const shareRes = await fetch(
         `https://www.googleapis.com/drive/v3/files/${folderId}/permissions`,
@@ -121,6 +120,7 @@ export async function createClientFolder({
             role: "reader",
             emailAddress: clientEmail,
           }),
+          signal: AbortSignal.timeout(15_000),
         },
       );
 

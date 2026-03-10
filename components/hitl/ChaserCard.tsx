@@ -84,22 +84,18 @@ export default function ChaserCard({ chaser, memories, onActionComplete, onSelec
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { toast } = useToast();
 
-  // Undo toast state
   const [undoTimer, setUndoTimer] = useState<ReturnType<typeof setTimeout> | null>(null);
   const [pendingApprove, setPendingApprove] = useState(false);
 
-  // Regeneration state
   const [instruction, setInstruction] = useState("");
   const [regenerating, setRegenerating] = useState(false);
   const [previousDraft, setPreviousDraft] = useState<string | null>(null);
   const [newDraft, setNewDraft] = useState<string | null>(null);
   const [newSubject, setNewSubject] = useState<string | null>(null);
 
-  // Tone state
   const initialTone = (hitlState?.tone_recommendation as Tone) ?? "neutral";
   const [selectedTone, setSelectedTone] = useState<Tone>(initialTone);
 
-  // Channel state
   const [selectedChannel, setSelectedChannel] = useState<"email" | "whatsapp" | "both">(
     (client.preferred_channel === "whatsapp" || client.preferred_channel === "both")
       ? client.preferred_channel as "email" | "whatsapp" | "both"
@@ -116,10 +112,8 @@ export default function ChaserCard({ chaser, memories, onActionComplete, onSelec
     ? Math.round((Date.now() - new Date(script.sent_at).getTime()) / 86400000)
     : null;
 
-  // Side-by-side comparison active
   const comparing = previousDraft !== null && newDraft !== null;
 
-  // Cleanup undo timer on unmount
   useEffect(() => {
     return () => {
       if (undoTimer) clearTimeout(undoTimer);
@@ -296,7 +290,6 @@ export default function ChaserCard({ chaser, memories, onActionComplete, onSelec
     }
   }
 
-  // Keyboard shortcuts
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       const tag = (e.target as HTMLElement).tagName;
@@ -369,7 +362,6 @@ export default function ChaserCard({ chaser, memories, onActionComplete, onSelec
     ? Math.round((client.approved_count / client.total_scripts) * 100)
     : null;
 
-  // Collect all scores for rendering
   const allScoreEntries: { label: string; value: number; group: string }[] = [];
 
   if (script.quality_score) {
@@ -392,7 +384,6 @@ export default function ChaserCard({ chaser, memories, onActionComplete, onSelec
 
   return (
     <div className="flex flex-col h-full">
-      {/* Keyboard shortcut hints */}
       {showHints && (
         <div className="px-6 py-1.5 border-b border-[var(--border)] bg-[var(--surface-elevated)]/50">
           <p className="text-[10px] text-[var(--muted)] opacity-50 text-center tracking-wide">
@@ -401,7 +392,6 @@ export default function ChaserCard({ chaser, memories, onActionComplete, onSelec
         </div>
       )}
 
-      {/* Top context bar */}
       <div className="px-6 py-3 border-b border-[var(--border)] bg-[var(--card)]">
         <div className="flex items-center gap-3 flex-wrap">
           <span className="text-[13px] font-medium text-[var(--text)]">{script.title}</span>
@@ -420,7 +410,6 @@ export default function ChaserCard({ chaser, memories, onActionComplete, onSelec
           </span>
         </div>
 
-        {/* Client risk line */}
         <div className="flex items-center gap-4 flex-wrap mt-2">
           <div className="flex items-center gap-1.5">
             <AlertTriangle size={11} className="text-amber-400" />
@@ -452,7 +441,6 @@ export default function ChaserCard({ chaser, memories, onActionComplete, onSelec
         </div>
       </div>
 
-      {/* Collapsible scores section */}
       {allScoreEntries.length > 0 && (
         <div className="border-b border-[var(--border)]">
           <button
@@ -467,7 +455,6 @@ export default function ChaserCard({ chaser, memories, onActionComplete, onSelec
           {scoresExpanded && (
             <div className="px-6 pb-4">
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-8 gap-y-4">
-                {/* Script quality */}
                 {script.quality_score && (
                   <div>
                     <p className="text-[10px] uppercase tracking-widest text-[var(--muted)] opacity-50 mb-2">Script Quality</p>
@@ -508,7 +495,6 @@ export default function ChaserCard({ chaser, memories, onActionComplete, onSelec
                   </div>
                 )}
 
-                {/* Chaser quality */}
                 {scores && (
                   <div>
                     <p className="text-[10px] uppercase tracking-widest text-[var(--muted)] opacity-50 mb-2">Chaser Quality</p>
@@ -541,7 +527,6 @@ export default function ChaserCard({ chaser, memories, onActionComplete, onSelec
         </div>
       )}
 
-      {/* Client review response */}
       {script.status && script.status !== "pending_review" && script.status !== "draft" && (
         <div className="px-6 py-3 border-b border-[var(--border)]">
           <div className={cn(
@@ -577,10 +562,8 @@ export default function ChaserCard({ chaser, memories, onActionComplete, onSelec
         </div>
       )}
 
-      {/* Main content: side-by-side drafts */}
       <div className="flex-1 overflow-y-auto">
         <div className="p-6">
-          {/* Tone selector */}
           <div className="mb-4">
             <p className="text-[10px] uppercase tracking-widest text-[var(--muted)] opacity-50 mb-2">Tone</p>
             <div className="flex gap-1.5">
@@ -607,7 +590,6 @@ export default function ChaserCard({ chaser, memories, onActionComplete, onSelec
             </div>
           </div>
 
-          {/* Subject line */}
           {hitlState?.email_subject && !comparing && (
             <div className="mb-4">
               <p className="text-[10px] text-[var(--muted)] opacity-50 mb-0.5">Subject</p>
@@ -615,7 +597,6 @@ export default function ChaserCard({ chaser, memories, onActionComplete, onSelec
             </div>
           )}
 
-          {/* Side-by-side comparison (after regen) */}
           {comparing ? (
             <div className="grid grid-cols-2 gap-4 mb-4">
               <div className="flex flex-col">
@@ -646,9 +627,7 @@ export default function ChaserCard({ chaser, memories, onActionComplete, onSelec
               </div>
             </div>
           ) : (
-            /* AI Draft (read-only) vs Your Version (editable) */
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
-              {/* AI Draft — read-only */}
               <div className="flex flex-col">
                 <div className="flex items-center justify-between mb-1.5">
                   <p className="text-[10px] uppercase tracking-widest text-[var(--muted)] opacity-50">AI Draft</p>
@@ -664,7 +643,6 @@ export default function ChaserCard({ chaser, memories, onActionComplete, onSelec
                 </div>
               </div>
 
-              {/* Editable version */}
               <div className="flex flex-col">
                 <div className="flex items-center justify-between mb-1.5">
                   <p className="text-[10px] uppercase tracking-widest text-[var(--muted)] opacity-50">Your Version</p>
@@ -684,7 +662,6 @@ export default function ChaserCard({ chaser, memories, onActionComplete, onSelec
             </div>
           )}
 
-          {/* Quick feedback chips */}
           {!comparing && (
             <div className="flex flex-wrap gap-1.5 mb-3">
               {QUICK_CHIPS.map((chip) => (
@@ -703,7 +680,6 @@ export default function ChaserCard({ chaser, memories, onActionComplete, onSelec
             </div>
           )}
 
-          {/* Instruction input */}
           {!comparing && (
             <div className="flex gap-2 mb-4">
               <input
@@ -728,7 +704,6 @@ export default function ChaserCard({ chaser, memories, onActionComplete, onSelec
             </div>
           )}
 
-          {/* Channel selector */}
           <div className="mb-3">
             <p className="text-[10px] uppercase tracking-widest text-[var(--muted)] opacity-50 mb-2">Send via</p>
             <div className="flex gap-1.5">
@@ -765,7 +740,6 @@ export default function ChaserCard({ chaser, memories, onActionComplete, onSelec
             )}
           </div>
 
-          {/* Client details + memories (collapsed context) */}
           <div className="flex items-center gap-4 text-[11px] text-[var(--muted)] mb-2">
             {client.email && (
               <span className="flex items-center gap-1"><Mail size={10} /> {client.email}</span>
@@ -805,7 +779,6 @@ export default function ChaserCard({ chaser, memories, onActionComplete, onSelec
         </div>
       </div>
 
-      {/* Sticky bottom action bar */}
       <div className="sticky bottom-0 border-t border-[var(--border)] bg-[var(--bg)] px-6 py-3 flex items-center justify-between">
         <div>
           <button

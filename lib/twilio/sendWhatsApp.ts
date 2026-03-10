@@ -59,11 +59,10 @@ export async function sendWhatsApp({
     const twilioErr = err as { code?: number; message?: string };
     const message = twilioErr.message ?? "WhatsApp send failed";
 
-    // Error 63016: unverified number in sandbox
+    // 63016 = unverified number in Twilio sandbox, must fallback to email
     if (twilioErr.code === 63016) {
       console.warn(`[whatsapp] Sandbox error 63016 for ${to} — falling back to email`);
 
-      // Log audit entry
       if (scriptId) {
         try {
           const supabase: SupabaseAny = createServiceClientDirect();
@@ -79,7 +78,6 @@ export async function sendWhatsApp({
         }
       }
 
-      // Fallback to email
       if (clientEmail) {
         const emailResult = await sendReviewEmail({
           to: clientEmail,

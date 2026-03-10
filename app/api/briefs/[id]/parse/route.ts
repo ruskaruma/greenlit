@@ -16,7 +16,6 @@ export async function POST(
   const { id } = await params;
   const supabase: SupabaseAny = createServiceClientDirect();
 
-  // Fetch the brief
   const { data: brief, error: fetchError } = await supabase
     .from("briefs")
     .select("*")
@@ -27,7 +26,6 @@ export async function POST(
     return NextResponse.json({ error: "Brief not found" }, { status: 404 });
   }
 
-  // Set status to parsing
   await supabase
     .from("briefs")
     .update({ status: "parsing", updated_at: new Date().toISOString() })
@@ -63,7 +61,6 @@ export async function POST(
       return NextResponse.json({ error: updateError.message }, { status: 500 });
     }
 
-    // Audit log
     await supabase.from("audit_log").insert({
       entity_type: "brief",
       entity_id: id,
@@ -74,7 +71,6 @@ export async function POST(
 
     return NextResponse.json(updated);
   } catch (err) {
-    // Revert status on failure
     await supabase
       .from("briefs")
       .update({ status: "intake", updated_at: new Date().toISOString() })

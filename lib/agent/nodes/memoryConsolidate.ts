@@ -21,6 +21,11 @@ interface MemoryEntry {
   content: string;
 }
 
+function isValidSummaryArray(value: unknown): value is string[] {
+  if (!Array.isArray(value)) return false;
+  return value.length > 0 && value.every((item) => typeof item === "string" && item.length > 0);
+}
+
 function buildConsolidationPrompt(entries: MemoryEntry[]): string {
   const formatted = entries
     .map((e, i) => `${i + 1}. [${e.memory_type}] ${e.content}`)
@@ -57,21 +62,30 @@ async function summarizeEntries(entries: MemoryEntry[]): Promise<string[]> {
     messages: [{ role: "user", content: buildConsolidationPrompt(entries) }],
   });
 
-  const text =
-    response.content[0].type === "text" ? response.content[0].text : "";
-  return JSON.parse(text) as string[];
-}
+  // C3: Guard response.content array access
+  if (!response.content || response.content.length === 0) {
+    throw new Error("LLM returned empty content array");
+  }
 
-async function deleteAllClientMemories(
-  supabase: SupabaseAny,
-  clientId: string
-): Promise<void> {
-  const { error } = await supabase
-    .from("client_memories")
-    .delete()
-    .eq("client_id", clientId);
+  const block = response.content[0];
+  const text = block.type === "text" ? block.text : "";
 
-  if (error) throw new Error(`Delete memories failed: ${error.message}`);
+  // C1: Wrap JSON.parse in try-catch
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    console.error("[memoryConsolidate] Failed to parse LLM response:", text.slice(0, 500));
+    throw new Error("LLM returned non-JSON response");
+  }
+
+  // A1: Validate shape
+  if (!isValidSummaryArray(parsed)) {
+    console.error("[memoryConsolidate] Invalid shape or empty array from LLM:", JSON.stringify(parsed).slice(0, 500));
+    throw new Error("LLM returned invalid or empty summary array");
+  }
+
+  return parsed;
 }
 
 async function insertConsolidatedMemory(
@@ -102,19 +116,40 @@ export async function consolidateClientMemories(
   clientId: string
 ): Promise<ConsolidationResult> {
   const supabase: SupabaseAny = createServiceClientDirect();
-  const entries = await fetchClientMemories(supabase, clientId);
 
-  if (entries.length <= CONSOLIDATION_THRESHOLD) {
+  try {
+    const entries = await fetchClientMemories(supabase, clientId);
+
+    if (entries.length <= CONSOLIDATION_THRESHOLD) {
+      return { consolidated: false };
+    }
+
+    const summaries = await summarizeEntries(entries);
+
+    // Fix 3: Insert consolidated FIRST, confirm success, THEN delete originals
+    const originalCount = entries.length;
+    for (const summary of summaries) {
+      await insertConsolidatedMemory(supabase, clientId, summary, originalCount);
+    }
+
+    // Only delete originals after all inserts succeeded
+    const originalIds = entries.map((e) => e.id);
+    const { error: deleteError } = await supabase
+      .from("client_memories")
+      .delete()
+      .in("id", originalIds);
+
+    if (deleteError) {
+      console.error(`[memoryConsolidate] client=${clientId} Delete failed after insert:`, deleteError.message);
+      // Inserts succeeded but delete failed — originals remain alongside consolidated.
+      // This is safe: duplicates are better than data loss.
+    }
+
+    return { consolidated: true, entryCount: summaries.length };
+  } catch (err) {
+    // Fix 13: Log with client ID for operator visibility
+    const message = err instanceof Error ? err.message : "Unknown consolidation error";
+    console.error(`[memoryConsolidate] client=${clientId} Consolidation failed:`, message);
     return { consolidated: false };
   }
-
-  const summaries = await summarizeEntries(entries);
-  await deleteAllClientMemories(supabase, clientId);
-
-  const originalCount = entries.length;
-  for (const summary of summaries) {
-    await insertConsolidatedMemory(supabase, clientId, summary, originalCount);
-  }
-
-  return { consolidated: true, entryCount: summaries.length };
 }

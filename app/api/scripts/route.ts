@@ -23,7 +23,8 @@ export async function GET(request: Request) {
     .select("id", { count: "exact", head: true });
 
   if (countError) {
-    return NextResponse.json({ error: countError.message }, { status: 500 });
+    console.error("[scripts/GET] Count query failed:", countError.message);
+    return NextResponse.json({ error: "Failed to fetch scripts" }, { status: 500 });
   }
 
   const { data, error } = await (supabase as SupabaseAny)
@@ -33,7 +34,8 @@ export async function GET(request: Request) {
     .range(offset, offset + limit - 1);
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error("[scripts/GET] Query failed:", error.message);
+    return NextResponse.json({ error: "Failed to fetch scripts" }, { status: 500 });
   }
 
   return NextResponse.json({
@@ -68,7 +70,6 @@ export async function POST(request: Request) {
     );
   }
 
-  // Guard: empty script content
   if (!content || !content.trim()) {
     return NextResponse.json(
       { error: "Script content is required. The approval loop cannot function without the script text." },
@@ -76,7 +77,6 @@ export async function POST(request: Request) {
     );
   }
 
-  // Fetch client to validate contact info and quota before inserting
   const { data: client, error: clientError } = await supabase
     .from("clients")
     .select("name, email, total_scripts, monthly_volume, whatsapp_number, preferred_channel")
@@ -84,10 +84,26 @@ export async function POST(request: Request) {
     .single();
 
   if (clientError) {
-    return NextResponse.json({ error: clientError.message }, { status: 500 });
+    console.error("[scripts/POST] Client lookup failed:", clientError.message);
+    return NextResponse.json({ error: "Failed to look up client" }, { status: 500 });
   }
 
-  // Guard: no contact info
+  // Dedup: check for identical title+client within last 60 seconds (double-submit guard)
+  // For a proper fix, add a unique index on (client_id, title, status) at the DB level
+  const recentCutoff = new Date(Date.now() - 60_000).toISOString();
+  const { data: existing } = await supabase
+    .from("scripts")
+    .select("id, title, status, quality_score, created_at")
+    .eq("client_id", client_id)
+    .eq("title", title)
+    .gte("created_at", recentCutoff)
+    .limit(1)
+    .maybeSingle();
+
+  if (existing) {
+    return NextResponse.json(existing);
+  }
+
   if (!client.email && !client.whatsapp_number) {
     return NextResponse.json(
       { error: "This client has no email or WhatsApp number. Add contact information before uploading scripts." },
@@ -113,18 +129,17 @@ export async function POST(request: Request) {
     .single();
 
   if (scriptError) {
-    return NextResponse.json({ error: scriptError.message }, { status: 500 });
+    console.error("[scripts/POST] Insert failed:", scriptError.message);
+    return NextResponse.json({ error: "Failed to create script" }, { status: 500 });
   }
 
   const typedScript = script as Script;
 
-  // Increment total_scripts
   await supabase
     .from("clients")
     .update({ total_scripts: (client.total_scripts ?? 0) + 1 })
     .eq("id", client_id);
 
-  // Score the script synchronously
   let qualityScore: Script["quality_score"] = null;
   try {
     qualityScore = await scoreScript({

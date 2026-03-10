@@ -1,4 +1,5 @@
 import { createServiceClientDirect } from "@/lib/supabase/server";
+import { requireSession } from "@/lib/auth/requireSession";
 import { runChaserForScript } from "@/lib/agent/graph";
 import { registerStream, unregisterStream, addStreamEvent, closeStream } from "@/lib/agent/stream";
 import type { AgentState } from "@/lib/agent/types";
@@ -10,6 +11,9 @@ export async function GET(
   _request: Request,
   { params }: { params: Promise<{ scriptId: string }> }
 ) {
+  const { error: authError } = await requireSession();
+  if (authError) return authError;
+
   const { scriptId } = await params;
   const supabase: SupabaseAny = createServiceClientDirect();
 
@@ -37,9 +41,22 @@ export async function GET(
   const sentDate = script.sent_at ? new Date(script.sent_at) : new Date();
   const hoursOverdue = Math.max(0, Math.round((Date.now() - sentDate.getTime()) / (1000 * 60 * 60)));
 
+  const AGENT_STREAM_TIMEOUT_MS = 600_000;
+
   const stream = new ReadableStream({
     start(controller) {
       registerStream(scriptId, controller);
+
+      const timeoutId = setTimeout(() => {
+        console.warn(`[agent-stream] Timeout after ${AGENT_STREAM_TIMEOUT_MS}ms for script=${scriptId}`);
+        addStreamEvent(scriptId, {
+          node: "pipeline",
+          status: "error",
+          timestamp: new Date().toISOString(),
+          data: { type: "timeout", message: "Stream exceeded maximum duration" },
+        });
+        closeStream(scriptId);
+      }, AGENT_STREAM_TIMEOUT_MS);
 
       addStreamEvent(scriptId, {
         node: "pipeline",
@@ -72,6 +89,7 @@ export async function GET(
 
       runChaserForScript(initialState)
         .then((result) => {
+          clearTimeout(timeoutId);
           addStreamEvent(scriptId, {
             node: "result",
             status: result.error ? "error" : "completed",
@@ -90,6 +108,7 @@ export async function GET(
           closeStream(scriptId);
         })
         .catch((err) => {
+          clearTimeout(timeoutId);
           addStreamEvent(scriptId, {
             node: "pipeline",
             status: "error",

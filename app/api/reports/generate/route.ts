@@ -43,7 +43,6 @@ export async function POST(request: Request) {
   const aggregate = report.aggregate_metrics as Record<string, Record<string, number>> | null;
   const prevAggregate = report.previous_aggregate as Record<string, Record<string, number>> | null;
 
-  // Last 3 reports for context
   const { data: pastReports } = await supabase
     .from("reports")
     .select("report_title, period_start, period_end, aggregate_metrics, generated_summary")
@@ -52,7 +51,6 @@ export async function POST(request: Request) {
     .order("period_end", { ascending: false })
     .limit(3);
 
-  // Top 3 client memories
   const { data: memories } = await supabase
     .from("client_memories")
     .select("content, memory_type")
@@ -60,13 +58,11 @@ export async function POST(request: Request) {
     .order("created_at", { ascending: false })
     .limit(3);
 
-  // Build entries text
   const entriesText = entries.map((e, i) => {
     const metricsStr = Object.entries(e.metrics).map(([k, v]) => `${k}: ${v}`).join(", ");
     return `${i + 1}. "${e.title}" (${e.platform} ${e.content_type}, posted ${e.post_date})${e.post_url ? ` — ${e.post_url}` : ""}\n   Metrics: ${metricsStr}`;
   }).join("\n");
 
-  // Build aggregate text
   let aggregateText = "";
   if (aggregate) {
     const { overall, ...platforms } = aggregate;
@@ -76,7 +72,6 @@ export async function POST(request: Request) {
     }
   }
 
-  // Build previous period text
   let prevText = "No previous period data available.";
   if (prevAggregate) {
     const { overall, ...platforms } = prevAggregate;

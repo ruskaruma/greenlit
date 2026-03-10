@@ -26,6 +26,7 @@ export default function ScriptCard({ script, onClick, onArchive, onStatusChange,
   const noContact = !script.client.email && !script.client.whatsapp_number;
   const [menuOpen, setMenuOpen] = useState(false);
   const [loading, setLoading] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
   const hoursOverdue = overdue && script.sent_at ? getScriptAge(script.sent_at) : 0;
@@ -55,14 +56,21 @@ export default function ScriptCard({ script, onClick, onArchive, onStatusChange,
     if (action === "archive" || action === "unarchive") {
       const newArchived = action === "archive";
       setLoading(action);
+      setActionError(null);
       try {
         const res = await fetch(`/api/scripts/${script.id}/archive`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ archived: newArchived }),
         });
-        if (res.ok) onArchive?.(script.id, newArchived);
-      } catch { /* silent */ } finally { setLoading(null); }
+        if (res.ok) {
+          onArchive?.(script.id, newArchived);
+        } else {
+          setActionError(`Failed to ${action}`);
+        }
+      } catch {
+        setActionError(`Failed to ${action}`);
+      } finally { setLoading(null); }
       return;
     }
 
@@ -77,14 +85,21 @@ export default function ScriptCard({ script, onClick, onArchive, onStatusChange,
     if (!newStatus) return;
 
     setLoading(action);
+    setActionError(null);
     try {
       const res = await fetch(`/api/scripts/${script.id}/status`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: newStatus }),
       });
-      if (res.ok) onStatusChange?.(script.id, newStatus);
-    } catch { /* silent */ } finally { setLoading(null); }
+      if (res.ok) {
+        onStatusChange?.(script.id, newStatus);
+      } else {
+        setActionError(`Failed to ${action}`);
+      }
+    } catch {
+      setActionError(`Failed to ${action}`);
+    } finally { setLoading(null); }
   }
 
   const menuItems: { key: string; label: string; icon: React.ReactNode; show: boolean }[] = [
@@ -251,6 +266,13 @@ export default function ScriptCard({ script, onClick, onArchive, onStatusChange,
           </div>
         );
       })()}
+
+      {actionError && (
+        <div className="flex items-center gap-1.5 text-[11px] mt-1.5 text-red-400">
+          <AlertTriangle size={10} className="shrink-0" />
+          <span>{actionError}</span>
+        </div>
+      )}
     </motion.div>
   );
 }

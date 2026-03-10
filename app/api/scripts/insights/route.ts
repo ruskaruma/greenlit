@@ -31,14 +31,14 @@ export async function GET() {
     .not("client_feedback", "is", null);
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error("[scripts/insights] Query failed:", error.message);
+    return NextResponse.json({ error: "Failed to fetch insights" }, { status: 500 });
   }
 
   const feedbackItems: string[] = (data ?? [])
     .map((row: { client_feedback: string | null }) => row.client_feedback)
     .filter((f: string | null): f is string => !!f && f.trim().length > 0);
 
-  // Simple hash to detect feedback changes and bust cache
   const feedbackHash = feedbackItems.length + ":" + feedbackItems.slice(0, 10).join("|").slice(0, 200);
 
   if (cachedResult && Date.now() - cachedResult.fetchedAt < CACHE_TTL && cachedResult.feedbackHash === feedbackHash) {

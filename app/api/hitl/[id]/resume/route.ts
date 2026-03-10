@@ -30,7 +30,6 @@ export async function POST(
     return NextResponse.json({ error: "Invalid action" }, { status: 400 });
   }
 
-  // Fetch chaser to get script_id for thread ID
   const { data: chaser, error: fetchError } = await supabase
     .from("chasers")
     .select("id, script_id, client_id, draft_content, status, scripts(title)")
@@ -50,11 +49,11 @@ export async function POST(
 
   const threadId = `chaser-${chaser.script_id}`;
 
-  // If team lead edited before approving, store as few-shot example
   const wasEdited = editedContent != null && editedContent !== chaser.draft_content;
   if (wasEdited && (action === "approved" || action === "edited")) {
     storeFewShotExample({
       clientId: chaser.client_id,
+      chaserId: chaser.id,
       originalDraft: chaser.draft_content,
       editedDraft: editedContent!,
       scriptTitle: chaser.scripts?.title ?? null,
@@ -63,7 +62,6 @@ export async function POST(
     );
   }
 
-  // Resume the graph
   const result = await resumeChaserGraph(
     threadId,
     wasEdited ? "edited" : action,
@@ -75,7 +73,6 @@ export async function POST(
     return NextResponse.json({ error: result.error }, { status: 500 });
   }
 
-  // Audit log
   await supabase.from("audit_log").insert({
     entity_type: "chaser",
     entity_id: id,

@@ -7,15 +7,19 @@ import type { Client, Script } from "@/lib/supabase/types";
 type SupabaseAny = any;
 
 export async function GET(request: Request) {
-  // Require CRON_SECRET or valid session to prevent unauthorized DB wipes
-  const cronSecret = process.env.CRON_SECRET;
-  const authHeader = request.headers.get("authorization");
-  const isDev = process.env.NODE_ENV === "development";
+  if (process.env.NODE_ENV !== "development") {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
 
-  if (!isDev) {
-    if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+  const seedSecret = process.env.SEED_SECRET_TOKEN;
+  if (!seedSecret) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  const token =
+    request.headers.get("x-seed-token") ??
+    request.headers.get("authorization")?.replace("Bearer ", "");
+  if (token !== seedSecret) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const supabase: SupabaseAny = createServiceClientDirect();
@@ -175,7 +179,6 @@ export async function GET(request: Request) {
     );
   }
 
-  // Seed starter memories with embeddings for each client
   const starterMemories: { clientId: string; name: string; company: string; channel: string; avgHours: number }[] = [
     { clientId: nike.id, name: "Sarah Chen", company: "Nike", channel: "both (email + WhatsApp)", avgHours: 12.5 },
     { clientId: adidas.id, name: "Marcus Weber", company: "Adidas", channel: "email", avgHours: 72 },
@@ -198,7 +201,6 @@ export async function GET(request: Request) {
     }
   }
 
-  // Seed historical interaction memories
   const historicalMemories: { clientId: string; content: string; type: "approval" | "rejection" | "feedback" }[] = [
     {
       clientId: nike.id,

@@ -65,7 +65,6 @@ function BriefsPageShellInner({ initialBriefs, clients }: BriefsPageShellProps) 
         </button>
       </header>
 
-      {/* Stats bar */}
       <div className="flex items-center gap-6 px-6 py-3 border-b border-[var(--border)]">
         <StatPill label="Total" value={stats.total} />
         <StatPill label="Intake" value={stats.intake} color="blue" />
@@ -78,7 +77,6 @@ function BriefsPageShellInner({ initialBriefs, clients }: BriefsPageShellProps) 
         <BriefList briefs={briefs} onRefresh={refreshBriefs} />
       </div>
 
-      {/* New Brief Modal */}
       <AnimatePresence>
         {modalOpen && (
           <motion.div

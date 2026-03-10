@@ -19,6 +19,15 @@ interface SendReportEmailParams {
   recommendations: string;
 }
 
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 function fmtLabel(key: string): string {
   return key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
@@ -57,7 +66,6 @@ export async function sendReportEmail({
   const fromEmail = process.env.RESEND_FROM_EMAIL || "greenlit@ruskaruma.me";
   const subject = `${reportTitle} — ${fmtDate(periodStart)} to ${fmtDate(periodEnd)}`;
 
-  // Aggregate metrics table
   const overallMetrics = aggregate?.overall ?? {};
   const prevOverall = previousAggregate?.overall ?? {};
   const hasPrev = Object.keys(prevOverall).length > 0;
@@ -81,15 +89,14 @@ export async function sendReportEmail({
     ? '<th style="padding:6px 12px;font-size:10px;color:#F97316;text-transform:uppercase;letter-spacing:0.5px;text-align:right;border-bottom:1px solid #222222;">Change</th>'
     : "";
 
-  // Content entries list
   const entriesHtml = entries
     .map((e) => {
       const topMetrics = Object.entries(e.metrics).slice(0, 3).map(([k, v]) => `${fmtLabel(k)}: ${fmtVal(k, v)}`).join(" &middot; ");
-      const link = e.post_url ? `<a href="${e.post_url}" target="_blank" style="color:#F97316;text-decoration:none;font-size:12px;"> View &rarr;</a>` : "";
+      const link = e.post_url ? `<a href="${escapeHtml(e.post_url)}" target="_blank" style="color:#F97316;text-decoration:none;font-size:12px;"> View &rarr;</a>` : "";
       return `<tr>
         <td style="padding:10px 12px;border-bottom:1px solid #222222;">
-          <p style="margin:0;font-size:13px;color:#ffffff;font-weight:500;">${e.title} ${link}</p>
-          <p style="margin:2px 0 0 0;font-size:11px;color:#71717a;">${e.platform} ${e.content_type} &middot; ${fmtDate(e.post_date)}</p>
+          <p style="margin:0;font-size:13px;color:#ffffff;font-weight:500;">${escapeHtml(e.title)} ${link}</p>
+          <p style="margin:2px 0 0 0;font-size:11px;color:#71717a;">${escapeHtml(e.platform)} ${escapeHtml(e.content_type)} &middot; ${fmtDate(e.post_date)}</p>
           <p style="margin:4px 0 0 0;font-size:12px;color:#a1a1aa;">${topMetrics}</p>
         </td>
       </tr>`;
@@ -112,13 +119,13 @@ export async function sendReportEmail({
           <tr>
             <td style="padding:40px 40px 16px 40px;">
               <p style="margin:0 0 4px 0;font-size:13px;color:#F97316;font-weight:600;letter-spacing:0.5px;">GREENLIT</p>
-              <h1 style="margin:0 0 4px 0;font-size:20px;color:#ffffff;font-weight:600;line-height:1.3;">${reportTitle}</h1>
+              <h1 style="margin:0 0 4px 0;font-size:20px;color:#ffffff;font-weight:600;line-height:1.3;">${escapeHtml(reportTitle)}</h1>
               <p style="margin:0;font-size:13px;color:#71717a;">${fmtDate(periodStart)} to ${fmtDate(periodEnd)} &middot; ${entries.length} piece${entries.length !== 1 ? "s" : ""} of content</p>
             </td>
           </tr>
           <tr>
             <td style="padding:8px 40px 24px 40px;">
-              <p style="margin:0;font-size:14px;color:#a1a1aa;">Hi ${clientName}, here's your content performance summary.</p>
+              <p style="margin:0;font-size:14px;color:#a1a1aa;">Hi ${escapeHtml(clientName)}, here's your content performance summary.</p>
             </td>
           </tr>
 
@@ -152,7 +159,7 @@ export async function sendReportEmail({
           <tr>
             <td style="padding:0 40px 24px 40px;">
               <p style="margin:0 0 8px 0;font-size:11px;color:#F97316;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;">Performance Overview</p>
-              <p style="margin:0;font-size:14px;color:#a1a1aa;line-height:1.7;">${overview}</p>
+              <p style="margin:0;font-size:14px;color:#a1a1aa;line-height:1.7;">${escapeHtml(overview)}</p>
             </td>
           </tr>
 
@@ -160,7 +167,7 @@ export async function sendReportEmail({
           <tr>
             <td style="padding:0 40px 24px 40px;">
               <p style="margin:0 0 8px 0;font-size:11px;color:#F97316;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;">Period Comparison</p>
-              <p style="margin:0;font-size:14px;color:#a1a1aa;line-height:1.7;">${comparison}</p>
+              <p style="margin:0;font-size:14px;color:#a1a1aa;line-height:1.7;">${escapeHtml(comparison)}</p>
             </td>
           </tr>` : ""}
 
@@ -168,7 +175,7 @@ export async function sendReportEmail({
           <tr>
             <td style="padding:0 40px 32px 40px;">
               <p style="margin:0 0 8px 0;font-size:11px;color:#F97316;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;">Recommendations</p>
-              <p style="margin:0;font-size:14px;color:#a1a1aa;line-height:1.7;">${recommendations}</p>
+              <p style="margin:0;font-size:14px;color:#a1a1aa;line-height:1.7;">${escapeHtml(recommendations)}</p>
             </td>
           </tr>` : ""}
 

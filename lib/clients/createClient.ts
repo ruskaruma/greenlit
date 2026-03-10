@@ -27,10 +27,6 @@ export interface CreateClientResult {
   error: string | null;
 }
 
-/**
- * Shared client creation logic used by both /api/clients and /api/onboarding.
- * Validates input and inserts into the clients table.
- */
 export async function createClient(input: CreateClientInput): Promise<CreateClientResult> {
   if (!input.name || !input.email) {
     return { client: null, error: "Name and email are required" };
@@ -41,6 +37,19 @@ export async function createClient(input: CreateClientInput): Promise<CreateClie
   }
 
   const supabase: SupabaseAny = createServiceClientDirect();
+
+  // Dedup: return existing client if email matches (double-submit guard)
+  // For a proper fix, add a unique index on (email) at the DB level
+  const { data: existingClient } = await supabase
+    .from("clients")
+    .select("*")
+    .eq("email", input.email)
+    .limit(1)
+    .maybeSingle();
+
+  if (existingClient) {
+    return { client: existingClient, error: null };
+  }
 
   const insertData: Record<string, unknown> = {
     name: input.name,
@@ -68,7 +77,8 @@ export async function createClient(input: CreateClientInput): Promise<CreateClie
     .single();
 
   if (error) {
-    return { client: null, error: error.message };
+    console.error("[createClient] Insert failed:", error.message);
+    return { client: null, error: "Failed to create client" };
   }
 
   return { client: data, error: null };

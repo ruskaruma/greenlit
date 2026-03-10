@@ -154,7 +154,6 @@ export default function ScriptDetailSheet({ script, onClose, onStatusChange, onS
 
   return (
     <>
-      {/* Backdrop */}
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -163,7 +162,6 @@ export default function ScriptDetailSheet({ script, onClose, onStatusChange, onS
         onClick={onClose}
       />
 
-      {/* Sheet */}
       <motion.div
         initial={{ x: "100%" }}
         animate={{ x: 0 }}
@@ -171,7 +169,6 @@ export default function ScriptDetailSheet({ script, onClose, onStatusChange, onS
         transition={{ type: "spring", damping: 30, stiffness: 300 }}
         className="fixed right-0 top-0 h-screen w-full max-w-md z-50 bg-[var(--card)] border-l border-[var(--border)] flex flex-col"
       >
-        {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border)]">
           <h2 className="text-sm font-semibold text-[var(--text)] truncate pr-4">
             {script.title}
@@ -181,9 +178,7 @@ export default function ScriptDetailSheet({ script, onClose, onStatusChange, onS
           </button>
         </div>
 
-        {/* Content */}
         <div className="flex-1 overflow-y-auto px-6 py-5 space-y-6">
-          {/* Status with change option */}
           <div className="relative">
             <p className="text-[10px] uppercase tracking-widest text-[var(--muted)] opacity-50 mb-2">Status</p>
             <button
@@ -215,7 +210,6 @@ export default function ScriptDetailSheet({ script, onClose, onStatusChange, onS
             )}
           </div>
 
-          {/* Resend banner for changes_requested / rejected */}
           {canResend && (
             <div className={cn(
               "p-3 rounded-lg border",
@@ -253,7 +247,6 @@ export default function ScriptDetailSheet({ script, onClose, onStatusChange, onS
             </div>
           )}
 
-          {/* Send button for draft scripts */}
           {script.status === "draft" && (
             <div className="p-3 rounded-lg border bg-[var(--surface-elevated)] border-[var(--border)]">
               <p className="text-xs text-[var(--text)] font-medium mb-1">
@@ -273,7 +266,6 @@ export default function ScriptDetailSheet({ script, onClose, onStatusChange, onS
             </div>
           )}
 
-          {/* Client info */}
           <div>
             <p className="text-[10px] uppercase tracking-widest text-[var(--muted)] opacity-50 mb-2">Client</p>
             <div className="flex items-center gap-2">
@@ -289,7 +281,6 @@ export default function ScriptDetailSheet({ script, onClose, onStatusChange, onS
             </div>
           </div>
 
-          {/* Metadata */}
           <div className="grid grid-cols-2 gap-4">
             {script.version > 1 && (
               <div>
@@ -319,7 +310,6 @@ export default function ScriptDetailSheet({ script, onClose, onStatusChange, onS
             )}
           </div>
 
-          {/* Feedback */}
           {script.client_feedback && (
             <div>
               <p className="text-[10px] uppercase tracking-widest text-[var(--muted)] opacity-50 mb-2">Client Feedback</p>
@@ -329,7 +319,6 @@ export default function ScriptDetailSheet({ script, onClose, onStatusChange, onS
             </div>
           )}
 
-          {/* Script Quality */}
           {script.quality_score && (
             <div>
               <p className="text-[10px] uppercase tracking-widest text-[var(--muted)] opacity-50 mb-2">Script Quality</p>
@@ -381,7 +370,6 @@ export default function ScriptDetailSheet({ script, onClose, onStatusChange, onS
             </div>
           )}
 
-          {/* Script content — editable or read-only */}
           <div>
             <div className="flex items-center justify-between mb-2">
               <p className="text-[10px] uppercase tracking-widest text-[var(--muted)] opacity-50">Script Content</p>

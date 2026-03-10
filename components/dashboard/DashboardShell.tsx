@@ -528,8 +528,8 @@ function DashboardShellInner({
               </div>
               <div className="px-5 py-4 space-y-3">
                 <p className="text-xs text-[var(--muted)]">Top revision themes from the last 30 days:</p>
-                {themes.map((theme, i) => (
-                  <div key={i} className="bg-[var(--input-bg)] border border-[var(--border)] rounded-lg p-3">
+                {themes.map((theme) => (
+                  <div key={theme.label} className="bg-[var(--input-bg)] border border-[var(--border)] rounded-lg p-3">
                     <div className="flex items-center justify-between mb-1">
                       <span className="text-sm font-medium text-[var(--text)]">{theme.label}</span>
                       <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">

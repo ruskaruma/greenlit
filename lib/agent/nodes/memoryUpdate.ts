@@ -34,7 +34,8 @@ export async function storeClientMemory(
   }
 
   consolidateClientMemories(clientId).catch((err) => {
-    console.error("[memory] Consolidation check failed:", err instanceof Error ? err.message : err);
+    const message = err instanceof Error ? err.message : String(err);
+    console.error(`[memory] client=${clientId} Consolidation check failed:`, message);
   });
 }
 

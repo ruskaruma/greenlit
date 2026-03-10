@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { MODEL_CLAUDE_HAIKU } from "@/lib/agent/config";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -13,6 +14,7 @@ export interface ScoreResult {
   feedback: string;
   strengths: string[];
   improvements: string[];
+  error?: boolean;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -21,6 +23,29 @@ type SupabaseAny = any;
 function clamp(val: unknown, min: number, max: number): number {
   const num = typeof val === "number" && !isNaN(val) ? val : 0;
   return Math.max(min, Math.min(max, num));
+}
+
+function isValidScoreShape(parsed: unknown): parsed is Record<string, unknown> {
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) return false;
+  const obj = parsed as Record<string, unknown>;
+  return typeof obj.hook_strength !== "undefined" && typeof obj.cta_clarity !== "undefined";
+}
+
+function fallbackScore(reason: string): ScoreResult {
+  console.error("[scoreScript] Returning fallback score:", reason);
+  return {
+    hook_strength: 5,
+    cta_clarity: 5,
+    tone_consistency: null,
+    brand_alignment: 5,
+    platform_fit: 5,
+    pacing_structure: 5,
+    average: 5,
+    feedback: `Scoring failed: ${reason}`,
+    strengths: [],
+    improvements: [],
+    error: true,
+  };
 }
 
 export async function scoreScript({
@@ -34,14 +59,12 @@ export async function scoreScript({
   platform?: string | null;
   supabase: SupabaseAny;
 }): Promise<ScoreResult> {
-  // Fetch client profile for context
   const { data: client } = await supabase
     .from("clients")
     .select("name, company, brand_voice, platform_focus, monthly_volume")
     .eq("id", clientId)
     .single();
 
-  // Fetch client memories for deeper context
   const { data: memories } = await supabase
     .from("client_memories")
     .select("content, memory_type")
@@ -55,7 +78,6 @@ export async function scoreScript({
   const platformFocus = client?.platform_focus ?? [];
   const hasMemories = memories && memories.length > 0;
 
-  // Build client context for the scorer
   const clientContext: string[] = [];
   if (brandVoice) {
     clientContext.push(`BRAND VOICE: ${brandVoice}`);
@@ -91,13 +113,15 @@ export async function scoreScript({
 
   const platformStr = platform ?? (platformFocus.length > 0 ? platformFocus[0] : "general");
 
-  const response = await anthropic.messages.create({
-    model: "claude-haiku-4-5-20251001",
-    max_tokens: 600,
-    messages: [
-      {
-        role: "user",
-        content: `You are a strict content quality reviewer for a video content agency. Be honest and critical. Most scripts are average (4-6). Only give 8+ for genuinely exceptional work.
+  let response;
+  try {
+    response = await anthropic.messages.create({
+      model: MODEL_CLAUDE_HAIKU,
+      max_tokens: 600,
+      messages: [
+        {
+          role: "user",
+          content: `You are a strict content quality reviewer for a video content agency. Be honest and critical. Most scripts are average (4-6). Only give 8+ for genuinely exceptional work.
 
 Score this video script for the client "${clientName}" (${company}), targeted at "${platformStr}".
 
@@ -135,12 +159,30 @@ ${hasMemories
   : `{"hook_strength": N, "cta_clarity": N, "brand_alignment": N, "platform_fit": N, "pacing_structure": N, "feedback": "one sentence overall assessment", "strengths": ["strength1", "strength2"], "improvements": ["improvement1", "improvement2"]}`}
 
 JSON:`,
-      },
-    ],
-  });
+        },
+      ],
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "API call failed";
+    return fallbackScore(message);
+  }
 
-  const text = response.content[0].type === "text" ? response.content[0].text : "";
-  const parsed = JSON.parse(text.replace(/```json\n?|\n?```/g, "").trim());
+  const text = response.content[0]?.type === "text" ? response.content[0].text : "";
+
+  // C1: Wrap JSON.parse in try-catch
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text.replace(/```json\n?|\n?```/g, "").trim());
+  } catch {
+    console.error("[scoreScript] Failed to parse LLM response:", text.slice(0, 500));
+    return fallbackScore("LLM returned non-JSON response");
+  }
+
+  // A1: Validate shape
+  if (!isValidScoreShape(parsed)) {
+    console.error("[scoreScript] Invalid response shape:", JSON.stringify(parsed).slice(0, 500));
+    return fallbackScore("LLM returned invalid response shape");
+  }
 
   const hookScore = clamp(parsed.hook_strength, 1, 10);
   const ctaScore = clamp(parsed.cta_clarity, 1, 10);
@@ -167,7 +209,7 @@ JSON:`,
     pacing_structure: pacingScore,
     average,
     feedback: typeof parsed.feedback === "string" ? parsed.feedback : "No feedback.",
-    strengths: Array.isArray(parsed.strengths) ? parsed.strengths.slice(0, 3) : [],
-    improvements: Array.isArray(parsed.improvements) ? parsed.improvements.slice(0, 3) : [],
+    strengths: Array.isArray(parsed.strengths) ? (parsed.strengths as string[]).slice(0, 3) : [],
+    improvements: Array.isArray(parsed.improvements) ? (parsed.improvements as string[]).slice(0, 3) : [],
   };
 }

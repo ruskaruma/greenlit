@@ -176,18 +176,15 @@ export default function ReportsPanel({ clients, initialReports }: ReportsPanelPr
   const [emailPreview, setEmailPreview] = useState<{ reportId: string; email: string; title: string; period: string; entryCount: number } | null>(null);
   const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
 
-  // Form state
   const [reportTitle, setReportTitle] = useState("");
   const [periodStart, setPeriodStart] = useState("");
   const [periodEnd, setPeriodEnd] = useState("");
   const [entries, setEntries] = useState<EntryForm[]>([emptyEntry()]);
 
-  // Actions
   const [saving, setSaving] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [sending, setSending] = useState(false);
 
-  // Generated output
   const [generatedOutput, setGeneratedOutput] = useState<{
     id: string;
     overview: string;
@@ -195,7 +192,6 @@ export default function ReportsPanel({ clients, initialReports }: ReportsPanelPr
     recommendations: string;
   } | null>(null);
 
-  // Derived
   const isAllClients = selectedClientId === "";
   const clientReports = useMemo(
     () => isAllClients ? reports : reports.filter((r) => r.client_id === selectedClientId),
@@ -204,7 +200,6 @@ export default function ReportsPanel({ clients, initialReports }: ReportsPanelPr
   const selectedClient = clients.find((c) => c.id === selectedClientId);
   const viewingReport = selectedReportId ? reports.find((r) => r.id === selectedReportId) : null;
 
-  // Cross-client aggregate stats
   const aggregateStats = useMemo(() => {
     if (!isAllClients) return null;
     const totalEntries = clientReports.reduce((sum, r) => sum + r.entries.length, 0);
@@ -451,7 +446,6 @@ export default function ReportsPanel({ clients, initialReports }: ReportsPanelPr
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-[340px_1fr] gap-0 min-h-[calc(100vh-65px)]">
-      {/* ===== LEFT PANEL ===== */}
       <div className="border-r border-[var(--border)] bg-[var(--card)]/50 flex flex-col">
         <div className="p-4 border-b border-[var(--border)]">
           <p className="text-[10px] uppercase tracking-widest text-[var(--muted)] opacity-50 mb-2">Client</p>
@@ -491,7 +485,6 @@ export default function ReportsPanel({ clients, initialReports }: ReportsPanelPr
 
         <div className="flex-1 overflow-y-auto">
           <div className="p-4">
-            {/* Cross-client aggregate stats */}
             {aggregateStats && (
               <div className="grid grid-cols-2 gap-2 mb-4">
                 <div className="bg-[var(--bg)] border border-[var(--border)] rounded-lg p-2.5 text-center">
@@ -601,7 +594,6 @@ export default function ReportsPanel({ clients, initialReports }: ReportsPanelPr
         </div>
       </div>
 
-      {/* ===== RIGHT PANEL ===== */}
       <div className="flex flex-col overflow-y-auto">
         <AnimatePresence mode="wait">
           {isViewingGenerated && generatedOutput && viewingReport ? (
@@ -613,7 +605,6 @@ export default function ReportsPanel({ clients, initialReports }: ReportsPanelPr
               exit={{ opacity: 0, y: -8 }}
               className="p-6 space-y-6"
             >
-              {/* Header */}
               <div>
                 <button onClick={handleNewReport} className="flex items-center gap-1.5 text-xs text-[var(--muted)] hover:text-[var(--text)] transition-colors mb-3">
                   <ArrowLeft size={12} /> New report
@@ -630,7 +621,6 @@ export default function ReportsPanel({ clients, initialReports }: ReportsPanelPr
                 </div>
               </div>
 
-              {/* Aggregate Metrics */}
               {viewingReport.aggregate_metrics?.overall && (
                 <div>
                   <p className="text-[10px] uppercase tracking-widest text-[var(--muted)] opacity-50 mb-3">Overall Performance</p>
@@ -661,7 +651,6 @@ export default function ReportsPanel({ clients, initialReports }: ReportsPanelPr
                 </div>
               )}
 
-              {/* Content Entries Breakdown */}
               <div>
                 <p className="text-[10px] uppercase tracking-widest text-[var(--muted)] opacity-50 mb-3">Content Breakdown</p>
                 <div className="space-y-2">
@@ -700,7 +689,6 @@ export default function ReportsPanel({ clients, initialReports }: ReportsPanelPr
                 </div>
               </div>
 
-              {/* Generated Sections */}
               <div className="bg-[var(--card)] border border-[var(--border)] rounded-lg p-5">
                 <p className="text-[10px] uppercase tracking-widest text-[var(--accent-primary)] mb-3 font-semibold">Performance Overview</p>
                 <p className="text-sm text-[var(--text)] leading-relaxed whitespace-pre-wrap">{generatedOutput.overview}</p>
@@ -720,7 +708,6 @@ export default function ReportsPanel({ clients, initialReports }: ReportsPanelPr
                 </div>
               )}
 
-              {/* Send */}
               <div className="flex items-center gap-3 flex-wrap pb-6">
                 <button
                   onClick={() => handleSendEmailClick(generatedOutput.id)}
@@ -756,7 +743,6 @@ export default function ReportsPanel({ clients, initialReports }: ReportsPanelPr
                 </h2>
               </div>
 
-              {/* Report Title + Period */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="sm:col-span-1">
                   <label className="text-[10px] uppercase tracking-widest text-[var(--muted)] opacity-50 mb-2 block">Report Title</label>
@@ -788,7 +774,6 @@ export default function ReportsPanel({ clients, initialReports }: ReportsPanelPr
                 </div>
               </div>
 
-              {/* Content Entries */}
               <div>
                 <div className="flex items-center justify-between mb-3">
                   <label className="text-[10px] uppercase tracking-widest text-[var(--muted)] opacity-50">
@@ -811,7 +796,6 @@ export default function ReportsPanel({ clients, initialReports }: ReportsPanelPr
                         key={entry.id}
                         className="bg-[var(--card)] border border-[var(--border)] rounded-lg overflow-hidden"
                       >
-                        {/* Entry Header */}
                         <div className="flex items-center gap-3 px-4 py-3 border-b border-[var(--border)]">
                           <button onClick={() => toggleEntryCollapse(entry.id)} className="text-[var(--muted)] hover:text-[var(--text)]">
                             {entry.collapsed ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
@@ -829,7 +813,6 @@ export default function ReportsPanel({ clients, initialReports }: ReportsPanelPr
                           )}
                         </div>
 
-                        {/* Entry Body */}
                         <AnimatePresence>
                           {!entry.collapsed && (
                             <motion.div
@@ -839,7 +822,6 @@ export default function ReportsPanel({ clients, initialReports }: ReportsPanelPr
                               className="overflow-hidden"
                             >
                               <div className="p-4 space-y-4">
-                                {/* Title + URL + Date row */}
                                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                                   <div>
                                     <label className="text-[10px] text-[var(--muted)] opacity-60 mb-1 block">Title</label>
@@ -875,7 +857,6 @@ export default function ReportsPanel({ clients, initialReports }: ReportsPanelPr
                                   </div>
                                 </div>
 
-                                {/* Platform + Type */}
                                 <div className="grid grid-cols-2 gap-3">
                                   <div>
                                     <label className="text-[10px] text-[var(--muted)] opacity-60 mb-1 block">Platform</label>
@@ -905,7 +886,6 @@ export default function ReportsPanel({ clients, initialReports }: ReportsPanelPr
                                   </div>
                                 </div>
 
-                                {/* Metrics */}
                                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
                                   {metricFields.map((field) => (
                                     <div key={field.key}>
@@ -933,7 +913,6 @@ export default function ReportsPanel({ clients, initialReports }: ReportsPanelPr
                   })}
                 </div>
 
-                {/* Add another */}
                 <button
                   onClick={addEntry}
                   className="w-full mt-3 flex items-center justify-center gap-2 py-3 rounded-lg border border-dashed border-[var(--border)] text-xs text-[var(--muted)] hover:text-[var(--text)] hover:border-[var(--accent-primary)]/30 transition-colors"
@@ -943,7 +922,6 @@ export default function ReportsPanel({ clients, initialReports }: ReportsPanelPr
                 </button>
               </div>
 
-              {/* Actions */}
               <div className="flex items-center gap-3 pt-2 pb-6">
                 <button
                   onClick={handleGenerate}
@@ -972,7 +950,6 @@ export default function ReportsPanel({ clients, initialReports }: ReportsPanelPr
         </AnimatePresence>
       </div>
 
-      {/* ===== EMAIL PREVIEW MODAL ===== */}
       <AnimatePresence>
         {emailPreview && (
           <motion.div

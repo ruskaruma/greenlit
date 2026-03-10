@@ -39,8 +39,10 @@ interface InsightsResponse {
   data: InsightEntry[];
 }
 
+const FETCH_TIMEOUT_MS = 15_000;
+
 async function fetchJson<T>(url: string): Promise<T> {
-  const res = await fetch(url);
+  const res = await fetch(url, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
   if (!res.ok) {
     const body = await res.text();
     throw new Error(`Instagram API ${res.status}: ${body}`);
@@ -53,15 +55,19 @@ function isWithinRange(timestamp: string, since: string, until: string): boolean
   return ts >= new Date(since).getTime() && ts <= new Date(until).getTime();
 }
 
+const MAX_PAGES = 50;
+
 async function fetchAllMedia(accessToken: string): Promise<MediaItem[]> {
   const items: MediaItem[] = [];
   let url: string | null =
     `${GRAPH_API_BASE}/me/media?fields=${MEDIA_FIELDS}&access_token=${accessToken}`;
+  let pages = 0;
 
-  while (url) {
+  while (url && pages < MAX_PAGES) {
     const page: MediaResponse = await fetchJson<MediaResponse>(url);
     items.push(...page.data);
     url = page.paging?.next ?? null;
+    pages++;
   }
 
   return items;

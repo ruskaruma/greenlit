@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { Bot, X, Loader2, CheckCircle, Circle, AlertCircle } from "lucide-react";
@@ -33,9 +33,6 @@ const NODE_LABELS: Record<string, string> = {
   revision: "Revising draft...",
 };
 
-// --- Batch mode (header button): runs agent on ALL overdue scripts ---
-// --- Single mode (per-card): runs agent on ONE specific script ---
-
 interface RunAgentButtonProps {
   scripts: ScriptInfo[];
   mode: "batch" | "single";
@@ -58,17 +55,23 @@ export default function RunAgentButton({ scripts, mode, singleScript, onOpenChan
   const [running, setRunning] = useState(false);
   const [done, setDone] = useState(false);
 
-  // Single mode state
   const [currentNode, setCurrentNode] = useState<string | null>(null);
   const [completedNodes, setCompletedNodes] = useState<string[]>([]);
   const eventSourceRef = useRef<EventSource | null>(null);
 
-  // Batch mode state
   const [batchProgress, setBatchProgress] = useState<BatchScriptProgress[]>([]);
   const batchEsRefs = useRef<Map<string, EventSource>>(new Map());
 
   const { toast } = useToast();
   const router = useRouter();
+
+  useEffect(() => {
+    return () => {
+      eventSourceRef.current?.close();
+      batchEsRefs.current.forEach((es) => es.close());
+      batchEsRefs.current.clear();
+    };
+  }, []);
 
   const overdueScripts = scripts
     .filter((s) => isOverdue(s.sent_at, s.status, s.response_deadline_minutes) || s.status === "overdue")
@@ -100,7 +103,6 @@ export default function RunAgentButton({ scripts, mode, singleScript, onOpenChan
     onOpenChange?.(false);
   }
 
-  // --- Single script agent run ---
   const runSingle = useCallback(async (scriptId: string) => {
     setRunning(true);
     setCurrentNode(null);
@@ -161,7 +163,6 @@ export default function RunAgentButton({ scripts, mode, singleScript, onOpenChan
     }
   }, [toast]);
 
-  // --- Batch agent run on all overdue ---
   const runBatch = useCallback(async () => {
     setRunning(true);
     setDone(false);
@@ -188,7 +189,6 @@ export default function RunAgentButton({ scripts, mode, singleScript, onOpenChan
     }
 
     for (const script of overdueScripts) {
-      // Connect SSE
       const es = new EventSource(`/api/agent/stream/${script.id}`);
       batchEsRefs.current.set(script.id, es);
 
@@ -236,7 +236,6 @@ export default function RunAgentButton({ scripts, mode, singleScript, onOpenChan
         checkAllDone();
       };
 
-      // Queue each script
       try {
         const res = await fetch(`/api/agent/process-queue?scriptId=${script.id}`);
         if (!res.ok) {
@@ -264,7 +263,6 @@ export default function RunAgentButton({ scripts, mode, singleScript, onOpenChan
     }
   }, [overdueScripts]);
 
-  // Render: single mode renders just a modal (triggered externally), batch mode renders button + modal
   if (mode === "single" && singleScript) {
     return (
       <AnimatePresence>
@@ -347,7 +345,6 @@ export default function RunAgentButton({ scripts, mode, singleScript, onOpenChan
     );
   }
 
-  // Batch mode: button + modal
   return (
     <>
       <div className="relative group">
@@ -474,7 +471,6 @@ export default function RunAgentButton({ scripts, mode, singleScript, onOpenChan
   );
 }
 
-// Shared node progress list for single mode
 function NodeProgressList({ currentNode, completedNodes, done }: { currentNode: string | null; completedNodes: string[]; done: boolean }) {
   return (
     <div className="space-y-2.5">

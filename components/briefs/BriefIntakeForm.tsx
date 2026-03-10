@@ -108,7 +108,6 @@ export default function BriefIntakeForm({ clients, onClose, onBriefCreated }: Br
 
     setSubmitting(true);
     try {
-      // Create the brief
       const res = await fetch("/api/briefs", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -128,7 +127,6 @@ export default function BriefIntakeForm({ clients, onClose, onBriefCreated }: Br
       setCreatedBriefId(brief.id);
       toast("success", "Brief created. Parsing with AI...");
 
-      // Trigger AI parsing
       setParsing(true);
       const parseRes = await fetch(`/api/briefs/${brief.id}/parse`, {
         method: "POST",
@@ -151,7 +149,6 @@ export default function BriefIntakeForm({ clients, onClose, onBriefCreated }: Br
     }
   }
 
-  // Show parsed result
   if (parsedResult) {
     return (
       <div className="space-y-5">
@@ -225,7 +222,6 @@ export default function BriefIntakeForm({ clients, onClose, onBriefCreated }: Br
     );
   }
 
-  // Loading state
   if (submitting || parsing) {
     return (
       <div className="flex flex-col items-center justify-center py-16 gap-4">
@@ -244,7 +240,6 @@ export default function BriefIntakeForm({ clients, onClose, onBriefCreated }: Br
 
   return (
     <div className="space-y-5">
-      {/* Mode toggle */}
       <div className="flex items-center gap-2 p-1 bg-[var(--surface-elevated)] border border-[var(--border)] rounded-lg w-fit">
         <button
           onClick={() => setMode("structured")}
@@ -272,7 +267,6 @@ export default function BriefIntakeForm({ clients, onClose, onBriefCreated }: Br
         </button>
       </div>
 
-      {/* Client Select */}
       <Field icon={Users} label="Client *">
         <div className="relative">
           <select
@@ -291,7 +285,6 @@ export default function BriefIntakeForm({ clients, onClose, onBriefCreated }: Br
         </div>
       </Field>
 
-      {/* Content Type */}
       <Field icon={Video} label="Content Type">
         <div className="flex gap-2 flex-wrap">
           {CONTENT_TYPES.map((ct) => (
@@ -312,7 +305,6 @@ export default function BriefIntakeForm({ clients, onClose, onBriefCreated }: Br
         </div>
       </Field>
 
-      {/* Platform */}
       <Field icon={Globe} label="Platform">
         <div className="flex gap-2 flex-wrap">
           {PLATFORMS.map((p) => (
@@ -460,7 +452,6 @@ Client wants a 60-second Instagram Reel about their new protein bar launch. Targ
         )}
       </AnimatePresence>
 
-      {/* Actions */}
       <div className="flex items-center justify-between pt-2">
         <button
           onClick={onClose}

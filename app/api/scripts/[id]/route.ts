@@ -22,7 +22,6 @@ export async function PATCH(
     return NextResponse.json({ error: "Nothing to update" }, { status: 400 });
   }
 
-  // Fetch current script
   const { data: script, error: fetchError } = await supabase
     .from("scripts")
     .select("id, status, content, title")

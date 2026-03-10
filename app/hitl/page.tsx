@@ -74,7 +74,8 @@ async function getPendingChasers(): Promise<ChaserData[]> {
     .from("chasers")
     .select("id, draft_content, created_at, script_id, client_id, status, hitl_state, clients(name, company, email, whatsapp_number, preferred_channel, avg_response_hours, approved_count, rejected_count, changes_requested_count, total_scripts), scripts(title, content, platform, assigned_writer, sent_at, status, client_feedback, reviewed_at, quality_score)")
     .in("status", ["pending_hitl", "draft_saved"])
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    .limit(200);
 
   if (error) {
     console.error("[hitl] Failed to fetch chasers:", error.message);
@@ -95,7 +96,6 @@ async function getPendingChasers(): Promise<ChaserData[]> {
     return true;
   });
 
-  // Fetch sent chaser counts per script
   if (deduped.length > 0) {
     const scriptIds = deduped.map((c) => c.script_id);
     const { data: sentChasers } = await supabase

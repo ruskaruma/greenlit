@@ -55,7 +55,6 @@ export async function createClientPage({
       "Notion-Version": NOTION_API_VERSION,
     };
 
-    // Build properties object
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const properties: Record<string, any> = {
       Name: {
@@ -99,7 +98,6 @@ export async function createClientPage({
       };
     }
 
-    // Build page content blocks
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const children: any[] = [];
 
@@ -130,6 +128,7 @@ export async function createClientPage({
         properties,
         ...(children.length > 0 ? { children } : {}),
       }),
+      signal: AbortSignal.timeout(15_000),
     });
 
     if (!res.ok) {

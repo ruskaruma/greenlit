@@ -5,19 +5,25 @@ import { requireSession } from "@/lib/auth/requireSession";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type SupabaseAny = any;
 
-export async function GET() {
+export async function GET(request: Request) {
   const { error: authError } = await requireSession();
   if (authError) return authError;
+
+  const url = new URL(request.url);
+  const limit = Math.min(Math.max(parseInt(url.searchParams.get("limit") || "100", 10) || 100, 1), 500);
+  const offset = Math.max(parseInt(url.searchParams.get("offset") || "0", 10) || 0, 0);
 
   const supabase: SupabaseAny = createServiceClientDirect();
 
   const { data, error } = await supabase
     .from("briefs")
     .select("*, client:clients(id, name, company, email)")
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    .range(offset, offset + limit - 1);
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error("[briefs/GET] Query failed:", error.message);
+    return NextResponse.json({ error: "Failed to fetch briefs" }, { status: 500 });
   }
 
   return NextResponse.json(data ?? []);
@@ -63,7 +69,6 @@ export async function POST(request: Request) {
     );
   }
 
-  // Validate client exists
   const { data: client, error: clientError } = await supabase
     .from("clients")
     .select("id, name")
@@ -94,10 +99,10 @@ export async function POST(request: Request) {
     .single();
 
   if (insertError) {
-    return NextResponse.json({ error: insertError.message }, { status: 500 });
+    console.error("[briefs/POST] Insert failed:", insertError.message);
+    return NextResponse.json({ error: "Failed to create brief" }, { status: 500 });
   }
 
-  // Audit log
   await supabase.from("audit_log").insert({
     entity_type: "brief",
     entity_id: brief.id,

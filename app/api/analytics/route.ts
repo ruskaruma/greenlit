@@ -12,23 +12,21 @@ export async function GET(request: Request) {
   const supabase: SupabaseAny = createServiceClientDirect();
   const url = new URL(request.url);
   const clientId = url.searchParams.get("client_id");
-  const range = url.searchParams.get("range") || "30"; // days
+  const rangeDays = url.searchParams.get("range") || "30";
+  const limit = Math.min(Math.max(parseInt(url.searchParams.get("limit") || "200", 10) || 200, 1), 1000);
+  const offset = Math.max(parseInt(url.searchParams.get("offset") || "0", 10) || 0, 0);
 
-  // Calculate date cutoff
-  const cutoffDate = range === "all" ? null : new Date(Date.now() - parseInt(range) * 86400000).toISOString();
+  const cutoffDate = rangeDays === "all" ? null : new Date(Date.now() - parseInt(rangeDays) * 86400000).toISOString();
 
-  // Fetch all scripts (with client info)
   let query = supabase.from("scripts").select("id, title, status, client_id, sent_at, reviewed_at, due_date, created_at, quality_score, clients(id, name, company)");
   if (clientId) query = query.eq("client_id", clientId);
   if (cutoffDate) query = query.gte("created_at", cutoffDate);
-  const { data: scripts } = await query.order("created_at", { ascending: true });
+  const { data: scripts } = await query.order("created_at", { ascending: true }).range(offset, offset + limit - 1);
 
-  // Fetch chasers count
   let chaserQuery = supabase.from("chasers").select("id, script_id, status, created_at");
   if (cutoffDate) chaserQuery = chaserQuery.gte("created_at", cutoffDate);
   const { data: chasers } = await chaserQuery;
 
-  // Filter chasers by client if needed
   const scriptIds = new Set((scripts ?? []).map((s: { id: string }) => s.id));
   const filteredChasers = clientId
     ? (chasers ?? []).filter((c: { script_id: string }) => scriptIds.has(c.script_id))
@@ -36,11 +34,9 @@ export async function GET(request: Request) {
 
   const allScripts = (scripts ?? []) as { id: string; title: string; status: string; client_id: string; sent_at: string | null; reviewed_at: string | null; due_date: string | null; created_at: string; quality_score: { average?: number } | null; clients: { id: string; name: string; company: string | null } }[];
 
-  // KPIs
   const pending = allScripts.filter(s => s.status === "pending_review" || s.status === "overdue").length;
   const chasersSent = filteredChasers.filter((c: { status: string }) => c.status === "sent").length;
 
-  // Avg approval time (hours from sent_at to reviewed_at for approved scripts)
   const approvedWithTimes = allScripts.filter(s => s.status === "approved" && s.sent_at && s.reviewed_at);
   let avgApprovalHours: number | null = null;
   if (approvedWithTimes.length > 0) {
@@ -50,22 +46,18 @@ export async function GET(request: Request) {
     avgApprovalHours = Math.round((totalHours / approvedWithTimes.length) * 10) / 10;
   }
 
-  // Approval rate
   const nonDraft = allScripts.filter(s => s.status !== "draft");
   const approved = allScripts.filter(s => s.status === "approved").length;
   const approvalRate = nonDraft.length > 0 ? Math.round((approved / nonDraft.length) * 100) : null;
 
-  // Status distribution for donut chart
   const statusCounts: Record<string, number> = {};
   for (const s of allScripts) {
     statusCounts[s.status] = (statusCounts[s.status] ?? 0) + 1;
   }
 
-  // Timeline data: group scripts by week, count created vs approved
   const timelineMap = new Map<string, { date: string; created: number; approved: number }>();
   for (const s of allScripts) {
     const d = new Date(s.created_at);
-    // Group by week start (Monday)
     const dayOfWeek = d.getDay();
     const diff = d.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
     const weekStart = new Date(d);
@@ -81,7 +73,6 @@ export async function GET(request: Request) {
   }
   const timeline = [...timelineMap.values()].sort((a, b) => a.date.localeCompare(b.date));
 
-  // Scripts table data
   const tableData = allScripts.map(s => {
     const chaserCount = filteredChasers.filter((c: { script_id: string; status: string }) => c.script_id === s.id && c.status === "sent").length;
     let approvalTime: number | null = null;
@@ -100,7 +91,6 @@ export async function GET(request: Request) {
     };
   });
 
-  // Fetch clients for filter dropdown
   const { data: clients } = await supabase.from("clients").select("id, name").order("name", { ascending: true });
 
   return NextResponse.json({

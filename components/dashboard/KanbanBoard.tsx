@@ -53,6 +53,8 @@ interface KanbanBoardProps {
 
 export default function KanbanBoard({ initialScripts, onConnectionChange, refreshKey, onArchive, activeClientId }: KanbanBoardProps) {
   const [scripts, setScripts] = useState<ScriptWithClient[]>(initialScripts);
+  const [renderKey, setRenderKey] = useState(0);
+  void renderKey;
   const [selectedScript, setSelectedScript] = useState<ScriptWithClient | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [undoToast, setUndoToast] = useState<{ scriptId: string; oldStatus: ScriptStatus; newStatus: ScriptStatus; colLabel: string } | null>(null);
@@ -120,7 +122,7 @@ export default function KanbanBoard({ initialScripts, onConnectionChange, refres
   }, [handleScriptChange, onConnectionChange, fetchScripts, activeClientId]);
 
   useEffect(() => {
-    const interval = setInterval(() => setScripts((prev) => [...prev]), 60_000);
+    const interval = setInterval(() => setRenderKey((k) => k + 1), 60_000);
     return () => clearInterval(interval);
   }, []);
 
@@ -172,7 +174,6 @@ export default function KanbanBoard({ initialScripts, onConnectionChange, refres
 
     handleStatusChange(scriptId, newStatus);
 
-    // Show undo toast
     if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
     const colLabel = columns.find((c) => c.key === destCol)?.label ?? destCol;
     setUndoToast({ scriptId, oldStatus, newStatus, colLabel });

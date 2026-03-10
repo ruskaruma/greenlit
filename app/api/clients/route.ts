@@ -7,19 +7,25 @@ import type { Client } from "@/lib/supabase/types";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type SupabaseAny = any;
 
-export async function GET() {
+export async function GET(request: Request) {
   const { error: authError } = await requireSession();
   if (authError) return authError;
+
+  const url = new URL(request.url);
+  const limit = Math.min(Math.max(parseInt(url.searchParams.get("limit") || "200", 10) || 200, 1), 500);
+  const offset = Math.max(parseInt(url.searchParams.get("offset") || "0", 10) || 0, 0);
 
   const supabase = createServiceClientDirect();
 
   const { data, error } = await (supabase as SupabaseAny)
     .from("clients")
     .select("*")
-    .order("name", { ascending: true });
+    .order("name", { ascending: true })
+    .range(offset, offset + limit - 1);
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error("[clients/GET] Query failed:", error.message);
+    return NextResponse.json({ error: "Failed to fetch clients" }, { status: 500 });
   }
 
   return NextResponse.json(data as Client[]);

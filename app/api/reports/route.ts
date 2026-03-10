@@ -15,7 +15,7 @@ function computeAggregate(entries: ReportEntry[]) {
     perPlatform[entry.platform].entry_count++;
 
     for (const [key, value] of Object.entries(entry.metrics)) {
-      // Rates/percentages: average instead of sum
+      // Rates must be averaged, not summed
       const isRate = key.includes("rate") || key === "ctr";
       if (isRate) {
         const countKey = `_${key}_sum`;
@@ -31,7 +31,6 @@ function computeAggregate(entries: ReportEntry[]) {
     }
   }
 
-  // Resolve averages for rates
   const resolveRates = (obj: Record<string, number>) => {
     const keys = Object.keys(obj).filter((k) => k.startsWith("_") && k.endsWith("_sum"));
     for (const sumKey of keys) {
@@ -51,19 +50,25 @@ function computeAggregate(entries: ReportEntry[]) {
   return { overall, ...perPlatform };
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   const { error: authError } = await requireSession();
   if (authError) return authError;
+
+  const url = new URL(request.url);
+  const limit = Math.min(Math.max(parseInt(url.searchParams.get("limit") || "100", 10) || 100, 1), 500);
+  const offset = Math.max(parseInt(url.searchParams.get("offset") || "0", 10) || 0, 0);
 
   const supabase: SupabaseAny = createServiceClientDirect();
 
   const { data, error } = await supabase
     .from("reports")
     .select("*, clients(name, email, company)")
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    .range(offset, offset + limit - 1);
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error("[reports/GET] Query failed:", error.message);
+    return NextResponse.json({ error: "Failed to fetch reports" }, { status: 500 });
   }
 
   const reports = (data ?? []).map((row: Record<string, unknown>) => ({
@@ -85,7 +90,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
   }
 
-  // Validate period dates
   const startDate = new Date(period_start);
   const endDate = new Date(period_end);
   if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
@@ -104,7 +108,6 @@ export async function POST(request: Request) {
 
   const aggregate = computeAggregate(entries as ReportEntry[]);
 
-  // Auto-fetch previous report for this client to use as previous_aggregate
   const supabase: SupabaseAny = createServiceClientDirect();
 
   const { data: prevReport } = await supabase
@@ -132,7 +135,8 @@ export async function POST(request: Request) {
     .single();
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error("[reports/POST] Insert failed:", error.message);
+    return NextResponse.json({ error: "Failed to create report" }, { status: 500 });
   }
 
   return NextResponse.json({ report: data });

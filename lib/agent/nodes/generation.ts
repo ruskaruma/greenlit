@@ -1,5 +1,6 @@
 import { ChatAnthropic } from "@langchain/anthropic";
 import { createServiceClientDirect } from "@/lib/supabase/server";
+import { MODEL_CLAUDE_HAIKU } from "../config";
 import { assembleContext } from "./contextAssembly";
 import type { AgentState, NodeLogEntry } from "../types";
 
@@ -7,7 +8,7 @@ import type { AgentState, NodeLogEntry } from "../types";
 type SupabaseAny = any;
 
 const model = new ChatAnthropic({
-  model: "claude-haiku-4-5-20251001",
+  model: MODEL_CLAUDE_HAIKU,
   maxTokens: 500,
   temperature: 0.7,
 });
@@ -31,10 +32,19 @@ function replacePlaceholders(text: string, state: AgentState): string {
 
 function parseEmailResponse(text: string, state: AgentState): { subject: string; body: string } {
   const subjectMatch = text.match(/SUBJECT:\s*(.+?)(?:\n|$)/i);
-  const bodyMatch = text.match(/BODY:\s*([\s\S]+)/i);
+  const bodyMatch = text.match(/BODY:\s*([\s\S]+?)(?:\n(?:NOTE|PS|SIGNATURE|---|\[).*$|$)/im);
 
   const rawSubject = subjectMatch?.[1]?.trim() ?? "Following up on your script review";
-  const rawBody = bodyMatch?.[1]?.trim() ?? text.trim();
+
+  let rawBody: string;
+  if (bodyMatch?.[1]?.trim()) {
+    rawBody = bodyMatch[1].trim();
+  } else if (subjectMatch) {
+    const afterSubject = text.slice((subjectMatch.index ?? 0) + subjectMatch[0].length).trim();
+    rawBody = afterSubject || text.trim();
+  } else {
+    rawBody = text.trim();
+  }
 
   return {
     subject: replacePlaceholders(rawSubject, state),
@@ -60,13 +70,11 @@ export async function generateChaser(state: AgentState): Promise<AgentState> {
 
     const { subject, body } = parseEmailResponse(responseText, state);
 
-    // Validate non-empty output
     if (!body || body.length < 20) {
       console.error("[generation] Generated email is empty or too short:", body?.length ?? 0);
       return { ...state, error: "Generated email was empty or too short" };
     }
 
-    // Store draft in chasers table
     const { data: chaser, error: chaserError } = await supabase
       .from("chasers")
       .insert({
@@ -90,7 +98,6 @@ export async function generateChaser(state: AgentState): Promise<AgentState> {
       return { ...state, error: `Failed to store chaser: ${chaserError.message}` };
     }
 
-    // Audit log
     await supabase.from("audit_log").insert({
       entity_type: "chaser",
       entity_id: chaser.id,

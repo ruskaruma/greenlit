@@ -27,7 +27,8 @@ async function getClientData(id: string) {
       .from("client_memories")
       .select("*")
       .eq("client_id", id)
-      .order("created_at", { ascending: false }),
+      .order("created_at", { ascending: false })
+      .limit(200),
   ]);
 
   if (clientRes.error || !clientRes.data) return null;

@@ -34,7 +34,6 @@ export async function POST(
     );
   }
 
-  // Check for existing pending chaser to prevent duplicates
   const { data: existingChaser } = await supabase
     .from("chasers")
     .select("id")

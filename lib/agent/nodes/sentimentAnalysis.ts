@@ -1,8 +1,9 @@
 import { ChatAnthropic } from "@langchain/anthropic";
+import { MODEL_CLAUDE_HAIKU } from "../config";
 import type { AgentState, NodeLogEntry } from "../types";
 
 const model = new ChatAnthropic({
-  model: "claude-haiku-4-5-20251001",
+  model: MODEL_CLAUDE_HAIKU,
   maxTokens: 300,
   temperature: 0,
 });
@@ -35,6 +36,11 @@ function validateTone(val: unknown): string {
 export async function analyzeSentiment(state: AgentState): Promise<AgentState> {
   const start = Date.now();
 
+  // Fix 6: Guard against null sent_at producing NaN
+  const hoursOverdue = isNaN(state.hoursOverdue) || state.hoursOverdue === null || state.hoursOverdue === undefined
+    ? 0
+    : state.hoursOverdue;
+
   try {
     const memoryContext = state.clientMemories.length > 0
       ? `Past interactions:\n${state.clientMemories.join("\n")}`
@@ -44,7 +50,7 @@ export async function analyzeSentiment(state: AgentState): Promise<AgentState> {
       { role: "system", content: systemPrompt },
       {
         role: "user",
-        content: `Client: ${state.clientName}\nScript: "${state.scriptTitle}"\nHours overdue: ${state.hoursOverdue}\n${memoryContext}`,
+        content: `Client: ${state.clientName}\nScript: "${state.scriptTitle}"\nHours overdue: ${hoursOverdue}\n${memoryContext}`,
       },
     ]);
 
@@ -78,7 +84,7 @@ export async function analyzeSentiment(state: AgentState): Promise<AgentState> {
     console.error("[sentimentAnalysis]", message);
 
     // Derive fallback from hours overdue instead of hardcoding neutral
-    const fallbackUrgency = state.hoursOverdue > 168 ? 8 : state.hoursOverdue > 72 ? 6 : state.hoursOverdue > 24 ? 4 : 2;
+    const fallbackUrgency = hoursOverdue > 168 ? 8 : hoursOverdue > 72 ? 6 : hoursOverdue > 24 ? 4 : 2;
     const fallbackTone = fallbackUrgency >= 7 ? "firm" : fallbackUrgency >= 4 ? "neutral" : "gentle";
 
     const entry: NodeLogEntry = {

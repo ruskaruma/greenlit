@@ -13,7 +13,6 @@ const embeddings = new OpenAIEmbeddings({
 function buildContextualQuery(state: AgentState): string {
   const parts = [`client ${state.clientName}`];
 
-  // Add context-specific terms based on situation
   if (state.hoursOverdue > 168) {
     parts.push("unresponsive repeated follow-up escalation");
   } else if (state.hoursOverdue > 72) {
@@ -34,7 +33,6 @@ export async function retrieveClientMemories(state: AgentState): Promise<AgentSt
     const query = buildContextualQuery(state);
     const queryEmbedding = await embeddings.embedQuery(query);
 
-    // pgvector cosine distance search
     const { data, error } = await supabase.rpc("match_client_memories", {
       query_embedding: queryEmbedding,
       match_client_id: state.clientId,
@@ -42,7 +40,6 @@ export async function retrieveClientMemories(state: AgentState): Promise<AgentSt
     });
 
     if (error) {
-      // Fallback: fetch recent memories without vector search
       console.error("[rag] Vector search failed, falling back to recent:", error.message);
       const { data: fallback } = await supabase
         .from("client_memories")
@@ -51,19 +48,22 @@ export async function retrieveClientMemories(state: AgentState): Promise<AgentSt
         .order("created_at", { ascending: false })
         .limit(5);
 
+      const memories = (fallback ?? []).map((m: { content: string }) => m.content);
       return {
         ...state,
-        clientMemories: (fallback ?? []).map((m: { content: string }) => m.content),
+        clientMemories: memories,
+        ragEmpty: memories.length === 0,
       };
     }
 
+    const memories = (data ?? []).map((m: { content: string }) => m.content);
     return {
       ...state,
-      clientMemories: (data ?? []).map((m: { content: string }) => m.content),
+      clientMemories: memories,
+      ragEmpty: memories.length === 0,
     };
   } catch (err) {
     console.error("[rag] Embedding generation failed:", err);
-    // Last resort: try plain text memories
     try {
       const { data: fallback } = await supabase
         .from("client_memories")
@@ -72,12 +72,14 @@ export async function retrieveClientMemories(state: AgentState): Promise<AgentSt
         .order("created_at", { ascending: false })
         .limit(3);
 
+      const memories = (fallback ?? []).map((m: { content: string }) => m.content);
       return {
         ...state,
-        clientMemories: (fallback ?? []).map((m: { content: string }) => m.content),
+        clientMemories: memories,
+        ragEmpty: memories.length === 0,
       };
     } catch {
-      return { ...state, clientMemories: [] };
+      return { ...state, clientMemories: [], ragEmpty: true };
     }
   }
 }

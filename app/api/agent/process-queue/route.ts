@@ -59,7 +59,6 @@ export async function GET(request: Request) {
     let queueItem;
 
     if (specificScriptId) {
-      // Process a specific script (from per-card Run Agent button)
       const { data } = await supabase
         .from("agent_queue")
         .select("id, script_id")
@@ -70,7 +69,6 @@ export async function GET(request: Request) {
         .maybeSingle();
 
       if (!data) {
-        // No queued item — insert one and process it
         const { data: inserted, error: insertErr } = await supabase
           .from("agent_queue")
           .insert({ script_id: specificScriptId, status: "queued" })
@@ -85,7 +83,6 @@ export async function GET(request: Request) {
         queueItem = data;
       }
     } else {
-      // Pick next queued item
       const { data, error } = await supabase
         .from("agent_queue")
         .select("id, script_id")
@@ -95,7 +92,8 @@ export async function GET(request: Request) {
         .maybeSingle();
 
       if (error) {
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        console.error("[process-queue] Queue query failed:", error.message);
+        return NextResponse.json({ error: "Failed to query processing queue" }, { status: 500 });
       }
 
       if (!data) {
@@ -105,13 +103,11 @@ export async function GET(request: Request) {
       queueItem = data;
     }
 
-    // Mark as processing
     await supabase
       .from("agent_queue")
       .update({ status: "processing" })
       .eq("id", queueItem.id);
 
-    // Fetch script + client data
     const { data: script, error: scriptErr } = await supabase
       .from("scripts")
       .select("id, title, content, client_id, sent_at, due_date, status, clients(id, name, email)")
@@ -135,7 +131,6 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Client not found for script" }, { status: 400 });
     }
 
-    // Check for existing pending chaser
     const { data: existingChaser } = await supabase
       .from("chasers")
       .select("id")
@@ -205,7 +200,6 @@ export async function GET(request: Request) {
       return NextResponse.json({ processed: script.id, error: msg });
     }
 
-    // Count remaining
     const { count } = await supabase
       .from("agent_queue")
       .select("id", { count: "exact", head: true })

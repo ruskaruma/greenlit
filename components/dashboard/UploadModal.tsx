@@ -113,14 +113,12 @@ export default function UploadModal({ clients, onScriptUploaded }: UploadModalPr
       const score = data.quality_score as QualityScore | null;
       const returnedChannel = data.review_channel as string;
 
-      // If score is low, show warning instead of auto-sending
       if (score && score.average < 6) {
         setScoreResult({ score, scriptId: data.id, reviewChannel: returnedChannel });
         setIsLoading(false);
         return;
       }
 
-      // Score is good (or no score) — send immediately
       await sendScript(data.id, returnedChannel);
 
       setIsOpen(false);
@@ -397,8 +395,8 @@ export default function UploadModal({ clients, onScriptUploaded }: UploadModalPr
                       )}
                       {scoreResult.score.improvements && scoreResult.score.improvements.length > 0 && (
                         <div className="mt-1">
-                          {scoreResult.score.improvements.map((s, i) => (
-                            <p key={i} className="text-[11px] text-amber-400/80">- {s}</p>
+                          {scoreResult.score.improvements.map((s) => (
+                            <p key={s} className="text-[11px] text-amber-400/80">- {s}</p>
                           ))}
                         </div>
                       )}

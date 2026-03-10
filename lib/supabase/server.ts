@@ -46,7 +46,7 @@ export async function createServiceClient() {
               cookieStore.set(name, value, options)
             );
           } catch {
-            // Safe to ignore in Server Components.
+            // Safe to ignore: called from Server Components where cookies can't be set
           }
         },
       },
@@ -54,7 +54,6 @@ export async function createServiceClient() {
   );
 }
 
-// Service client for API route handlers (no cookie dependency)
 export function createServiceClientDirect() {
   return createJsClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,

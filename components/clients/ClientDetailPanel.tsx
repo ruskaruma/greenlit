@@ -173,7 +173,6 @@ export default function ClientDetailPanel({
       </header>
 
       <div className="px-6 py-6 space-y-6">
-        {/* Profile Card */}
         <div className="bg-[var(--card)] border border-[var(--border)] rounded-lg p-5">
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-x-6 gap-y-3">
             {profileFields.map((field) => {
@@ -223,7 +222,6 @@ export default function ClientDetailPanel({
           </div>
         </div>
 
-        {/* Tabs */}
         <div className="flex gap-1 border-b border-[var(--border)]">
           {TAB_OPTIONS.map((tab) => (
             <button
@@ -241,7 +239,6 @@ export default function ClientDetailPanel({
           ))}
         </div>
 
-        {/* Tab Content */}
         {activeTab === "scripts" && (
           <div className="bg-[var(--card)] border border-[var(--border)] rounded-lg overflow-hidden">
             {scripts.length === 0 ? (

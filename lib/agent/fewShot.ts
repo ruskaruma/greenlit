@@ -10,12 +10,9 @@ export interface FewShotExample {
   tone: string | null;
 }
 
-/**
- * Store a few-shot example: the original AI draft paired with the team lead's edit.
- * Used to improve future generation for this client.
- */
 export async function storeFewShotExample(params: {
   clientId: string;
+  chaserId: string;
   originalDraft: string;
   editedDraft: string;
   scriptTitle: string | null;
@@ -23,8 +20,34 @@ export async function storeFewShotExample(params: {
 }): Promise<void> {
   const supabase: SupabaseAny = createServiceClientDirect();
 
+  // Fix 8: Deduplicate — check if example exists for same chaser, update if so
+  const { data: existing } = await supabase
+    .from("chaser_few_shot_examples")
+    .select("id")
+    .eq("chaser_id", params.chaserId)
+    .limit(1);
+
+  if (existing && existing.length > 0) {
+    const { error } = await supabase
+      .from("chaser_few_shot_examples")
+      .update({
+        original_draft: params.originalDraft,
+        edited_draft: params.editedDraft,
+        script_title: params.scriptTitle,
+        tone: params.tone ?? null,
+      })
+      .eq("id", existing[0].id);
+
+    if (error) {
+      console.error("[fewShot] Failed to update example:", error.message);
+      throw error;
+    }
+    return;
+  }
+
   const { error } = await supabase.from("chaser_few_shot_examples").insert({
     client_id: params.clientId,
+    chaser_id: params.chaserId,
     original_draft: params.originalDraft,
     edited_draft: params.editedDraft,
     script_title: params.scriptTitle,
@@ -37,10 +60,6 @@ export async function storeFewShotExample(params: {
   }
 }
 
-/**
- * Fetch the most recent few-shot examples for a client.
- * Returns up to `limit` examples, newest first.
- */
 export async function getFewShotExamples(
   clientId: string,
   limit = 3

@@ -17,7 +17,8 @@ export async function GET() {
     .eq("status", "pending_hitl");
 
   if (error) {
-    return NextResponse.json({ count: 0 });
+    console.error("[hitl/pending-count] Query failed:", error.message);
+    return NextResponse.json({ error: "Failed to query pending count" }, { status: 500 });
   }
 
   return NextResponse.json({ count: count ?? 0 });

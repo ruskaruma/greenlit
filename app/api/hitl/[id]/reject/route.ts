@@ -42,7 +42,6 @@ export async function POST(
     return NextResponse.json({ error: updateError.message }, { status: 500 });
   }
 
-  // Resume the LangGraph thread — rejected loops back to generation
   const threadId = `chaser-${chaser.script_id}`;
   resumeChaserGraph(threadId, "rejected").catch((err: unknown) =>
     console.error("[hitl/reject] Graph resume failed (non-blocking):", err)

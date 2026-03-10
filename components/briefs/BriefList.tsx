@@ -168,7 +168,6 @@ export default function BriefList({ briefs, onRefresh }: BriefListProps) {
 
   return (
     <div>
-      {/* Status filter */}
       <div className="flex items-center gap-2 mb-4 overflow-x-auto pb-1">
         <Filter size={12} className="text-[var(--muted)] shrink-0" />
         {STATUS_FILTERS.map((sf) => {
@@ -190,7 +189,6 @@ export default function BriefList({ briefs, onRefresh }: BriefListProps) {
         })}
       </div>
 
-      {/* Brief list */}
       {filtered.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16">
           <FileText size={24} className="text-[var(--muted)] opacity-30 mb-3" />
@@ -209,7 +207,6 @@ export default function BriefList({ briefs, onRefresh }: BriefListProps) {
                 layout
                 className="bg-[var(--card)] border border-[var(--border)] rounded-lg overflow-hidden"
               >
-                {/* Card header */}
                 <button
                   onClick={() => setExpandedId(isExpanded ? null : brief.id)}
                   className="w-full flex items-center justify-between p-4 text-left hover:bg-[var(--surface-elevated)]/50 transition-colors"
@@ -276,7 +273,6 @@ export default function BriefList({ briefs, onRefresh }: BriefListProps) {
                   </div>
                 </button>
 
-                {/* Expanded detail */}
                 <AnimatePresence>
                   {isExpanded && (
                     <motion.div
@@ -287,7 +283,6 @@ export default function BriefList({ briefs, onRefresh }: BriefListProps) {
                       className="overflow-hidden"
                     >
                       <div className="px-4 pb-4 border-t border-[var(--border)]">
-                        {/* Actions bar */}
                         <div className="flex items-center gap-2 py-3">
                           {(brief.status === "intake" || brief.status === "parsing") && (
                             <button
@@ -363,7 +358,6 @@ export default function BriefList({ briefs, onRefresh }: BriefListProps) {
                           )}
                         </div>
 
-                        {/* Parsed brief content */}
                         {parsed ? (
                           <div className="bg-[var(--bg)] border border-[var(--border)] rounded-lg divide-y divide-[var(--border)]">
                             <DetailRow label="Hook Angle" value={parsed.hook_angle} />
@@ -414,7 +408,6 @@ export default function BriefList({ briefs, onRefresh }: BriefListProps) {
                           </div>
                         )}
 
-                        {/* Metadata */}
                         <div className="flex items-center gap-4 mt-3 text-[10px] text-[var(--muted)] opacity-60">
                           <span className="flex items-center gap-1">
                             <Clock size={10} />

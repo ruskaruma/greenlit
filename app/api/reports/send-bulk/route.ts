@@ -75,5 +75,9 @@ export async function POST(request: Request) {
     }
   }
 
+  if (sent === 0 && failed > 0) {
+    return NextResponse.json({ sent, failed }, { status: 502 });
+  }
+
   return NextResponse.json({ sent, failed });
 }

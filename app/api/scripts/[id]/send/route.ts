@@ -20,7 +20,6 @@ export async function POST(
   const body = await request.json();
   const { review_channel } = body as { review_channel?: string };
 
-  // Fetch script + client
   const { data: script, error: scriptError } = await supabase
     .from("scripts")
     .select("*, client:clients(name, email, whatsapp_number, preferred_channel)")
@@ -31,7 +30,6 @@ export async function POST(
     return NextResponse.json({ error: "Script not found" }, { status: 404 });
   }
 
-  // Allow sending from draft OR re-sending after changes_requested/rejected
   const allowedStatuses = ["draft", "changes_requested", "rejected"];
   if (!allowedStatuses.includes(script.status)) {
     return NextResponse.json(
@@ -42,7 +40,7 @@ export async function POST(
 
   const isResend = script.status !== "draft";
 
-  // Generate a new review token for re-sends so the old link is invalidated
+  // Invalidate old review link on re-send
   let reviewToken = script.review_token;
   if (isResend) {
     const newToken = crypto.randomUUID();
@@ -110,12 +108,11 @@ export async function POST(
       })
       .eq("id", id);
   } else {
-    // Still mark as pending_review even if delivery failed
-    await supabase
-      .from("scripts")
-      .update({ status: "pending_review" })
-      .eq("id", id);
+    return NextResponse.json(
+      { error: "All delivery channels failed" },
+      { status: 502 }
+    );
   }
 
-  return NextResponse.json({ success: true, sent: anySendSucceeded });
+  return NextResponse.json({ success: true, sent: true });
 }

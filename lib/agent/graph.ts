@@ -9,6 +9,7 @@ import { generateChaser } from "./nodes/generation";
 import { selfCritique } from "./nodes/selfCritique";
 import { reviseEmail } from "./nodes/revision";
 import { addStreamEvent } from "./stream";
+import { appendNodeLog } from "./types";
 import type { AgentState, CritiqueScores, NodeLogEntry } from "./types";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -16,8 +17,8 @@ type SupabaseAny = any;
 
 const MAX_REVISIONS = 2;
 const ESCALATION_THRESHOLD = 3;
-// With binary criteria (10 checks), 8/10 = 80% pass rate required
-const MIN_PASS_RATE = 8; // minimum average score out of 10
+const MIN_PASS_RATE = 8;
+const CIRCUIT_BREAKER_LIMIT = 3;
 
 const GraphState = Annotation.Root({
   scriptId: Annotation<string>(),
@@ -38,19 +39,22 @@ const GraphState = Annotation.Root({
   toneRecommendation: Annotation<string | null>(),
   critiqueScores: Annotation<CritiqueScores | null>(),
   revisionCount: Annotation<number>(),
-  nodeExecutionLog: Annotation<NodeLogEntry[]>(),
-  // HITL interrupt/resume fields
+  nodeExecutionLog: Annotation<NodeLogEntry[]>({
+    reducer: appendNodeLog,
+    default: () => [],
+  }),
   hitlAction: Annotation<string | null>(),
   hitlEditedContent: Annotation<string | null>(),
   recommendedChannel: Annotation<string | null>(),
   preferredChannel: Annotation<string | null>(),
+  ragEmpty: Annotation<boolean | undefined>(),
 });
 
 async function ragNode(state: typeof GraphState.State): Promise<Partial<typeof GraphState.State>> {
   addStreamEvent(state.scriptId, { node: "ragRetrieval", status: "started", timestamp: new Date().toISOString() });
   const result = await retrieveClientMemories(state as AgentState);
   addStreamEvent(state.scriptId, { node: "ragRetrieval", status: "completed", timestamp: new Date().toISOString(), data: { memoriesFound: result.clientMemories.length } });
-  return { clientMemories: result.clientMemories };
+  return { clientMemories: result.clientMemories, ragEmpty: result.ragEmpty };
 }
 
 async function sentimentNode(state: typeof GraphState.State): Promise<Partial<typeof GraphState.State>> {
@@ -66,9 +70,16 @@ async function sentimentNode(state: typeof GraphState.State): Promise<Partial<ty
 
 async function channelStrategyNode(state: typeof GraphState.State): Promise<Partial<typeof GraphState.State>> {
   addStreamEvent(state.scriptId, { node: "channelStrategy", status: "started", timestamp: new Date().toISOString() });
-  const result = await determineChannel(state as AgentState);
-  addStreamEvent(state.scriptId, { node: "channelStrategy", status: "completed", timestamp: new Date().toISOString(), data: { channel: result.recommendedChannel } });
-  return { recommendedChannel: result.recommendedChannel ?? null, preferredChannel: result.preferredChannel ?? null };
+  try {
+    const result = await determineChannel(state as AgentState);
+    addStreamEvent(state.scriptId, { node: "channelStrategy", status: "completed", timestamp: new Date().toISOString(), data: { channel: result.recommendedChannel } });
+    return { recommendedChannel: result.recommendedChannel ?? null, preferredChannel: result.preferredChannel ?? null };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Channel strategy failed";
+    console.error("[channelStrategy]", message);
+    addStreamEvent(state.scriptId, { node: "channelStrategy", status: "error", timestamp: new Date().toISOString(), data: { error: message } });
+    return { recommendedChannel: null, preferredChannel: null, error: message };
+  }
 }
 
 async function generationNode(state: typeof GraphState.State): Promise<Partial<typeof GraphState.State>> {
@@ -119,6 +130,20 @@ function routeAfterCritique(state: typeof GraphState.State): "revision" | "final
 }
 
 async function checkAndEscalateScript(scriptId: string, supabase: SupabaseAny): Promise<void> {
+  const { error: updateError } = await supabase
+    .from("scripts")
+    .update({ status: "escalated" })
+    .eq("id", scriptId)
+    .neq("status", "escalated")
+    .lt(
+      "id",
+      supabase
+        .from("chasers")
+        .select("script_id", { count: "exact", head: true })
+        .eq("script_id", scriptId)
+        .in("status", ["sent", "approved", "edited"])
+    );
+
   const { count, error: countError } = await supabase
     .from("chasers")
     .select("id", { count: "exact", head: true })
@@ -132,27 +157,38 @@ async function checkAndEscalateScript(scriptId: string, supabase: SupabaseAny): 
 
   if ((count ?? 0) < ESCALATION_THRESHOLD) return;
 
-  const { error: updateError } = await supabase
+  const { data: script } = await supabase
+    .from("scripts")
+    .select("status")
+    .eq("id", scriptId)
+    .single();
+
+  if (script?.status === "escalated") return;
+
+  const { error: escError } = await supabase
     .from("scripts")
     .update({ status: "escalated" })
-    .eq("id", scriptId);
+    .eq("id", scriptId)
+    .neq("status", "escalated");
 
-  if (updateError) {
-    console.error("[escalation] Failed to escalate script:", updateError.message);
+  if (escError) {
+    console.error("[escalation] Failed to escalate script:", escError.message);
     return;
   }
 
-  const { error: auditError } = await supabase.from("audit_log").insert({
+  if (updateError) {
+    // logged but non-fatal
+  }
+
+  await supabase.from("audit_log").insert({
     entity_type: "script",
     entity_id: scriptId,
     action: "auto_escalated",
     actor: "system",
     metadata: { chaser_count: count, threshold: ESCALATION_THRESHOLD },
+  }).then(({ error: auditError }: { error: { message: string } | null }) => {
+    if (auditError) console.error("[escalation] Failed to insert audit log:", auditError.message);
   });
-
-  if (auditError) {
-    console.error("[escalation] Failed to insert audit log:", auditError.message);
-  }
 }
 
 async function finalizeNode(state: typeof GraphState.State): Promise<Partial<typeof GraphState.State>> {
@@ -186,6 +222,10 @@ async function finalizeNode(state: typeof GraphState.State): Promise<Partial<typ
     } : {}),
   };
 
+  if (state.nodeExecutionLog.length > 0) {
+    updatePayload.node_execution_log = state.nodeExecutionLog;
+  }
+
   if (Object.keys(updatePayload).length > 0) {
     const { error } = await supabase.from("chasers").update(updatePayload).eq("id", state.chaserId);
     if (error) {
@@ -198,15 +238,20 @@ async function finalizeNode(state: typeof GraphState.State): Promise<Partial<typ
   return {};
 }
 
-/**
- * HITL node — pauses the graph via interrupt().
- * The team lead's action (approved/edited/rejected) is returned as the resume value.
- * Graph state is serialized to Supabase via SupabaseCheckpointSaver.
- */
+interface ResumeValue {
+  action: string;
+  editedContent?: string | null;
+}
+
+function isValidResumeValue(value: unknown): value is ResumeValue {
+  if (typeof value !== "object" || value === null) return false;
+  const obj = value as Record<string, unknown>;
+  return typeof obj.action === "string";
+}
+
 function hitlNode(state: typeof GraphState.State): Partial<typeof GraphState.State> {
   addStreamEvent(state.scriptId, { node: "hitl", status: "started", timestamp: new Date().toISOString() });
 
-  // interrupt() pauses here. Resume value = { action, editedContent? }
   const resume = interrupt({
     chaserId: state.chaserId,
     scriptId: state.scriptId,
@@ -216,15 +261,19 @@ function hitlNode(state: typeof GraphState.State): Partial<typeof GraphState.Sta
     critiqueScores: state.critiqueScores,
   });
 
-  const action = (resume as { action: string }).action;
-  const editedContent = (resume as { editedContent?: string }).editedContent ?? null;
+  if (!isValidResumeValue(resume)) {
+    console.error("[hitl] Invalid resume value shape:", JSON.stringify(resume));
+    return { error: "Invalid resume value received at HITL node" };
+  }
+
+  const action = resume.action;
+  const editedContent = resume.editedContent ?? null;
 
   addStreamEvent(state.scriptId, { node: "hitl", status: "completed", timestamp: new Date().toISOString(), data: { action } });
 
   return {
     hitlAction: action,
     hitlEditedContent: editedContent,
-    // If edited, update the email content
     ...(editedContent ? { generatedEmail: editedContent } : {}),
   };
 }
@@ -234,18 +283,11 @@ function routeAfterHitl(state: typeof GraphState.State): "delivery" | "generatio
     return "delivery";
   }
   if (state.hitlAction === "rejected") {
-    // Loop back to generation for a new draft
     return "generation";
   }
   return END;
 }
 
-/**
- * Delivery node — the graph proceeds here after HITL approval.
- * Marks the chaser as approved/edited in DB. Actual email/WhatsApp send
- * is still handled by the approve route for now (keeps delivery logic
- * in one place with error handling + channel selection).
- */
 async function deliveryNode(state: typeof GraphState.State): Promise<Partial<typeof GraphState.State>> {
   if (!state.chaserId) return {};
 
@@ -263,6 +305,7 @@ async function deliveryNode(state: typeof GraphState.State): Promise<Partial<typ
 
   if (state.recommendedChannel) {
     updatePayload.recommended_channel = state.recommendedChannel;
+    updatePayload.delivery_channel = state.recommendedChannel;
   }
 
   const { error } = await supabase.from("chasers").update(updatePayload).eq("id", state.chaserId);
@@ -270,7 +313,7 @@ async function deliveryNode(state: typeof GraphState.State): Promise<Partial<typ
     console.error("[delivery] Failed to update chaser:", error.message);
   }
 
-  addStreamEvent(state.scriptId, { node: "delivery", status: "completed", timestamp: new Date().toISOString(), data: { status: newStatus } });
+  addStreamEvent(state.scriptId, { node: "delivery", status: "completed", timestamp: new Date().toISOString(), data: { status: newStatus, channel: state.recommendedChannel } });
 
   return {};
 }
@@ -311,11 +354,6 @@ function defaultState(): Partial<AgentState> {
   };
 }
 
-/**
- * Run the chaser graph for a single script.
- * The graph will pause at the HITL node (interrupt) and return.
- * Thread ID = script ID so we can resume later.
- */
 export async function runChaserForScript(initialState: AgentState): Promise<AgentState> {
   const fullState = { ...defaultState(), ...initialState, hitlAction: null, hitlEditedContent: null };
   const threadId = `chaser-${initialState.scriptId}`;
@@ -328,10 +366,6 @@ export async function runChaserForScript(initialState: AgentState): Promise<Agen
   return result as AgentState;
 }
 
-/**
- * Resume a paused graph after HITL decision.
- * Called by the resume API route.
- */
 export async function resumeChaserGraph(
   threadId: string,
   action: "approved" | "edited" | "rejected",
@@ -352,9 +386,6 @@ export async function resumeChaserGraph(
   }
 }
 
-/**
- * Get the current state of a paused graph thread.
- */
 export async function getThreadState(threadId: string) {
   return workflow.getState({ configurable: { thread_id: threadId } });
 }
@@ -369,18 +400,29 @@ export async function runChaserAgent(): Promise<{ processed: number; errors: str
 
   const errors: string[] = [];
   let processed = 0;
+  let consecutiveFailures = 0;
 
   for (const state of overdueScripts) {
+    if (consecutiveFailures >= CIRCUIT_BREAKER_LIMIT) {
+      const msg = `Circuit breaker tripped after ${CIRCUIT_BREAKER_LIMIT} consecutive failures — aborting remaining ${overdueScripts.length - processed - errors.length} scripts`;
+      console.error(`[agent] ${msg}`);
+      errors.push(msg);
+      break;
+    }
+
     try {
       const result = await runChaserForScript(state);
       if (result.error) {
         errors.push(`Script ${state.scriptId}: ${result.error}`);
+        consecutiveFailures++;
       } else {
         processed++;
+        consecutiveFailures = 0;
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Unknown error";
       errors.push(`Script ${state.scriptId}: ${msg}`);
+      consecutiveFailures++;
     }
   }
 

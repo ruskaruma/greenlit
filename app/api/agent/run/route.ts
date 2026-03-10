@@ -1,6 +1,3 @@
-// To test manually after deploy, run:
-// curl -X GET https://greenlit.ruskaruma.me/api/agent/run -H 'Authorization: Bearer greenlit-cron-2026'
-
 import { NextResponse } from "next/server";
 import { createServiceClientDirect } from "@/lib/supabase/server";
 import { requireSession } from "@/lib/auth/requireSession";
@@ -43,7 +40,6 @@ export async function GET(request: Request) {
     const nowMs = Date.now();
     const nowIso = new Date(nowMs).toISOString();
 
-    // Fetch all pending_review scripts that have been sent
     const { data: candidates, error: queryError } = await supabase
       .from("scripts")
       .select("id, title, sent_at, due_date, response_deadline_minutes")
@@ -56,7 +52,6 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: queryError.message }, { status: 500 });
     }
 
-    // Filter: overdue if due_date passed OR sent_at + response_deadline_minutes passed
     const overdueScripts = (candidates ?? []).filter(
       (s: { sent_at: string; due_date: string | null; response_deadline_minutes: number | null }) => {
         const deadlineMinutes = s.response_deadline_minutes ?? 2880;
@@ -93,8 +88,6 @@ export async function GET(request: Request) {
       });
     }
 
-    // Full mode: queue agent runs instead of running inline
-    // Filter out scripts that already have a queued entry to prevent duplicates
     const { data: alreadyQueued } = await supabase
       .from("agent_queue")
       .select("script_id")

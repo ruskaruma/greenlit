@@ -48,7 +48,9 @@ export async function PATCH(
 
   const updates: Record<string, unknown> = {};
   for (const key of allowed) {
-    if (key in body && body[key] !== null && body[key] !== "") updates[key] = body[key];
+    if (key in body && body[key] !== undefined) {
+      updates[key] = body[key] === "" ? null : body[key];
+    }
   }
 
   if (Object.keys(updates).length === 0) {
@@ -63,7 +65,8 @@ export async function PATCH(
     .single();
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error("[clients/PATCH] Update failed:", error.message);
+    return NextResponse.json({ error: "Failed to update client" }, { status: 500 });
   }
 
   return NextResponse.json(data);
@@ -79,13 +82,35 @@ export async function DELETE(
   const { id } = await params;
   const supabase: SupabaseAny = createServiceClientDirect();
 
+  const { count: scriptCount } = await supabase
+    .from("scripts")
+    .select("id", { count: "exact", head: true })
+    .eq("client_id", id);
+
+  const { count: chaserCount } = await supabase
+    .from("chasers")
+    .select("id", { count: "exact", head: true })
+    .eq("client_id", id);
+
+  const deps: string[] = [];
+  if ((scriptCount ?? 0) > 0) deps.push(`${scriptCount} scripts`);
+  if ((chaserCount ?? 0) > 0) deps.push(`${chaserCount} chasers`);
+
+  if (deps.length > 0) {
+    return NextResponse.json(
+      { error: `Cannot delete client with dependent records: ${deps.join(", ")}` },
+      { status: 409 }
+    );
+  }
+
   const { error } = await supabase
     .from("clients")
     .delete()
     .eq("id", id);
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error("[clients/DELETE] Failed:", error.message);
+    return NextResponse.json({ error: "Failed to delete client" }, { status: 500 });
   }
 
   return NextResponse.json({ success: true });
