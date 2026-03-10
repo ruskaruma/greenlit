@@ -6,6 +6,7 @@ import { Clock, Calendar, AlertTriangle, MoreHorizontal, Bot, Archive, ArchiveRe
 import type { DraggableProvidedDragHandleProps } from "@hello-pangea/dnd";
 import StatusBadge from "@/components/ui/StatusBadge";
 import { cn, formatTimeAgo, isOverdue, getScriptAge, getChaseCountdown } from "@/lib/utils";
+import Link from "next/link";
 import type { ScriptWithClient, ScriptStatus } from "@/lib/supabase/types";
 
 interface ScriptCardProps {
@@ -127,6 +128,11 @@ export default function ScriptCard({ script, onClick, onArchive, onStatusChange,
           </h3>
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
+          {script.status === "escalated" && (
+            <span className="text-[8px] font-bold px-1.5 py-0.5 rounded bg-red-500/20 text-red-400 border border-red-500/30 uppercase tracking-wider">
+              Escalated
+            </span>
+          )}
           {isCritical && (
             <span className="text-[8px] font-bold px-1.5 py-0.5 rounded bg-red-500/20 text-red-400 border border-red-500/30 uppercase tracking-wider">
               Critical
@@ -187,7 +193,13 @@ export default function ScriptCard({ script, onClick, onArchive, onStatusChange,
           {clientInitial}
         </div>
         <span className="truncate">
-          {script.client.name}
+          <Link
+            href={`/clients/${script.client.id}`}
+            onClick={(e) => e.stopPropagation()}
+            className="hover:underline"
+          >
+            {script.client.name}
+          </Link>
           {script.client.company && (
             <span className="opacity-60"> / {script.client.company}</span>
           )}

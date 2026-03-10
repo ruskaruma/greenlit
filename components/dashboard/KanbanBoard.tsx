@@ -33,6 +33,7 @@ const columnToStatus: Partial<Record<ColumnKey, ScriptStatus>> = {
 function categorizeScript(script: ScriptWithClient): ColumnKey | null {
   if (script.status === "closed") return null;
   if (script.status === "draft") return "draft";
+  if (script.status === "escalated") return "overdue";
   if (script.status === "overdue") return "overdue";
   if (isOverdue(script.sent_at, script.status, script.response_deadline_minutes)) return "overdue";
   if (script.status === "pending_review") return "pending_review";

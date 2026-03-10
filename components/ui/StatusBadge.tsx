@@ -10,6 +10,7 @@ const statusConfig: Record<ScriptStatus, { variant: "success" | "warning" | "des
   pending_review: { variant: "warning", dotColor: "bg-amber-400" },
   changes_requested: { variant: "warning", dotColor: "bg-amber-400" },
   overdue: { variant: "destructive", dotColor: "bg-red-400" },
+  escalated: { variant: "destructive", dotColor: "bg-red-400" },
   rejected: { variant: "destructive", dotColor: "bg-red-400" },
   draft: { variant: "mono" },
   closed: { variant: "mono" },

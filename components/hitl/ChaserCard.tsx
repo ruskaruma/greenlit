@@ -7,6 +7,7 @@ import {
   ChevronDown, ChevronUp, Mail, Phone, Send, Save,
   AlertTriangle, MessageSquare, Zap,
 } from "lucide-react";
+import Link from "next/link";
 import { cn, formatTimeAgo } from "@/lib/utils";
 import { useToast } from "@/components/ui/ToastProvider";
 import type { ChaserData } from "@/app/hitl/page";
@@ -432,7 +433,7 @@ export default function ChaserCard({ chaser, memories, onActionComplete, onSelec
           )}
           <div className="flex items-center gap-1.5">
             <User size={10} className="text-[var(--muted)]" />
-            <span className="text-[11px] text-[var(--text)]">{client.name}</span>
+            <Link href={`/clients/${chaser.client_id}`} className="text-[11px] text-[var(--text)] hover:underline">{client.name}</Link>
             {client.company && <span className="text-[11px] text-[var(--muted)] opacity-60">/ {client.company}</span>}
           </div>
           {approvalRate !== null && (

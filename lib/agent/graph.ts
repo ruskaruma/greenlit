@@ -4,6 +4,7 @@ import { SupabaseCheckpointSaver } from "./checkpointer";
 import { monitorOverdueScripts } from "./nodes/monitor";
 import { retrieveClientMemories } from "./nodes/ragRetrieval";
 import { analyzeSentiment } from "./nodes/sentimentAnalysis";
+import { determineChannel } from "./nodes/channelStrategy";
 import { generateChaser } from "./nodes/generation";
 import { selfCritique } from "./nodes/selfCritique";
 import { reviseEmail } from "./nodes/revision";
@@ -14,6 +15,7 @@ import type { AgentState, CritiqueScores, NodeLogEntry } from "./types";
 type SupabaseAny = any;
 
 const MAX_REVISIONS = 2;
+const ESCALATION_THRESHOLD = 3;
 // With binary criteria (10 checks), 8/10 = 80% pass rate required
 const MIN_PASS_RATE = 8; // minimum average score out of 10
 
@@ -40,6 +42,8 @@ const GraphState = Annotation.Root({
   // HITL interrupt/resume fields
   hitlAction: Annotation<string | null>(),
   hitlEditedContent: Annotation<string | null>(),
+  recommendedChannel: Annotation<string | null>(),
+  preferredChannel: Annotation<string | null>(),
 });
 
 async function ragNode(state: typeof GraphState.State): Promise<Partial<typeof GraphState.State>> {
@@ -58,6 +62,13 @@ async function sentimentNode(state: typeof GraphState.State): Promise<Partial<ty
     toneRecommendation: result.toneRecommendation,
     nodeExecutionLog: result.nodeExecutionLog,
   };
+}
+
+async function channelStrategyNode(state: typeof GraphState.State): Promise<Partial<typeof GraphState.State>> {
+  addStreamEvent(state.scriptId, { node: "channelStrategy", status: "started", timestamp: new Date().toISOString() });
+  const result = await determineChannel(state as AgentState);
+  addStreamEvent(state.scriptId, { node: "channelStrategy", status: "completed", timestamp: new Date().toISOString(), data: { channel: result.recommendedChannel } });
+  return { recommendedChannel: result.recommendedChannel ?? null, preferredChannel: result.preferredChannel ?? null };
 }
 
 async function generationNode(state: typeof GraphState.State): Promise<Partial<typeof GraphState.State>> {
@@ -107,6 +118,43 @@ function routeAfterCritique(state: typeof GraphState.State): "revision" | "final
   return "finalize";
 }
 
+async function checkAndEscalateScript(scriptId: string, supabase: SupabaseAny): Promise<void> {
+  const { count, error: countError } = await supabase
+    .from("chasers")
+    .select("id", { count: "exact", head: true })
+    .eq("script_id", scriptId)
+    .in("status", ["sent", "approved", "edited"]);
+
+  if (countError) {
+    console.error("[escalation] Failed to count chasers:", countError.message);
+    return;
+  }
+
+  if ((count ?? 0) < ESCALATION_THRESHOLD) return;
+
+  const { error: updateError } = await supabase
+    .from("scripts")
+    .update({ status: "escalated" })
+    .eq("id", scriptId);
+
+  if (updateError) {
+    console.error("[escalation] Failed to escalate script:", updateError.message);
+    return;
+  }
+
+  const { error: auditError } = await supabase.from("audit_log").insert({
+    entity_type: "script",
+    entity_id: scriptId,
+    action: "auto_escalated",
+    actor: "system",
+    metadata: { chaser_count: count, threshold: ESCALATION_THRESHOLD },
+  });
+
+  if (auditError) {
+    console.error("[escalation] Failed to insert audit log:", auditError.message);
+  }
+}
+
 async function finalizeNode(state: typeof GraphState.State): Promise<Partial<typeof GraphState.State>> {
   if (!state.chaserId) return {};
 
@@ -114,12 +162,10 @@ async function finalizeNode(state: typeof GraphState.State): Promise<Partial<typ
 
   const updatePayload: Record<string, unknown> = {};
 
-  // Always save the latest draft content
   if (state.generatedEmail) {
     updatePayload.draft_content = state.generatedEmail;
   }
 
-  // Build comprehensive hitl_state with all context
   updatePayload.hitl_state = {
     email_subject: state.emailSubject,
     client_email: state.clientEmail,
@@ -146,6 +192,8 @@ async function finalizeNode(state: typeof GraphState.State): Promise<Partial<typ
       console.error("[finalize] Failed to update chaser:", error.message);
     }
   }
+
+  await checkAndEscalateScript(state.scriptId, supabase);
 
   return {};
 }
@@ -213,6 +261,10 @@ async function deliveryNode(state: typeof GraphState.State): Promise<Partial<typ
     updatePayload.team_lead_edits = state.hitlEditedContent;
   }
 
+  if (state.recommendedChannel) {
+    updatePayload.recommended_channel = state.recommendedChannel;
+  }
+
   const { error } = await supabase.from("chasers").update(updatePayload).eq("id", state.chaserId);
   if (error) {
     console.error("[delivery] Failed to update chaser:", error.message);
@@ -228,6 +280,7 @@ const checkpointer = new SupabaseCheckpointSaver();
 const workflow = new StateGraph(GraphState)
   .addNode("ragRetrieval", ragNode)
   .addNode("sentimentAnalysis", sentimentNode)
+  .addNode("channelStrategy", channelStrategyNode)
   .addNode("generation", generationNode)
   .addNode("selfCritique", critiqueNode)
   .addNode("revision", revisionNode)
@@ -236,7 +289,8 @@ const workflow = new StateGraph(GraphState)
   .addNode("delivery", deliveryNode)
   .addEdge(START, "ragRetrieval")
   .addEdge("ragRetrieval", "sentimentAnalysis")
-  .addEdge("sentimentAnalysis", "generation")
+  .addEdge("sentimentAnalysis", "channelStrategy")
+  .addEdge("channelStrategy", "generation")
   .addEdge("generation", "selfCritique")
   .addConditionalEdges("selfCritique", routeAfterCritique)
   .addEdge("revision", "selfCritique")
@@ -252,6 +306,8 @@ function defaultState(): Partial<AgentState> {
     critiqueScores: null,
     revisionCount: 0,
     nodeExecutionLog: [],
+    recommendedChannel: null,
+    preferredChannel: null,
   };
 }
 

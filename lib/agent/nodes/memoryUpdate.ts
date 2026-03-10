@@ -1,5 +1,6 @@
 import { createServiceClientDirect } from "@/lib/supabase/server";
 import { generateEmbedding } from "./ragRetrieval";
+import { consolidateClientMemories } from "./memoryConsolidate";
 import type { MemoryType } from "@/lib/supabase/types";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -31,6 +32,10 @@ export async function storeClientMemory(
   if (error) {
     console.error("[memory] Failed to store memory:", error.message);
   }
+
+  consolidateClientMemories(clientId).catch((err) => {
+    console.error("[memory] Consolidation check failed:", err instanceof Error ? err.message : err);
+  });
 }
 
 export function buildMemoryContent(

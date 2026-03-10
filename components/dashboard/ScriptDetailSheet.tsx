@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
+import Link from "next/link";
 import { X, ChevronRight, Loader2, Pencil, Send, Save } from "lucide-react";
 import StatusBadge from "@/components/ui/StatusBadge";
 import { cn, formatTimeAgo, formatStatus } from "@/lib/utils";
@@ -280,7 +281,7 @@ export default function ScriptDetailSheet({ script, onClose, onStatusChange, onS
                 {script.client.name.charAt(0).toUpperCase()}
               </div>
               <div>
-                <p className="text-sm text-[var(--text)]">{script.client.name}</p>
+                <Link href={`/clients/${script.client.id}`} className="text-sm text-[var(--text)] hover:underline">{script.client.name}</Link>
                 {script.client.company && (
                   <p className="text-[11px] text-[var(--muted)] opacity-60">{script.client.company}</p>
                 )}

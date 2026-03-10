@@ -2,6 +2,7 @@ import { createServiceClientDirect } from "@/lib/supabase/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { storeClientMemory, buildClientResponseMemory } from "@/lib/agent/nodes/memoryUpdate";
 import { notifyTeam } from "@/lib/notifications/notifyTeam";
+import { isRateLimited } from "@/lib/rateLimit";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type SupabaseAny = any;
@@ -57,6 +58,11 @@ JSON:`,
 }
 
 export async function POST(request: Request) {
+  const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+  if (isRateLimited(ip)) {
+    return twiml("Too many requests, please try again later.");
+  }
+
   const formData = await request.formData();
   const from = formData.get("From")?.toString() ?? "";
   const body = formData.get("Body")?.toString()?.trim() ?? "";

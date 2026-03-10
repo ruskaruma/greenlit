@@ -5,8 +5,8 @@ const integrations = [
   { icon: HardDrive, name: "Google Drive", desc: "Sync scripts and assets from shared drives", connected: true },
   { icon: BookOpen, name: "Notion", desc: "Pull briefs and content calendars automatically", connected: true },
   { icon: Table2, name: "Airtable", desc: "Two-way sync with production tracking bases", connected: true },
-  { icon: Instagram, name: "Instagram API", desc: "Post performance metrics and scheduling", connected: false },
-  { icon: Youtube, name: "YouTube API", desc: "Upload status and analytics integration", connected: false },
+  { icon: Instagram, name: "Instagram API", desc: "Post performance metrics and scheduling", connected: !!process.env.INSTAGRAM_ACCESS_TOKEN },
+  { icon: Youtube, name: "YouTube API", desc: "Upload status and analytics integration", connected: !!process.env.YOUTUBE_API_KEY },
 ];
 
 export default function ToolsPage() {

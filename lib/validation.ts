@@ -20,7 +20,8 @@ const VALID_TRANSITIONS: Record<ScriptStatus, ScriptStatus[]> = {
   changes_requested: ["pending_review"],
   approved: ["closed"],
   rejected: ["pending_review", "draft"],
-  overdue: ["pending_review"],
+  overdue: ["pending_review", "escalated"],
+  escalated: ["pending_review", "draft"],
   closed: ["draft"],
 };
 

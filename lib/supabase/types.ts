@@ -5,6 +5,7 @@ export type ScriptStatus =
   | "approved"
   | "rejected"
   | "overdue"
+  | "escalated"
   | "closed";
 
 export type ChaserStatus =

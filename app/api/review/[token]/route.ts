@@ -2,15 +2,25 @@ import { NextResponse } from "next/server";
 import { createServiceClientDirect } from "@/lib/supabase/server";
 import { storeClientMemory, buildClientResponseMemory } from "@/lib/agent/nodes/memoryUpdate";
 import { notifyTeam } from "@/lib/notifications/notifyTeam";
+import { isRateLimited } from "@/lib/rateLimit";
 import type { ScriptStatus } from "@/lib/supabase/types";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type SupabaseAny = any;
 
+function extractIp(request: Request): string {
+  return request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+}
+
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ token: string }> }
 ) {
+  const ip = extractIp(request);
+  if (isRateLimited(ip)) {
+    return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+  }
+
   const { token } = await params;
   const supabase: SupabaseAny = createServiceClientDirect();
 
@@ -34,6 +44,11 @@ export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ token: string }> }
 ) {
+  const ip = extractIp(request);
+  if (isRateLimited(ip)) {
+    return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+  }
+
   const { token } = await params;
   const supabase: SupabaseAny = createServiceClientDirect();
   const body = await request.json();

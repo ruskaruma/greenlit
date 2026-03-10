@@ -24,6 +24,8 @@ export interface AgentState {
   // HITL interrupt/resume (set during graph execution, not required at init)
   hitlAction?: string | null;
   hitlEditedContent?: string | null;
+  recommendedChannel?: string | null;
+  preferredChannel?: string | null;
 }
 
 export interface CritiqueScores {
